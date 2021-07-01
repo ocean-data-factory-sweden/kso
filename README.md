@@ -1,4 +1,4 @@
-# YoloV3 PyTorch Implementation - Koster
+# YoloV4 (YoloV5 - Ultralytics)  PyTorch Implementation - Koster
 
 Simple overview of use/purpose.
 
