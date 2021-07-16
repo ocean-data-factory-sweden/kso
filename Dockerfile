@@ -21,7 +21,8 @@ COPY . /usr/src/app
 
 # Set environment variables
 ENV HOME=/usr/src/app
-
+ENV WANDB_DIR=/cephyr/NOBACKUP/groups/snic2021-6-9/
+ENV WANDB_CACHE_DIR=/cephyr/NOBACKUP/groups/snic2021-6-9/
 
 # Usage Examples -------------------------------------------------------------------------------------------------------
 

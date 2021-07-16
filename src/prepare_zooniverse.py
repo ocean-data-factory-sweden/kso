@@ -125,6 +125,7 @@ def main():
     else:
         species_ref = pd.read_sql_query(f"SELECT id FROM species", conn)["id"].tolist()
 
+
     if len(args.class_list) == 1:
         train_rows = pd.read_sql_query(
             f"SELECT b.filename, b.frame_number, a.species_id, a.x_position, a.y_position, a.width, a.height FROM \
@@ -236,7 +237,7 @@ def main():
     )
 
     # See species frame distribution
-    print(full_rows.groupby("species_id").count())
+    #print(full_rows.groupby("species_id").count())
 
     # Create output folder
     if not os.path.isdir(args.out_path):
@@ -261,20 +262,22 @@ def main():
 
     data = dict(
         train=str(Path(args.out_path, "train.txt")),
-        valid=str(Path(args.out_path, "valid.txt")),
+        val=str(Path(args.out_path, "valid.txt")),
         nc=len(args.class_list),
-        names=args.class_list,
+        names=species_list,
     )
 
     with open(Path(args.out_path, "koster.yaml"), "w") as outfile:
-        yaml.dump(data, outfile, default_flow_style=False)
+        yaml.dump(data, outfile, default_flow_style=None)
 
     species_df = pd.read_sql_query(
-        f"SELECT id, label FROM species WHERE label=='{args.class_list[0]}'", conn
+        f"SELECT id, label FROM species", conn
     )
 
+    species_df["clean_label"] = species_df.label.apply(clean_species_name)
+
     sp_id2mod_id = {
-        species_df[species_df.label == species_list[i]]["id"]: i
+        species_df[species_df.clean_label == species_list[i]].id.values[0]: i
         for i in range(len(species_list))
     }
 
@@ -310,6 +313,9 @@ def main():
     print("Frames extracted successfully")
 
     # Clear images
+    if len(full_rows) == 0:
+        raise Exception("No frames found for the selected species. Please retry with a different configuration.")
+    
     process_frames(args.out_path + "/images", size=tuple(args.img_size))
 
     # Create training/test sets
