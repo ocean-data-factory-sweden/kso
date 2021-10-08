@@ -21,7 +21,8 @@ def process_frames(frames_path, size=(416, 416)):
 
 
 def process_path(path):
-    return os.path.basename(re.split("_[0-9]+", path)[0]).replace("_frame", "") + ".mov"
+    print(path)
+    return os.path.basename(re.split("_[0-9]+", path)[0]).replace("_frame", "")
 
 def split_frames(data_path, perc_test):
     dataset_path = Path(data_path)
@@ -112,6 +113,8 @@ def main():
 
     args = parser.parse_args()
     conn = create_connection(args.db_path)
+    
+    args.class_list = [i.replace(",", "").replace("[", "").replace("]", "") for i in args.class_list]
 
     if len(args.class_list) > 0:
         if len(args.class_list) == 1:
@@ -128,15 +131,15 @@ def main():
 
     if len(args.class_list) == 1:
         train_rows = pd.read_sql_query(
-            f"SELECT b.filename, b.frame_number, a.species_id, a.x_position, a.y_position, a.width, a.height FROM \
-            agg_annotations_frame AS a LEFT JOIN subjects AS b ON a.subject_id=b.id WHERE \
-            species_id=='{tuple(species_ref)[0]}'",
+            f"SELECT a.subject_id, b.id, b.movie_id, b.frame_number, a.species_id, a.x_position, a.y_position, a.width, a.height FROM \
+            agg_annotations_frame AS a INNER JOIN subjects AS b ON a.subject_id=b.id WHERE \
+            species_id=='{tuple(species_ref)[0]}' AND subject_type='frame'",
             conn,
         )
     else:
         train_rows = pd.read_sql_query(
-            f"SELECT b.filename, b.frame_number, a.species_id, a.x_position, a.y_position, a.width, a.height FROM \
-            agg_annotations_frame AS a LEFT JOIN subjects AS b ON a.subject_id=b.id WHERE species_id IN {tuple(species_ref)}",
+            f"SELECT b.frame_number, b.movie_id, a.species_id, a.x_position, a.y_position, a.width, a.height FROM \
+            agg_annotations_frame AS a INNER JOIN subjects AS b ON a.subject_id=b.id WHERE species_id IN {tuple(species_ref)} AND subject_type='frame'",
             conn,
         )
 
@@ -144,10 +147,13 @@ def main():
     bboxes = {}
     tboxes = {}
     new_rows = []
-
-    train_rows["movie_path"] = (
-        args.movie_dir + "/" + train_rows["filename"].apply(lambda x: process_path(x))
-    )
+    
+    movie_df = pd.read_sql_query("SELECT id, fpath FROM movies", conn)
+    
+    train_rows["movie_path"] = train_rows.merge(movie_df, 
+                                              left_on="movie_id", right_on="id", how='left')["fpath"]
+    
+    #train_rows["movie_path"] = args.movie_dir + '/' + train_rows["filename"].apply(process_path)
 
     video_dict = {}
     for i in train_rows["movie_path"].unique():
@@ -158,10 +164,12 @@ def main():
                 video_dict[unswedify(i)] = pims.Video(unswedify(i))
             except:
                 print("Missing file", i)
+                
+    
+                
 
     train_rows = train_rows[
         [
-            "filename",
             "species_id",
             "frame_number",
             "movie_path",
@@ -171,18 +179,20 @@ def main():
             "height",
         ]
     ]
+    
+    
 
     for name, group in tqdm(
-        train_rows.groupby(["filename", "species_id", "frame_number", "movie_path"])
+        train_rows.groupby(["movie_path", "frame_number", "species_id"])
     ):
-        filename, species_id, frame_number, movie_path = name[:4]
-        named_tuple = tuple([filename, species_id, frame_number, movie_path])
+        movie_path, frame_number, species_id = name[:3]
+        named_tuple = tuple([species_id, frame_number, movie_path])
 
         # Track intermediate frames
-        final_name = name[3] if name[3] in video_dict else unswedify(name[3])
+        final_name = name[0] if name[0] in video_dict else unswedify(name[0])
         if final_name in video_dict:
             bboxes[named_tuple], tboxes[named_tuple] = [], []
-            bboxes[named_tuple].extend(tuple(i[4:]) for i in group.values)
+            bboxes[named_tuple].extend(tuple(i[3:]) for i in group.values)
             tboxes[named_tuple].extend(
                 frame_tracker.track_objects(
                     video_dict[final_name],
@@ -196,7 +206,6 @@ def main():
             for box in bboxes[named_tuple]:
                 new_rows.append(
                     (
-                        filename,
                         species_id,
                         frame_number,
                         movie_path,
@@ -209,7 +218,6 @@ def main():
             for box in tboxes[named_tuple]:
                 new_rows.append(
                     (
-                        filename,
                         species_id,
                         frame_number + box[0],
                         movie_path,
@@ -223,7 +231,6 @@ def main():
     full_rows = pd.DataFrame(
         new_rows,
         columns=[
-            "filename",
             "species_id",
             "frame",
             "movie_path",
@@ -281,22 +288,22 @@ def main():
         for i in range(len(species_list))
     }
 
-    for name, groups in full_rows.groupby(["filename", "frame", "movie_path"]):
-        file, ext = os.path.splitext(name[2])
+    for name, groups in full_rows.groupby(["frame", "movie_path"]):
+        file, ext = os.path.splitext(name[1])
         file_base = os.path.basename(file)
         # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
         if args.out_format == "yolo":
-            open(f"{args.out_path}/labels/{file_base}_frame_{name[1]}.txt", "w").write(
+            open(f"{args.out_path}/labels/{file_base}_frame_{name[0]}.txt", "w").write(
                 "\n".join(
                     [
                         "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
                             0
                             if len(args.class_list) == 1
-                            else sp_id2mod_id[i[1]],  # single class vs multiple classes
+                            else sp_id2mod_id[i[0]],  # single class vs multiple classes
+                            min((i[5] + i[7] / 2) / i[3], 1.0),
                             min((i[6] + i[8] / 2) / i[4], 1.0),
-                            min((i[7] + i[9] / 2) / i[5], 1.0),
+                            min(i[7] / i[3], 1.0),
                             min(i[8] / i[4], 1.0),
-                            min(i[9] / i[5], 1.0),
                         )
                         for i in groups.values
                     ]
@@ -304,10 +311,10 @@ def main():
             )
 
         # Save frames to image files
-        save_name = name[2] if name[2] in video_dict else unswedify(name[2])
+        save_name = name[1] if name[1] in video_dict else unswedify(name[1])
         if save_name in video_dict:
-            Image.fromarray(video_dict[save_name][name[1]][:, :, [2, 1, 0]]).save(
-                f"{args.out_path}/images/{file_base}_frame_{name[1]}.jpg"
+            Image.fromarray(video_dict[save_name][name[0]][:, :, [2, 1, 0]]).save(
+                f"{args.out_path}/images/{file_base}_frame_{name[0]}.jpg"
             )
 
     print("Frames extracted successfully")
@@ -315,7 +322,6 @@ def main():
     # Clear images
     if len(full_rows) == 0:
         raise Exception("No frames found for the selected species. Please retry with a different configuration.")
-    
     process_frames(args.out_path + "/images", size=tuple(args.img_size))
 
     # Create training/test sets

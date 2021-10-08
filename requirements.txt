@@ -33,7 +33,14 @@ pandas
 # onnx>=1.9.0
 # scikit-learn==0.19.2  # for coreml quantization
 
-# extras --------------------------------------
+# extras -------------------------------------
 # Cython  # for pycocotools https://github.com/cocodataset/cocoapi/issues/172
 # pycocotools>=2.0  # COCO mAP
 thop  # FLOPs computation
+
+#tutorial extras
+ipyfilechooser
+gdown
+itables
+getpass
+
