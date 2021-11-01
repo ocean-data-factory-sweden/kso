@@ -1,4 +1,4 @@
-# YoloV4 (YoloV5 - Ultralytics)  PyTorch Implementation - Koster Seafloor Observatory
+# KSO Object Detection models
 
 This is a custom implementation of YOLOv5 by Ultralytics for use with Koster pipelines and data management services. 
 
@@ -11,10 +11,6 @@ will be periodically updated as necessary.
 
 Jurie Germishuys
 Victor Anton
-
-ex. Dominique Pizzie  
-ex. [@DomPizzie](https://twitter.com/dompizzie)
-
 
 Inspiration, code snippets, etc.
 * [YoloV5](https://github.com/ultralytics/yolov5)
