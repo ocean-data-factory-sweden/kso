@@ -3,14 +3,14 @@ import os, re, json, argparse, glob, pims, random, shutil, yaml
 import pandas as pd
 import numpy as np
 import frame_tracker
+
 from collections import OrderedDict, Counter
 from pathlib import Path
 from functools import partial
 from ast import literal_eval
 from tqdm import tqdm
-
 from PIL import Image
-from db_utils import create_connection, unswedify, clean_species_name
+from tutorial_utils.db_utils import create_connection, unswedify, clean_species_name
 from prepare_input import ProcFrameCuda, ProcFrames
 
 # utility functions
