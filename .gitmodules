@@ -1,0 +1,3 @@
+[submodule "kso_utils"]
+	path = kso_utils
+	url = https://github.com/ocean-data-factory-sweden/kso_utils.git
