@@ -37,7 +37,7 @@ jobs:
           context: .
           # Note: tags has to be all lower-case
           tags: |
-            jannesg/koster_yolov4:latest 
+            jannesg/koster-yolov4:latest 
           # build on feature branches, push only on main branch
           push: ${{ github.ref == 'refs/heads/master' }}
 
