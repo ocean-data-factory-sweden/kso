@@ -54,8 +54,6 @@ def track_objects(video, class_ids, bboxes, start_frame, last_frame):
     multiTracker = cv2.legacy.MultiTracker_create()
 
     # Extract relevant frame
-    # reader = Videos()
-    # video = reader.read([videoPath])
     frame = video[start_frame]  # [0]
 
     # Initialize MultiTracker
