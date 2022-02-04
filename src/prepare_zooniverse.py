@@ -57,25 +57,25 @@ def split_frames(data_path, perc_test):
 
     # Populate train.txt and test.txt
     counter = 1
-    index_test = int((1-perc_test) * len(os.listdir(images_path)))
+    index_test = int((1-perc_test) * len([s for s in os.listdir(images_path) if s.endswith('.jpg')]))
     latest_movie = ""
     for pathAndFilename in glob.iglob(os.path.join(images_path, "*.jpg")):
         title, ext = os.path.splitext(os.path.basename(pathAndFilename))
         movie_name = title.replace("_frame_*", "")
-
-        if counter == index_test + 1:
+        
+        if counter >= index_test + 1:
             # Avoid leaking frames into test set
             if movie_name != latest_movie or movie_name == title:
-                file_test.write(pathAndFilename + "\n")
+                file_valid.write(pathAndFilename + "\n")
             else:
                 file_train.write(pathAndFilename + "\n")
             counter += 1
         else:
             latest_movie = movie_name
-            if random.uniform(0, 1) <= 0.5:
-                file_train.write(pathAndFilename + "\n")
-            else:
-                file_valid.write(pathAndFilename + "\n")
+            #if random.uniform(0, 1) <= 0.5:
+            #    file_train.write(pathAndFilename + "\n")
+            #else:
+            file_train.write(pathAndFilename + "\n")
             counter += 1
 
 def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_list, img_size: tuple, out_format: str = "yolo"):
@@ -239,8 +239,8 @@ def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_lis
                     (
                         species_id,
                         filename,
-                        PIL.Image.open(filename).size[1],
                         PIL.Image.open(filename).size[0],
+                        PIL.Image.open(filename).size[1],
                     )
                     + box
                 )
@@ -259,6 +259,7 @@ def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_lis
                 "h",
             ],
         )
+        print(len(full_rows))
 
 
     # Create output folder
@@ -385,26 +386,30 @@ def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_lis
             file_base = os.path.basename(file)
             # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
             if out_format == "yolo":
-                open(f"{out_path}/labels/{file_base}.txt", "w").write(
-                    "\n".join(
-                        [
-                            "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
-                                0
-                                if len(class_list) == 1
-                                else sp_id2mod_id[i[speciesid_pos]],  # single class vs multiple classes
-                                min((i[x_pos] + i[w_pos] / 2) / i[fw_pos], 1.0),
-                                min((i[y_pos] + i[h_pos] / 2) / i[fh_pos], 1.0),
-                                min(i[w_pos] / i[fw_pos], 1.0),
-                                min(i[h_pos] / i[fh_pos], 1.0),
-                            )
-                            for i in groups.values
-                        ]
+                if len(groups.values) == 1 and str(groups.values[0][-1]) == "nan":
+                    open(f"{out_path}/labels/{file_base}.txt", "w")
+                else:
+                    groups = [i for i in groups.values if str(i[-1]) != "nan"]
+                    open(f"{out_path}/labels/{file_base}.txt", "w").write(
+                        "\n".join(
+                            [
+                                "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
+                                    0
+                                    if len(class_list) == 1
+                                    else sp_id2mod_id[i[speciesid_pos]],  # single class vs multiple classes
+                                    min((i[x_pos] + i[w_pos] / 2) / i[fw_pos], 1.0),
+                                    min((i[y_pos] + i[h_pos] / 2) / i[fh_pos], 1.0),
+                                    min(i[w_pos] / i[fw_pos], 1.0),
+                                    min(i[h_pos] / i[fh_pos], 1.0),
+                                )
+                                for i in groups
+                            ]
+                        )
                     )
-                )
 
             # Save frames to image files
             save_name = name
-            Image.fromarray(np.asarray(PIL.Image.open(save_name))[:, :, [2, 1, 0]]).save(
+            Image.fromarray(np.asarray(PIL.Image.open(save_name))).save(
                 f"{out_path}/images/{file_base}.jpg"
             )
 
