@@ -15,7 +15,7 @@ from tqdm import tqdm
 from PIL import Image
 from kso_utils.db_utils import create_connection
 from kso_utils.koster_utils import unswedify
-from kso_utils.t4_utils import retrieve_movie_info_from_server
+from kso_utils.t3_utils import retrieve_movie_info_from_server
 import kso_utils.tutorials_utils as t_utils
 from src.prepare_input import ProcFrameCuda, ProcFrames
 
