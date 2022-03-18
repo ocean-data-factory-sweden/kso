@@ -486,6 +486,7 @@ def main():
     
     args.class_list = [i.replace(",", "").replace("[", "").replace("]", "") for i in args.class_list]
 
+    # Select the id/s of species of interest
     if len(args.class_list) > 0:
         if len(args.class_list) == 1:
             species_ref = pd.read_sql_query(
@@ -499,6 +500,7 @@ def main():
         species_ref = pd.read_sql_query(f"SELECT id FROM species", conn)["id"].tolist()
 
 
+    # Select the aggregated classifications from the species of interest
     if len(args.class_list) == 1:
         train_rows = pd.read_sql_query(
             f"SELECT a.subject_id, b.id, b.movie_id, b.frame_number, a.species_id, a.x_position, a.y_position, a.width, a.height FROM \
