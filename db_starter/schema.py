@@ -25,6 +25,18 @@ UNIQUE (filename),
 FOREIGN KEY (site_id) REFERENCES sites (id)
 ); 
 
+CREATE TABLE IF NOT EXISTS photos
+(
+id integer PRIMARY KEY,
+filename text NOT NULL,
+created_on datetime NULL,
+site_id integer NULL,
+fpath text NULL,
+UNIQUE (filename),
+FOREIGN KEY (site_id) REFERENCES sites (id)
+); 
+
+
 CREATE TABLE IF NOT EXISTS subjects
 (
 id integer PRIMARY KEY,

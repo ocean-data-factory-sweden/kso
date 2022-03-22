@@ -1,5 +1,5 @@
 # module imports
-import os, re, json, argparse, glob, pims, random, shutil, yaml
+import os, re, glob, pims, shutil, yaml
 import pandas as pd
 import numpy as np
 import src.frame_tracker
@@ -7,16 +7,15 @@ import logging
 import datetime
 import PIL
 
-from collections import OrderedDict, Counter
 from pathlib import Path
 from functools import partial
-from ast import literal_eval
 from tqdm import tqdm
 from PIL import Image
 from kso_utils.db_utils import create_connection
 from kso_utils.koster_utils import unswedify
 from kso_utils.t3_utils import retrieve_movie_info_from_server
 import kso_utils.tutorials_utils as t_utils
+from kso_utils.t4_utils import get_species_ids, get_movie_url
 from src.prepare_input import ProcFrameCuda, ProcFrames
 
 # Logging
@@ -52,7 +51,7 @@ def split_frames(data_path, perc_test):
 
     # Create and/or truncate train.txt and test.txt
     file_train = open(Path(data_path, "train.txt"), "w")
-    file_test = open(Path(data_path, "test.txt"), "w")
+    #file_test = open(Path(data_path, "test.txt"), "w")
     file_valid = open(Path(data_path, "valid.txt"), "w")
 
     # Populate train.txt and test.txt
@@ -78,28 +77,24 @@ def split_frames(data_path, perc_test):
             file_train.write(pathAndFilename + "\n")
             counter += 1
 
-def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_list, img_size: tuple, out_format: str = "yolo"):
+
+def frame_aggregation(project, db_info_dict: dict, out_path: str, 
+                      perc_test: float, class_list: list, img_size: tuple,
+                      out_format: str = "yolo", remove_nulls: bool = True, 
+                      track_frames: bool = True, n_tracked_frames: int = 10):
     """
     Track frames and save to out_path
     """
     # Establish connection to database
-    conn = create_connection(db_info_dict["db_path"])
-    # Process class list for SQL query    
-    class_list = [i.replace(",", "").replace("[", "").replace("]", "") for i in class_list]
+    conn = create_connection(db_info_dict["db_path"])   
 
-    if len(class_list) > 0:
-        if len(class_list) == 1:
-            species_ref = pd.read_sql_query(
-                f"SELECT id FROM species WHERE label=='{class_list[0]}'", conn
-            )["id"].tolist()
-        else:
-            species_ref = pd.read_sql_query(
-                f"SELECT id FROM species WHERE label IN {tuple(class_list)}", conn
-            )["id"].tolist()
+    # Select the id/s of species of interest
+    if class_list[0] == "":
+        logging.error("No species were selected. Please select at least one species before continuing.")
     else:
-        species_ref = pd.read_sql_query(f"SELECT id FROM species", conn)["id"].tolist()
+        species_ref = get_species_ids(project, class_list)
 
-
+    # Select the aggregated classifications from the species of interest
     if len(class_list) == 1:
         train_rows = pd.read_sql_query(
             f"SELECT a.subject_id, b.id, b.movie_id, b.filename, b.frame_number, a.species_id, a.x_position, a.y_position, a.width, a.height FROM \
@@ -115,152 +110,18 @@ def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_lis
         )
         
     # Remove null annotations
-    train_rows = train_rows.dropna(subset=["x_position", "y_position", "width", "height"])
+    if remove_nulls:
+        train_rows = train_rows.dropna(subset=["x_position", "y_position", "width", "height"])
+        
+    if len(train_rows) == 0:
+        logging.error("No frames left. Please adjust aggregation parameters.")
 
     # Add dataset metadata to dataset table in koster db
     bboxes = {}
     tboxes = {}
-    new_rows = []
     
-    movie_df = retrieve_movie_info_from_server(project_name=project_name, db_info_dict=db_info_dict)
-    movie_folder = t_utils.get_project_info(project_name, "movie_folder")
-    
-    if not movie_folder == "None":
-        
-        train_rows["movie_path"] = movie_folder + train_rows.merge(movie_df, 
-                                              left_on="movie_id", right_on="id", how='left')["fpath"]
-        video_dict = {}
-        for i in train_rows["movie_path"].unique():
-            try:
-                video_dict[i] = pims.Video(i)
-            except:
-                try:
-                    video_dict[unswedify(i)] = pims.Video(unswedify(i))
-                except:
-                    logging.warning("Missing file"+f"{i}")
-                
-        train_rows = train_rows[
-            [
-                "species_id",
-                "frame_number",
-                "movie_path",
-                "x_position",
-                "y_position",
-                "width",
-                "height",
-            ]
-        ]
-
-        for name, group in tqdm(
-            train_rows.groupby(["movie_path", "frame_number", "species_id"])
-        ):
-            movie_path, frame_number, species_id = name[:3]
-            named_tuple = tuple([species_id, frame_number, movie_path])
-
-            # Track intermediate frames
-            final_name = name[0] if name[0] in video_dict else unswedify(name[0])
-            if final_name in video_dict:
-                bboxes[named_tuple], tboxes[named_tuple] = [], []
-                bboxes[named_tuple].extend(tuple(i[3:]) for i in group.values)
-                tboxes[named_tuple].extend(
-                    src.frame_tracker.track_objects(
-                        video_dict[final_name],
-                        species_id,
-                        bboxes[named_tuple],
-                        frame_number,
-                        frame_number + 10,
-                    )
-                )
-
-                for box in bboxes[named_tuple]:
-                    new_rows.append(
-                        (
-                            species_id,
-                            frame_number,
-                            movie_path,
-                            video_dict[final_name][frame_number].shape[1],
-                            video_dict[final_name][frame_number].shape[0],
-                        )
-                        + box
-                    )
-
-                for box in tboxes[named_tuple]:
-                    new_rows.append(
-                        (
-                            species_id,
-                            frame_number + box[0],
-                            movie_path,
-                            video_dict[final_name][frame_number].shape[1],
-                            video_dict[final_name][frame_number].shape[0],
-                        )
-                        + box[1:]
-                    )
-
-        # Export txt files
-        full_rows = pd.DataFrame(
-            new_rows,
-            columns=[
-                "species_id",
-                "frame",
-                "movie_path",
-                "f_w",
-                "f_h",
-                "x",
-                "y",
-                "w",
-                "h",
-            ],
-        )
-    else:
-        train_rows = train_rows[
-            [
-                "species_id",
-                "filename",
-                "x_position",
-                "y_position",
-                "width",
-                "height",
-            ]
-        ]
-
-        for name, group in tqdm(
-            train_rows.groupby(["filename", "species_id"])
-        ):
-            filename, species_id = name[:2]
-            filename = t_utils.get_project_info(project_name, "frame_folder") + filename
-            named_tuple = tuple([species_id, filename])
-
-            # Track intermediate frames
-            bboxes[named_tuple] = []
-            bboxes[named_tuple].extend(tuple(i[2:]) for i in group.values)
-
-            for box in bboxes[named_tuple]:
-                new_rows.append(
-                    (
-                        species_id,
-                        filename,
-                        PIL.Image.open(filename).size[0],
-                        PIL.Image.open(filename).size[1],
-                    )
-                    + box
-                )
-
-        # Export txt files
-        full_rows = pd.DataFrame(
-            new_rows,
-            columns=[
-                "species_id",
-                "filename",
-                "f_w",
-                "f_h",
-                "x",
-                "y",
-                "w",
-                "h",
-            ],
-        )
-        print(len(full_rows))
-
+    # Get movie info from server
+    movie_df = retrieve_movie_info_from_server(project=project, db_info_dict=db_info_dict)
 
     # Create output folder
     if not os.path.isdir(out_path):
@@ -291,7 +152,7 @@ def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_lis
         names=species_list,
     )
 
-    with open(Path(out_path, f"{project_name+'_'+datetime.datetime.now().strftime('%H:%M:%S')}.yaml"), "w") as outfile:
+    with open(Path(out_path, f"{project.Project_name+'_'+datetime.datetime.now().strftime('%H:%M:%S')}.yaml"), "w") as outfile:
         yaml.dump(data, outfile, default_flow_style=None)
 
     # Write hyperparameters default file (default hyperparameters from https://github.com/ultralytics/yolov5/blob/master/data/hyps/hyp.scratch.yaml)
@@ -331,7 +192,7 @@ def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_lis
 
     # Clean species names
     species_df = pd.read_sql_query(
-        f"SELECT id, label FROM species", conn
+        "SELECT id, label FROM species", conn
     )
     species_df["clean_label"] = species_df.label.apply(clean_species_name)
 
@@ -340,8 +201,108 @@ def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_lis
         for i in range(len(species_list))
     }
 
-    if not movie_folder == "None":
-        for name, groups in full_rows.groupby(["frame", "movie_path"]):
+    # If at least one movie is linked to the project
+    if len(movie_df) > 0:
+        
+        train_rows["movie_path"] = train_rows.merge(movie_df, 
+                                                left_on="movie_id", right_on="id", how='left')["spath"]
+
+        train_rows["movie_path"] = train_rows["movie_path"].apply(lambda x: get_movie_url(project, db_info_dict, x))
+        
+        video_dict = {}
+        for i in train_rows["movie_path"].unique():
+            try:
+                video_dict[i] = pims.Video(i)
+            except FileNotFoundError:
+                try:
+                    video_dict[unswedify(str(i))] = pims.Video(unswedify(str(i)))
+                except:
+                    logging.warning("Missing file"+f"{i}")
+                
+        # Ensure column order
+        train_rows = train_rows[
+            [
+                "species_id",
+                "frame_number",
+                "movie_path",
+                "x_position",
+                "y_position",
+                "width",
+                "height",
+            ]
+        ]
+
+        new_rows = []
+        bboxes = {}
+        tboxes = {}
+
+
+        # Create full rows
+        for name, group in tqdm(
+                train_rows.groupby(["movie_path", "frame_number", "species_id"])
+            ):
+                movie_path, frame_number, species_id = name[:3]
+                named_tuple = tuple([species_id, frame_number, movie_path])
+
+                final_name = name[0] if name[0] in video_dict else unswedify(name[0])
+                if frame_number > len(video_dict[final_name]):
+                    print(f"Frame out of range for video of length {len(video_dict[final_name])}")
+                    frame_number = frame_number // 2
+                if final_name in video_dict:
+                    bboxes[named_tuple], tboxes[named_tuple] = [], []
+                    bboxes[named_tuple].extend(tuple(i[3:]) for i in group.values)
+
+                    for box in bboxes[named_tuple]:
+                        new_rows.append(
+                            (
+                                species_id,
+                                frame_number,
+                                movie_path,
+                                video_dict[final_name][frame_number].shape[1],
+                                video_dict[final_name][frame_number].shape[0],
+                            )
+                            + box
+                        )
+                    if track_frames:
+                        # Track n frames after object is detected
+                        tboxes[named_tuple].extend(
+                            src.frame_tracker.track_objects(
+                                video_dict[final_name],
+                                species_id,
+                                bboxes[named_tuple],
+                                frame_number,
+                                frame_number + n_tracked_frames,
+                            )
+                        )
+                        for box in tboxes[named_tuple]:
+                            new_rows.append(
+                                (
+                                    species_id,
+                                    frame_number + box[0],
+                                    movie_path,
+                                    video_dict[final_name][frame_number].shape[1],
+                                    video_dict[final_name][frame_number].shape[0],
+                                )
+                                + box[1:]
+                            )
+        
+        # Export full rows
+        full_rows = pd.DataFrame(
+            new_rows,
+            columns=[
+                "species_id",
+                "frame_number",
+                "filename",
+                "f_w",
+                "f_h",
+                "x",
+                "y",
+                "w",
+                "h",
+            ],
+        )
+
+        for name, groups in full_rows.groupby(["frame_number", "filename"]):
             file, ext = os.path.splitext(name[1])
             file_base = os.path.basename(file)
             # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
@@ -370,6 +331,57 @@ def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_lis
                     f"{out_path}/images/{file_base}_frame_{name[0]}.jpg"
                 )
     else:
+        train_rows = train_rows[
+            [
+                "species_id",
+                "filename",
+                "x_position",
+                "y_position",
+                "width",
+                "height",
+            ]
+        ]
+        
+        new_rows = []
+        bboxes = {}
+        tboxes = {}
+
+        for name, group in tqdm(
+            train_rows.groupby(["filename", "species_id"])
+        ):
+            filename, species_id = name[:2]
+            filename = project.photo_folder + filename
+            named_tuple = tuple([species_id, filename])
+
+            # Track intermediate frames
+            bboxes[named_tuple] = []
+            bboxes[named_tuple].extend(tuple(i[2:]) for i in group.values)
+
+            for box in bboxes[named_tuple]:
+                new_rows.append(
+                    (
+                        species_id,
+                        filename,
+                        PIL.Image.open(filename).size[0],
+                        PIL.Image.open(filename).size[1],
+                    )
+                    + box
+                )
+                
+        full_rows = pd.DataFrame(
+            new_rows,
+            columns=[
+                "species_id",
+                "filename",
+                "f_w",
+                "f_h",
+                "x",
+                "y",
+                "w",
+                "h",
+            ],
+        )
+
         col_list = list(full_rows.columns)
         fw_pos, fh_pos, x_pos, y_pos, w_pos, h_pos, speciesid_pos = (
             col_list.index("f_w"),
@@ -381,6 +393,7 @@ def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_lis
             col_list.index("species_id"),
         )
         
+        # Export full rows
         for name, groups in full_rows.groupby(["filename"]):
             file, ext = os.path.splitext(name)
             file_base = os.path.basename(file)
@@ -415,282 +428,12 @@ def frame_aggregation(project_name, db_info_dict, out_path, perc_test, class_lis
 
     logging.info("Frames extracted successfully")
 
-    # Clear images
+    
     if len(full_rows) == 0:
         raise Exception("No frames found for the selected species. Please retry with a different configuration.")
+    
+    # Pre-process frames
     process_frames(out_path + "/images", size=tuple(img_size))
 
     # Create training/test sets
     split_frames(out_path, perc_test)
-
-def main():
-    "Handles argument parsing and launches the correct function."
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--out_path",
-        "-o",
-        help="output to txt files in YOLO format",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "--out_format",
-        "-f",
-        help="format of annotations for export",
-        type=str,
-        default=r"yolo",
-    )
-    parser.add_argument(
-        "--class_list",
-        "-c",
-        help="list of classes to use for dataset",
-        type=str,
-        nargs="*",
-        default="",
-    )
-    parser.add_argument(
-        "-db",
-        "--db_path",
-        type=str,
-        help="the absolute path to the database file",
-        default=r"koster_lab.db",
-        required=True,
-    )
-    parser.add_argument(
-        "-m",
-        "--movie_dir",
-        type=str,
-        help="the directory of movie files",
-        default=r"/uploads/",
-        required=True,
-    )
-    parser.add_argument(
-        "-pt",
-        "--perc_test",
-        type=float,
-        help="proportion of data to use for testing",
-        default=0.2,
-        required=True,
-    )
-    parser.add_argument(
-        "-img",
-        "--img_size",
-        type=int,
-        help="image size for model training",
-        nargs="+",
-        required=True,
-    )
-
-    args = parser.parse_args()
-    conn = create_connection(args.db_path)
-    
-    args.class_list = [i.replace(",", "").replace("[", "").replace("]", "") for i in args.class_list]
-
-    # Select the id/s of species of interest
-    if len(args.class_list) > 0:
-        if len(args.class_list) == 1:
-            species_ref = pd.read_sql_query(
-                f"SELECT id FROM species WHERE label=='{args.class_list[0]}'", conn
-            )["id"].tolist()
-        else:
-            species_ref = pd.read_sql_query(
-                f"SELECT id FROM species WHERE label IN {tuple(args.class_list)}", conn
-            )["id"].tolist()
-    else:
-        species_ref = pd.read_sql_query(f"SELECT id FROM species", conn)["id"].tolist()
-
-
-    # Select the aggregated classifications from the species of interest
-    if len(args.class_list) == 1:
-        train_rows = pd.read_sql_query(
-            f"SELECT a.subject_id, b.id, b.movie_id, b.frame_number, a.species_id, a.x_position, a.y_position, a.width, a.height FROM \
-            agg_annotations_frame AS a INNER JOIN subjects AS b ON a.subject_id=b.id WHERE \
-            species_id=='{tuple(species_ref)[0]}' AND subject_type='frame'",
-            conn,
-        )
-    else:
-        train_rows = pd.read_sql_query(
-            f"SELECT b.frame_number, b.movie_id, a.species_id, a.x_position, a.y_position, a.width, a.height FROM \
-            agg_annotations_frame AS a INNER JOIN subjects AS b ON a.subject_id=b.id WHERE species_id IN {tuple(species_ref)} AND subject_type='frame'",
-            conn,
-        )
-
-    # Add dataset metadata to dataset table in koster db
-    bboxes = {}
-    tboxes = {}
-    new_rows = []
-    
-    movie_df = pd.read_sql_query("SELECT id, fpath FROM movies", conn)
-    
-    train_rows["movie_path"] = train_rows.merge(movie_df, 
-                                              left_on="movie_id", right_on="id", how='left')["fpath"]
-    
-    #train_rows["movie_path"] = args.movie_dir + '/' + train_rows["filename"].apply(process_path)
-
-    video_dict = {}
-    for i in train_rows["movie_path"].unique():
-        try:
-            video_dict[i] = pims.Video(i)
-        except:
-            try:
-                video_dict[unswedify(i)] = pims.Video(unswedify(i))
-            except:
-                logging.warning("Missing file"+f"{i}")
-                
-    train_rows = train_rows[
-        [
-            "species_id",
-            "frame_number",
-            "movie_path",
-            "x_position",
-            "y_position",
-            "width",
-            "height",
-        ]
-    ]
-    
-    for name, group in tqdm(
-        train_rows.groupby(["movie_path", "frame_number", "species_id"])
-    ):
-        movie_path, frame_number, species_id = name[:3]
-        named_tuple = tuple([species_id, frame_number, movie_path])
-
-        # Track intermediate frames
-        final_name = name[0] if name[0] in video_dict else unswedify(name[0])
-        if final_name in video_dict:
-            bboxes[named_tuple], tboxes[named_tuple] = [], []
-            bboxes[named_tuple].extend(tuple(i[3:]) for i in group.values)
-            tboxes[named_tuple].extend(
-                src.frame_tracker.track_objects(
-                    video_dict[final_name],
-                    species_id,
-                    bboxes[named_tuple],
-                    frame_number,
-                    frame_number + 10,
-                )
-            )
-
-            for box in bboxes[named_tuple]:
-                new_rows.append(
-                    (
-                        species_id,
-                        frame_number,
-                        movie_path,
-                        video_dict[final_name][frame_number].shape[1],
-                        video_dict[final_name][frame_number].shape[0],
-                    )
-                    + box
-                )
-
-            for box in tboxes[named_tuple]:
-                new_rows.append(
-                    (
-                        species_id,
-                        frame_number + box[0],
-                        movie_path,
-                        video_dict[final_name][frame_number].shape[1],
-                        video_dict[final_name][frame_number].shape[0],
-                    )
-                    + box[1:]
-                )
-
-    # Export txt files
-    full_rows = pd.DataFrame(
-        new_rows,
-        columns=[
-            "species_id",
-            "frame",
-            "movie_path",
-            "f_w",
-            "f_h",
-            "x",
-            "y",
-            "w",
-            "h",
-        ],
-    )
-
-    # Create output folder
-    if not os.path.isdir(args.out_path):
-        os.mkdir(Path(args.out_path))
-
-    # Set up directory structure
-    img_dir = Path(args.out_path, "images")
-    label_dir = Path(args.out_path, "labels")
-
-    # Create directories
-    if os.path.isdir(img_dir):
-        shutil.rmtree(img_dir)
-
-    if os.path.isdir(label_dir):
-        shutil.rmtree(label_dir)
-
-    os.mkdir(img_dir)
-    os.mkdir(label_dir)
-
-    # Create koster yaml file with model configuration
-    species_list = [clean_species_name(sp) for sp in args.class_list]
-
-    data = dict(
-        train=str(Path(args.out_path, "train.txt")),
-        val=str(Path(args.out_path, "valid.txt")),
-        nc=len(args.class_list),
-        names=species_list,
-    )
-
-    with open(Path(args.out_path, "koster.yaml"), "w") as outfile:
-        yaml.dump(data, outfile, default_flow_style=None)
-
-    species_df = pd.read_sql_query(
-        f"SELECT id, label FROM species", conn
-    )
-
-    species_df["clean_label"] = species_df.label.apply(clean_species_name)
-
-    sp_id2mod_id = {
-        species_df[species_df.clean_label == species_list[i]].id.values[0]: i
-        for i in range(len(species_list))
-    }
-
-    for name, groups in full_rows.groupby(["frame", "movie_path"]):
-        file, ext = os.path.splitext(name[1])
-        file_base = os.path.basename(file)
-        # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
-        if args.out_format == "yolo":
-            open(f"{args.out_path}/labels/{file_base}_frame_{name[0]}.txt", "w").write(
-                "\n".join(
-                    [
-                        "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
-                            0
-                            if len(args.class_list) == 1
-                            else sp_id2mod_id[i[0]],  # single class vs multiple classes
-                            min((i[5] + i[7] / 2) / i[3], 1.0),
-                            min((i[6] + i[8] / 2) / i[4], 1.0),
-                            min(i[7] / i[3], 1.0),
-                            min(i[8] / i[4], 1.0),
-                        )
-                        for i in groups.values
-                    ]
-                )
-            )
-
-        # Save frames to image files
-        save_name = name[1] if name[1] in video_dict else unswedify(name[1])
-        if save_name in video_dict:
-            Image.fromarray(video_dict[save_name][name[0]][:, :, [2, 1, 0]]).save(
-                f"{args.out_path}/images/{file_base}_frame_{name[0]}.jpg"
-            )
-
-    logging.info("Frames extracted successfully")
-
-    # Clear images
-    if len(full_rows) == 0:
-        raise Exception("No frames found for the selected species. Please retry with a different configuration.")
-    process_frames(args.out_path + "/images", size=tuple(args.img_size))
-
-    # Create training/test sets
-    split_frames(args.out_path, args.perc_test)
-
-
-if __name__ == "__main__":
-    main()

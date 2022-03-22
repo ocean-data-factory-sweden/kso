@@ -1,8 +1,7 @@
-import os, time, argparse
+import os
+import time
 import cv2 as cv
 import numpy as np
-
-from functools import partial
 from pathlib import Path
 from kso_utils.koster_utils import unswedify
 
@@ -10,7 +9,7 @@ from kso_utils.koster_utils import unswedify
 frame_device = cv.cuda_GpuMat()
 
 def clearImage(frame):
-
+    '''Simple function to clear the image of any noise and normalize the image'''
     channels = cv.split(frame)
     # Get the maximum value of each channel
     # and get the dark channel of each image
@@ -63,14 +62,14 @@ def ProcFrames(proc_frame_func, frames_path):
 
 def ProcVid(proc_frame_func, vidPath):
     cap = cv.VideoCapture(vidPath)
-    if cap.isOpened() == False:
+    if cap.isOpened() is False:
         print("Error opening video stream or file")
         return
     n_frames = 0
     start = time.time()
     while cap.isOpened():
         ret, frame = cap.read()
-        if ret == True:
+        if ret:
             n_frames += 1
             proc_frame_func(frame)
         else:
