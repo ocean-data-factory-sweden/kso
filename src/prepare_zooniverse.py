@@ -152,7 +152,7 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
         names=species_list,
     )
 
-    with open(Path(out_path, f"{project.Project_name+'_'+datetime.datetime.now().strftime('%H:%M:%S')}.yaml"), "w") as outfile:
+    with open(Path(out_path, f"{project.Project_name+'_'+datetime.datetime.now().strftime('%H_%M_%S')}.yaml"), "w") as outfile:
         yaml.dump(data, outfile, default_flow_style=None)
 
     # Write hyperparameters default file (default hyperparameters from https://github.com/ultralytics/yolov5/blob/master/data/hyps/hyp.scratch.yaml)
@@ -245,6 +245,7 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
                 named_tuple = tuple([species_id, frame_number, movie_path])
 
                 final_name = name[0] if name[0] in video_dict else unswedify(name[0])
+                print(final_name)
                 if frame_number > len(video_dict[final_name]):
                     print(f"Frame out of range for video of length {len(video_dict[final_name])}")
                     frame_number = frame_number // 2
