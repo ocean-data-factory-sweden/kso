@@ -36,7 +36,7 @@ The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytic
 #### Download this repository
 Clone this repository using
 ```python
-git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_data_management.git
+git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
 ``` 
 
 #### Install dependecies
