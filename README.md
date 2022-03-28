@@ -56,7 +56,8 @@ nvidia-docker run --ipc=host -p 8888:8888 --hostname localhost --platform linux/
 
 2. CPU only
 
-```docker run -p 8888:8888 --hostname localhost --platform linux/amd64 --rm -it jannesg/koster-yolov4 jupyter notebook
+```python
+docker run -p 8888:8888 --hostname localhost --platform linux/amd64 --rm -it jannesg/koster-yolov4 jupyter notebook
 ```
 
 WIP
