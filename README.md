@@ -24,12 +24,19 @@ This Object Detection module contains scripts and resources to train and evaluat
 ![object_detection_module][object_detection_module]
  
  
-The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to Koster pipelines (src folder) and utils (tutorial_utils).
+The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to Koster pipelines (src folder) and utils (tutorial_utils). It is not recommended to simply clone this repository as many dependencies are resolved using the supplied Dockerfile.
 
 ## Quickstart
+
+#### Binder (No GPU Support)
+
 Check out our Binder project to try the system in your browser without installing anything. 
 
 [![binder][binderlogo]][binderlink]
+
+#### Google Colab
+
+[Model training notebook](https://colab.research.google.com/drive/1dl1H3S4wAC3sPOSjB1v6jz69iJFI5uZ6?usp=sharing)
 
 ## Installation
 
@@ -38,21 +45,18 @@ Check out our Binder project to try the system in your browser without installin
 * [Anaconda](https://docs.anaconda.com/anaconda/install/index.html)
 * [GIT](https://git-scm.com/downloads)
 
-#### Download this repository
-Clone this repository using
-```python
-git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
-``` 
+### Run notebooks locally
 
-#### Install dependecies
-Navigate to the folder where you have cloned the repository or unzipped the manually downloaded repository. 
+1. GPU (recommended)
+
 ```python
-cd koster_yolov4
+nvidia-docker run --ipc=host -p 8888:8888 --hostname localhost --platform linux/amd64 --rm -it jannesg/koster-yolov4 jupyter notebook
+
 ```
 
-Then install the requirements by running.
-```python
-pip install -r requirements.txt
+2. CPU only
+
+```docker run -p 8888:8888 --hostname localhost --platform linux/amd64 --rm -it jannesg/koster-yolov4 jupyter notebook
 ```
 
 WIP
