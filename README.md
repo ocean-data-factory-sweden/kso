@@ -24,7 +24,19 @@ This Object Detection module contains scripts and resources to train and evaluat
 ![object_detection_module][object_detection_module]
  
  
-The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to Koster pipelines (src folder) and utils (tutorial_utils).
+The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to Koster pipelines (src folder) and utils (tutorial_utils). It is not recommended to simply clone this repository as many dependencies are resolved using the supplied Dockerfile.
+
+## Quickstart
+
+#### Binder (No GPU Support)
+
+Check out our Binder project to try the system in your browser without installing anything. 
+
+[![binder][binderlogo]][binderlink]
+
+#### Google Colab
+
+[Model training notebook](https://colab.research.google.com/drive/1dl1H3S4wAC3sPOSjB1v6jz69iJFI5uZ6?usp=sharing)
 
 ## Installation
 
@@ -33,21 +45,19 @@ The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytic
 * [Anaconda](https://docs.anaconda.com/anaconda/install/index.html)
 * [GIT](https://git-scm.com/downloads)
 
-#### Download this repository
-Clone this repository using
-```python
-git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
-``` 
+### Run notebooks locally
 
-#### Install dependecies
-Navigate to the folder where you have cloned the repository or unzipped the manually downloaded repository. 
+1. GPU (recommended)
+
 ```python
-cd koster_yolov4
+nvidia-docker run --ipc=host -p 8888:8888 --hostname localhost --platform linux/amd64 --rm -it jannesg/koster-yolov4 jupyter notebook
+
 ```
 
-Then install the requirements by running.
+2. CPU only
+
 ```python
-pip install -r requirements.txt
+docker run -p 8888:8888 --hostname localhost --platform linux/amd64 --rm -it jannesg/koster-yolov4 jupyter notebook
 ```
 
 WIP
@@ -85,7 +95,7 @@ We are always excited to collaborate and help other marine scientists. Please fe
 [OBIS-site]: https://www.gbif.org/network/2b7c7b4f-4d4f-40d3-94de-c28b6fa054a6
 [Database_diagram]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/Database_diagram.png?raw=true "Entity relationship diagram of the SQLite database of the Koster Seafloor Observatory"
 [binderlogo]: https://mybinder.org/badge_logo.svg
-[binderlink]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/koster_data_management/main
+[binderlink]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/koster_yolov4/HEAD
 [screenshot_loading]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/screenshot_loading.png?raw=true
 [screenshot_started]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/screenshot_started.png?raw=true
 
