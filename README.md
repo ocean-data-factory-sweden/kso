@@ -26,6 +26,11 @@ This Object Detection module contains scripts and resources to train and evaluat
  
 The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to Koster pipelines (src folder) and utils (tutorial_utils).
 
+## Quickstart
+Check out our Binder project to try the system in your browser without installing anything. 
+
+[![binder][binderlogo]][binderlink]
+
 ## Installation
 
 ### Requirements
@@ -85,7 +90,7 @@ We are always excited to collaborate and help other marine scientists. Please fe
 [OBIS-site]: https://www.gbif.org/network/2b7c7b4f-4d4f-40d3-94de-c28b6fa054a6
 [Database_diagram]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/Database_diagram.png?raw=true "Entity relationship diagram of the SQLite database of the Koster Seafloor Observatory"
 [binderlogo]: https://mybinder.org/badge_logo.svg
-[binderlink]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/koster_data_management/main
+[binderlink]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/koster_yolov4/HEAD
 [screenshot_loading]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/screenshot_loading.png?raw=true
 [screenshot_started]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/screenshot_started.png?raw=true
 
