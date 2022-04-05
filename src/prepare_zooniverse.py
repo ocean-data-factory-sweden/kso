@@ -14,7 +14,6 @@ from PIL import Image
 from kso_utils.db_utils import create_connection
 from kso_utils.koster_utils import unswedify
 from kso_utils.t3_utils import retrieve_movie_info_from_server
-import kso_utils.tutorials_utils as t_utils
 from kso_utils.t4_utils import get_species_ids, get_movie_url
 from src.prepare_input import ProcFrameCuda, ProcFrames
 
@@ -152,7 +151,7 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
         names=species_list,
     )
 
-    with open(Path(out_path, f"{project.Project_name+'_'+datetime.datetime.now().strftime('%H_%M_%S')}.yaml"), "w") as outfile:
+    with open(Path(out_path, f"{project.Project_name+'_'+datetime.datetime.now().strftime('%H:%M:%S')}.yaml"), "w") as outfile:
         yaml.dump(data, outfile, default_flow_style=None)
 
     # Write hyperparameters default file (default hyperparameters from https://github.com/ultralytics/yolov5/blob/master/data/hyps/hyp.scratch.yaml)
@@ -245,7 +244,6 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
                 named_tuple = tuple([species_id, frame_number, movie_path])
 
                 final_name = name[0] if name[0] in video_dict else unswedify(name[0])
-                print(final_name)
                 if frame_number > len(video_dict[final_name]):
                     print(f"Frame out of range for video of length {len(video_dict[final_name])}")
                     frame_number = frame_number // 2
@@ -433,8 +431,8 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
     if len(full_rows) == 0:
         raise Exception("No frames found for the selected species. Please retry with a different configuration.")
     
-    # Pre-process frames
-    process_frames(out_path + "/images", size=tuple(img_size))
+    # Pre-process frames (Turned off since we now implement transformations separately)
+    # process_frames(out_path + "/images", size=tuple(img_size))
 
     # Create training/test sets
     split_frames(out_path, perc_test)

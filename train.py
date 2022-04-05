@@ -33,7 +33,7 @@ FILE = Path(__file__).absolute()
 sys.path.append(FILE.parents[0].as_posix())  # add yolov5/ to path
 #os.environ['WANDB_DIR'] = "/cephyr/NOBACKUP/groups/snic2021-6-9/"
 
-import test  # for end-of-epoch mAP
+import yolo_test  # for end-of-epoch mAP
 from models.experimental import attempt_load
 from models.yolo import Model
 from utils.autoanchor import check_anchors
@@ -387,7 +387,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             final_epoch = epoch + 1 == epochs
             if not notest or final_epoch:  # Calculate mAP
                 wandb_logger.current_epoch = epoch + 1
-                results, maps, _ = test.run(data_dict,
+                results, maps, _ = yolo_test.run(data_dict,
                                             batch_size=batch_size // WORLD_SIZE * 2,
                                             imgsz=imgsz_test,
                                             model=ema.ema,
@@ -455,7 +455,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
         if not evolve:
             if is_coco:  # COCO dataset
                 for m in [last, best] if best.exists() else [last]:  # speed, mAP tests
-                    results, _, _ = test.run(data_dict,
+                    results, _, _ = yolo_test.run(data_dict,
                                              batch_size=batch_size // WORLD_SIZE * 2,
                                              imgsz=imgsz_test,
                                              conf_thres=0.001,
