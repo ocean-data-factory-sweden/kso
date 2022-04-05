@@ -10,7 +10,7 @@ RUN python -m pip install --upgrade pip
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 RUN pip install --no-cache -r requirements.txt coremltools onnx gsutil notebook
 # RUN pip install --no-cache -U torch torchvision numpy
-RUN pip uninstall torch torchvision
+RUN pip uninstall -y torch torchvision
 RUN pip install --no-cache torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
 # Create working directory
