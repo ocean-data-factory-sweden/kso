@@ -36,7 +36,7 @@ Check out our Binder project to try the system in your browser without installin
 
 #### Google Colab
 
-[Model training notebook](https://colab.research.google.com/drive/1dl1H3S4wAC3sPOSjB1v6jz69iJFI5uZ6?usp=sharing)
+[![Open In Colab][colablogo]][colablink]
 
 ## Installation
 
@@ -96,6 +96,8 @@ We are always excited to collaborate and help other marine scientists. Please fe
 [Database_diagram]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/Database_diagram.png?raw=true "Entity relationship diagram of the SQLite database of the Koster Seafloor Observatory"
 [binderlogo]: https://mybinder.org/badge_logo.svg
 [binderlink]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/koster_yolov4/HEAD
+[colablogo]: https://colab.research.google.com/assets/colab-badge.svg
+[colablink]: https://colab.research.google.com/github/ocean-data-factory-sweden/koster_yolov4/blob/master/Colab/5_Colab_Train_Koster_ML_models.ipynb
 [screenshot_loading]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/screenshot_loading.png?raw=true
 [screenshot_started]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/screenshot_started.png?raw=true
 
