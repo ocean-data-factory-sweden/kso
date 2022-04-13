@@ -13,7 +13,7 @@ RUN apt-get update && \
     apt-get install -y vim && \
     apt-get install -y libglib2.0-0 && \
     apt-get install -y libsm6 libxext6 libxrender-dev && \
-    apt-get install -y ffmpeg && \
+    apt-get install -y ffmpeg==4.4 && \
     apt-get install -y libmagic-dev
 
 RUN apt update && apt install -y zip htop screen libgl1-mesa-glx
