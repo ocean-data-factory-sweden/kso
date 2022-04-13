@@ -1,6 +1,10 @@
 # Start FROM Nvidia PyTorch image https://ngc.nvidia.com/catalog/containers/nvidia:pytorch
 FROM nvcr.io/nvidia/pytorch:21.05-py3
 
+# Fix timezone issue
+ENV TZ=Europe/Stockholm
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # Install linux packages
 RUN apt-get update && \
     apt-get upgrade -y && \
