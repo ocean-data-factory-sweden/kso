@@ -2,8 +2,17 @@
 FROM nvcr.io/nvidia/pytorch:21.05-py3
 
 # Install linux packages
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y make automake gcc g++ subversion && \
+    apt-get install -y git && \
+    apt-get install -y vim && \
+    apt-get install -y libglib2.0-0 && \
+    apt-get install -y libsm6 libxext6 libxrender-dev && \
+    apt-get install -y ffmpeg && \
+    apt-get install -y libmagic-dev
+
 RUN apt update && apt install -y zip htop screen libgl1-mesa-glx
-RUN apt install -y ffmpeg
 
 # Install python dependencies
 COPY requirements.txt .
