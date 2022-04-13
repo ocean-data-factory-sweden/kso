@@ -2,7 +2,8 @@
 FROM nvcr.io/nvidia/pytorch:21.05-py3
 
 # Install linux packages
-RUN apt update && apt install -y zip htop screen libgl1-mesa-glx ffmpeg
+RUN apt update && apt install -y zip htop screen libgl1-mesa-glx
+RUN apt install -y ffmpeg
 
 # Install python dependencies
 COPY requirements.txt .
