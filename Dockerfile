@@ -1,21 +1,6 @@
 # Start FROM Nvidia PyTorch image https://ngc.nvidia.com/catalog/containers/nvidia:pytorch
 FROM nvcr.io/nvidia/pytorch:21.05-py3
 
-# Fix timezone issue
-ENV TZ=Europe/Stockholm
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-
-# Install linux packages
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y make automake gcc g++ subversion && \
-    apt-get install -y git && \
-    apt-get install -y vim && \
-    apt-get install -y libglib2.0-0 && \
-    apt-get install -y libsm6 libxext6 libxrender-dev && \
-    apt-get install -y ffmpeg==4.4 && \
-    apt-get install -y libmagic-dev
-
 RUN apt update && apt install -y zip htop screen libgl1-mesa-glx
 
 # Install python dependencies
