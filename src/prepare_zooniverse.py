@@ -1,21 +1,28 @@
-# module imports
-import os, re, glob, pims, shutil, yaml
+# base imports
+import os
+import re
+import glob
+import pims
+import shutil
+import yaml
 import pandas as pd
 import numpy as np
-import src.frame_tracker
 import logging
 import datetime
 import PIL
-
 from pathlib import Path
 from functools import partial
 from tqdm import tqdm
 from PIL import Image
+
+# utils imports
 from kso_utils.db_utils import create_connection
 from kso_utils.koster_utils import unswedify
 from kso_utils.server_utils import retrieve_movie_info_from_server, get_movie_url
 from kso_utils.t4_utils import get_species_ids
 from src.prepare_input import ProcFrameCuda, ProcFrames
+import src.frame_tracker
+
 
 # Logging
 
@@ -201,6 +208,7 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
     }
 
     # If at least one movie is linked to the project
+    print(f"There are {len(movie_df)} movies")
     if len(movie_df) > 0:
         
         train_rows["movie_path"] = train_rows.merge(movie_df, 
@@ -209,9 +217,13 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
         train_rows["movie_path"] = train_rows["movie_path"].apply(lambda x: get_movie_url(project, db_info_dict, x))
         
         video_dict = {}
-        for i in train_rows["movie_path"].unique():
+        for i in tqdm(train_rows["movie_path"].unique()):
             try:
-                video_dict[i] = pims.Video(i)
+                v = pims.Video(i)
+                if not v.frame_rate.is_integer():
+                    video_dict[i] = pims.ImageIOReader(i)
+                else:
+                    video_dict[i] = v
             except FileNotFoundError:
                 try:
                     video_dict[unswedify(str(i))] = pims.Video(unswedify(str(i)))
@@ -250,6 +262,8 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
                 if final_name in video_dict:
                     bboxes[named_tuple], tboxes[named_tuple] = [], []
                     bboxes[named_tuple].extend(tuple(i[3:]) for i in group.values)
+                    movie_h = video_dict[final_name][0].shape[1]
+                    movie_w = video_dict[final_name][0].shape[0]
 
                     for box in bboxes[named_tuple]:
                         new_rows.append(
@@ -257,11 +271,12 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
                                 species_id,
                                 frame_number,
                                 movie_path,
-                                video_dict[final_name][frame_number].shape[1],
-                                video_dict[final_name][frame_number].shape[0],
+                                movie_h,
+                                movie_w,
                             )
                             + box
                         )
+
                     if track_frames:
                         # Track n frames after object is detected
                         tboxes[named_tuple].extend(
@@ -301,7 +316,7 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
             ],
         )
 
-        for name, groups in full_rows.groupby(["frame_number", "filename"]):
+        for name, groups in tqdm(full_rows.groupby(["frame_number", "filename"]), desc="Saving frames...", colour="green"):
             file, ext = os.path.splitext(name[1])
             file_base = os.path.basename(file)
             # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
