@@ -24,6 +24,7 @@ boto3==1.21.27
 ffmpeg-python==0.2.0
 natsort==8.1.0
 easydict==1.9.0
+moviepy==1.0.3
 
 # logging -------------------------------------
 tensorboard>=2.4.1

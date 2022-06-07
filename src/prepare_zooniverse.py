@@ -14,6 +14,7 @@ from pathlib import Path
 from functools import partial
 from tqdm import tqdm
 from PIL import Image
+from time import time
 
 # utils imports
 from kso_utils.db_utils import create_connection
@@ -209,6 +210,7 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
 
     # If at least one movie is linked to the project
     print(f"There are {len(movie_df)} movies")
+    
     if len(movie_df) > 0:
         
         train_rows["movie_path"] = train_rows.merge(movie_df, 
@@ -219,11 +221,11 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
         video_dict = {}
         for i in tqdm(train_rows["movie_path"].unique()):
             try:
-                v = pims.Video(i)
-                if not v.frame_rate.is_integer():
-                    video_dict[i] = pims.ImageIOReader(i)
-                else:
-                    video_dict[i] = v
+                #v = pims.Video(i)
+                #if not v.frame_rate.is_integer():
+                video_dict[i] = pims.MoviePyReader(i)
+                #else:
+                #video_dict[i] = v
             except FileNotFoundError:
                 try:
                     video_dict[unswedify(str(i))] = pims.Video(unswedify(str(i)))
@@ -249,6 +251,7 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
 
 
         # Create full rows
+        train_rows = train_rows.sort_values(by=["movie_path", "frame_number"], ascending=True)
         for name, group in tqdm(
                 train_rows.groupby(["movie_path", "frame_number", "species_id"])
             ):
@@ -316,7 +319,8 @@ def frame_aggregation(project, db_info_dict: dict, out_path: str,
             ],
         )
 
-        for name, groups in tqdm(full_rows.groupby(["frame_number", "filename"]), desc="Saving frames...", colour="green"):
+        for name, groups in tqdm(full_rows.groupby(["frame_number", "filename"]),
+                                 desc="Saving frames...", colour="green"):
             file, ext = os.path.splitext(name[1])
             file_base = os.path.basename(file)
             # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
