@@ -1,6 +1,6 @@
-import sys
 import cv2
-from random import randint
+
+# from random import randint
 
 trackerTypes = [
     "BOOSTING",
@@ -14,7 +14,13 @@ trackerTypes = [
 ]
 
 
-def createTrackerByName(trackerType):
+def createTrackerByName(trackerType: str):
+    """
+    It creates a tracker based on the tracker name
+
+    :param trackerType: The type of tracker we want to use
+    :return: The tracker is being returned.
+    """
     # Create a tracker based on tracker name
     if trackerType == trackerTypes[0]:
         tracker = cv2.legacy.TrackerBoosting_create()
@@ -42,10 +48,22 @@ def createTrackerByName(trackerType):
     return tracker
 
 
-def track_objects(video, class_ids, bboxes, start_frame, last_frame):
+def track_objects(video, class_ids: list, bboxes: list, start_frame: int, last_frame: int):
+    """
+    It takes a video, a list of bounding boxes, and a start and end frame, and returns a list of tuples
+    containing the frame number, and the bounding box coordinates
+
+    :param video: the video to be tracked
+    :param class_ids: The class of the object you want to track
+    :param bboxes: the bounding boxes of the objects to be tracked
+    :param start_frame: the frame number to start tracking from
+    :param last_frame: the last frame of the video to be processed
+    :return: A list of tuples, where each tuple contains the frame number, x, y, width, and height of
+    the bounding box.
+    """
 
     # Set video to load
-    colors = [(randint(0, 255)) for i in bboxes]
+    # colors = [(randint(0, 255)) for i in bboxes]
 
     # Specify the tracker type
     trackerType = "CSRT"

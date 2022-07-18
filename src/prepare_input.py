@@ -1,5 +1,6 @@
 import os
 import time
+from collections.abc import Callable
 import cv2 as cv
 import numpy as np
 from pathlib import Path
@@ -8,8 +9,17 @@ from kso_utils.koster_utils import unswedify
 # globals
 frame_device = cv.cuda_GpuMat()
 
-def clearImage(frame):
-    '''Simple function to clear the image of any noise and normalize the image'''
+def clearImage(frame: np.ndarray):
+    """
+    We take the maximum value of each channel, and then take the minimum value of the three channels.
+    Then we blur the image, and then we take the maximum value of the blurred image and the value 0.5.
+    Then we take the maximum value of the difference between the channel and the maximum value of the
+    channel, divided by the blurred image, and the maximum value of the channel. Then we divide the
+    result by the maximum value of the channel and multiply by 255
+    
+    :param frame: the image to be processed
+    :return: The clear image
+    """
     channels = cv.split(frame)
     # Get the maximum value of each channel
     # and get the dark channel of each image
@@ -45,22 +55,45 @@ def clearImage(frame):
     return cv.merge(channels)
 
 
-def ProcFrames(proc_frame_func, frames_path):
+def ProcFrames(proc_frame_func: Callable, frames_path: str):
+    """
+    It takes a function that processes a single frame and a path to a folder containing frames, and
+    applies the function to each frame in the folder
+    
+    :param proc_frame_func: The function that will be applied to each frame
+    :type proc_frame_func: Callable
+    :param frames_path: The path to the directory containing the frames
+    :type frames_path: str
+    :return: The time it took to process all the frames in the folder, and the number of frames
+    processed.
+    """
     start = time.time()
     files = os.listdir(frames_path)
     for f in files:
         if f.endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
-            try:
+            if os.path.exists(str(Path(frames_path, f))):
                 new_frame = proc_frame_func(cv.imread(str(Path(frames_path, f))))
                 cv.imwrite(str(Path(frames_path, f)), new_frame)
-            except:
-                new_frame = proc_frame_func(cv.imread(unswedify(str(Path(frames_path, f)))))
+            else:
+                new_frame = proc_frame_func(
+                    cv.imread(unswedify(str(Path(frames_path, f))))
+                )
                 cv.imwrite(str(Path(frames_path, f)), new_frame)
     end = time.time()
     return (end - start) * 1000 / len(files), len(files)
 
 
-def ProcVid(proc_frame_func, vidPath):
+def ProcVid(proc_frame_func: Callable, vidPath: str):
+    """
+    It takes a function that processes a frame and a video path, and returns the average time it takes
+    to process a frame and the number of frames in the video
+    
+    :param proc_frame_func: This is the function that will be called on each frame
+    :type proc_frame_func: Callable
+    :param vidPath: The path to the video file
+    :type vidPath: str
+    :return: The average time to process a frame in milliseconds and the number of frames processed.
+    """
     cap = cv.VideoCapture(vidPath)
     if cap.isOpened() is False:
         print("Error opening video stream or file")
@@ -79,14 +112,24 @@ def ProcVid(proc_frame_func, vidPath):
     return (end - start) * 1000 / n_frames, n_frames
 
 
-def ProcFrameCuda(frame, size=(416, 416)):
-    #frame_device.upload(frame)
-    # change frame to frame_device below for gpu version
-    frame_device_small = cv.resize(frame, dsize=size)
-    fg_device = cv.cvtColor(frame_device_small, cv.COLOR_BGR2RGB)
-    #fg_host = fg_device.download()
-    fg_host = clearImage(fg_device)
-    # store_res = True
-    # if store_res:
-    #    gpu_res.append(np.copy(fg_host))
-    return fg_host
+def ProcFrameCuda(frame: np.ndarray, size=(416, 416), use_gpu=False):
+    """
+    It takes a frame, resizes it to a smaller size, converts it to RGB, and then clears it
+    
+    :param frame: the frame to be processed
+    :type frame: np.ndarray
+    :param size: the size of the image to be processed
+    :return: the processed frame.
+    """
+    if use_gpu:
+        frame_device.upload(frame)
+        frame_device_small = cv.resize(frame_device, dsize=size)
+        fg_device = cv.cvtColor(frame_device_small, cv.COLOR_BGR2RGB)
+        fg_host = fg_device.download()
+        fg_host = clearImage(fg_device)
+        return fg_host
+    else:
+        frame_device_small = cv.resize(frame, dsize=size)
+        fg_device = cv.cvtColor(frame_device_small, cv.COLOR_BGR2RGB)
+        fg_host = clearImage(fg_device)
+        return fg_host
