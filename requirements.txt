@@ -25,6 +25,8 @@ ffmpeg-python==0.2.0
 natsort==8.1.0
 easydict==1.9.0
 moviepy==1.0.3
+jupyter_bbox_widget==0.4.0
+imagesize==1.4.1
 
 # logging -------------------------------------
 tensorboard>=2.4.1
