@@ -71,3 +71,6 @@ USER root
 RUN chown ${NB_USER} -R ${HOME}
 USER ${NB_USER}
 WORKDIR ${HOME}
+
+# Ensure widget extensions are activated
+RUN jupyter nbextension enable --py --user jupyter_bbox_widget

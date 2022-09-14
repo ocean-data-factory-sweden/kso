@@ -46,7 +46,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("data_path", help="path to data folder", type=str)
     parser.add_argument(
-        "perc_test", help="percentage of data to use as part of test set", type=int
+        "perc_test", help="percentage of data to use as part of test set", type=float
     )
     parser.add_argument("out_path", help="path to save into text files", type=str)
     args = parser.parse_args()
