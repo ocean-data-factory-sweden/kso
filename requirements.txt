@@ -4,10 +4,10 @@
 panoptes-client==1.5.0
 python-magic==0.4.24
 -e git+https://github.com/julian-r/python-magic.git#egg=python-magic-bin
-matplotlib>=3.2.2
-numpy>=1.18.5
 opencv-python==4.5.4.60
 opencv-contrib-python
+matplotlib>=3.2.2
+numpy>=1.18.5
 PyYAML>=5.3.1
 scipy>=1.4.1
 #torch>=1.7.0,<1.11.0
@@ -21,7 +21,7 @@ uvicorn==0.17.2
 #streamlit==1.5.0
 protobuf==3.15.8
 python-multipart==0.0.5
-boto3==1.21.27
+boto3==1.15.18
 ffmpeg-python==0.2.0
 natsort==8.1.0
 easydict==1.9.0
