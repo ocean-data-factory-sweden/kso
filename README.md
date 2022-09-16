@@ -24,7 +24,7 @@ This Object Detection module contains scripts and resources to train and evaluat
 ![object_detection_module][object_detection_module]
  
  
-The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to Koster pipelines (src folder) and utils (tutorial_utils). It is not recommended to simply clone this repository as many dependencies are resolved using the supplied Dockerfile.
+The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to KSO pipelines (src folder) and utils (kso_utils). It is not recommended to simply clone this repository as many dependencies are resolved using the supplied Dockerfile.
 
 ## Quickstart
 
@@ -97,7 +97,7 @@ We are always excited to collaborate and help other marine scientists. Please fe
 [binderlogo]: https://mybinder.org/badge_logo.svg
 [binderlink]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/koster_yolov4/HEAD
 [colablogo]: https://colab.research.google.com/assets/colab-badge.svg
-[colablink]: https://colab.research.google.com/github/ocean-data-factory-sweden/koster_yolov4/blob/master/Colab/5_Colab_Train_Koster_ML_models.ipynb
+[colablink]: https://colab.research.google.com/github/ocean-data-factory-sweden/koster_yolov4/blob/master/tutorials/
 [screenshot_loading]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/screenshot_loading.png?raw=true
 [screenshot_started]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/screenshot_started.png?raw=true
 
