@@ -1,3 +1,6 @@
 [submodule "kso_utils"]
 	path = kso_utils
 	url = https://github.com/ocean-data-factory-sweden/kso_utils.git
+[submodule "yolov5"]
+	path = yolov5
+	url = https://github.com/ultralytics/yolov5
