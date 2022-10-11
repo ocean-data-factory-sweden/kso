@@ -1,4 +1,4 @@
-# KSO - Data management
+# KSO - Object Detection
 
 The Koster Seafloor Observatory is an open-source, citizen science and machine learning approach to analyse subsea movies.
 
@@ -57,28 +57,19 @@ If you want to fully use our system (Binder has computing limitations), you will
 #### Download this repository
 Clone this repository using
 ```python
-git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_data_management.git
+git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
 ``` 
 
 #### Install dependecies
 Navigate to the folder where you have cloned the repository or unzipped the manually downloaded repository. 
 ```python
-cd koster_data_management
+cd koster_yolov4
 ```
 
 Then install the requirements by running.
 ```python
 pip install -r requirements.txt
 ```
-
-#### Create initial information for the database 
-If you will work in a new project you will need to input the information about the underwater footage files, sites and species of interest. You can use a [template of the csv files](https://drive.google.com/file/d/1PZGRoSY_UpyLfMhRphMUMwDXw4yx1_Fn/view?usp=sharing) and move the directory to the "db_starter" folder.
-
-
-#### Link your footage to the database 
-You will need files of underwater footage to run this system. You can [download some samples](https://drive.google.com/drive/folders/1t2ce8euh3SEU2I8uhiZN1Tu-76ZDqB6w?usp=sharing) and move them to `db_starter`. You can also store your own files and specify their directory in the tutorials.
-
-
 ### Option 2: SNIC Users (VPN required)
 
 -----------------
@@ -125,12 +116,6 @@ We are always excited to collaborate and help other marine scientists. Please fe
 - python -m ipykernel install --user --name="new_environment"
 - from the jupyter notebook select kernel/change kernel
 
-## Troubleshooting
-
-If you experience issues uploading movies to Zooniverse, it might be related to the libmagic package. In Windows, the following commands seem to work:
-```python
-pip install python-libmagic
-pip install python-magic-bin
 ```
 
 
