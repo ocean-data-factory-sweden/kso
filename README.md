@@ -129,7 +129,7 @@ We are always excited to collaborate and help other marine scientists. Please fe
 [issues-url]: https://github.com/ocean-data-factory-sweden/koster_yolov4/issues
 [license-shield]: https://img.shields.io/github/license/ocean-data-factory-sweden/koster_yolov4.svg?style=for-the-badge
 [license-url]: https://github.com/ocean-data-factory-sweden/koster_yolov4/blob/main/LICENSE.txt
-[high-level-overview]: https://github.com/ocean-data-factory-sweden/koster_yolov4/blob/main/images/high-level-overview-2.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
+[high-level-overview]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/high-level-overview-2.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
 [Data_management_module]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/Koster_data_management_module.png?raw=true
 [object_detection_module]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/main/images/Koster_object_detection_module.png?raw=true
 [koster_utils_repo]: https://github.com/ocean-data-factory-sweden/kso_utils
@@ -146,7 +146,7 @@ We are always excited to collaborate and help other marine scientists. Please fe
 [colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/koster_yolov4/blob/master/tutorials/5_Train_YOLO_models.ipynb
 [binder_tut_5]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/koster_data_management/main
 [colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/koster_yolov4/blob/master/tutorials/6_Evaluate_ML_Models.ipynb
-[binder_tut_5]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/koster_data_management/main
+[binder_tut_6]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/koster_data_management/main
 [colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/koster_yolov4/blob/master/tutorials/7_Transfer_ML_Models.ipynb
 [binder_tut_7]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/koster_data_management/main
 [colab_tut_8]: https://colab.research.google.com/github/ocean-data-factory-sweden/koster_data_management/blob/main/tutorials/08_Analyse_Aggregate_Zooniverse_Annotations.ipynb
