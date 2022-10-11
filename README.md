@@ -116,8 +116,6 @@ We are always excited to collaborate and help other marine scientists. Please fe
 - python -m ipykernel install --user --name="new_environment"
 - from the jupyter notebook select kernel/change kernel
 
-```
-
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
