@@ -4,3 +4,6 @@
 [submodule "yolov5"]
 	path = yolov5
 	url = https://github.com/ultralytics/yolov5
+[submodule "yolov5_tracker"]
+	path = yolov5_tracker
+	url = https://github.com/mikel-brostrom/Yolov5_StrongSort_OSNet

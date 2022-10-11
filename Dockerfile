@@ -12,6 +12,10 @@ RUN pip install --no-cache -r requirements.txt coremltools onnx gsutil notebook
 RUN pip uninstall -y torch torchvision
 RUN pip install --no-cache torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
+# Install SNIC requirements
+RUN jupyter nbextension install --user --py widgetsnbextension
+RUN jupyter nbextension install --user --py jupyter_bbox_widget
+
 # Create working directory
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
@@ -73,4 +77,5 @@ USER ${NB_USER}
 WORKDIR ${HOME}
 
 # Ensure widget extensions are activated
-RUN jupyter nbextension enable --py --user jupyter_bbox_widget
+RUN jupyter nbextension enable --user --py widgetsnbextension
+RUN jupyter nbextension enable --user --py jupyter_bbox_widget
