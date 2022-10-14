@@ -8,7 +8,6 @@ COPY requirements.txt .
 RUN python -m pip install --upgrade pip
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 RUN pip install --no-cache -r requirements.txt coremltools onnx gsutil notebook
-# RUN pip install --no-cache -U torch torchvision numpy
 RUN pip uninstall -y torch torchvision
 RUN pip install --no-cache torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
@@ -20,39 +19,16 @@ RUN jupyter nbextension install --user --py jupyter_bbox_widget
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
+ADD https://api.github.com/repos/ocean-data-factory-sweden/koster_yolov4/git/refs/heads/master version.json
+RUN git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
+
 # Copy contents
 COPY . /usr/src/app
 
 # Set environment variables
-ENV HOME=/usr/src/app
+ENV HOME=/usr/src/app/koster_yolov4
 ENV WANDB_DIR=/cephyr/NOBACKUP/groups/snic2021-6-9/
 ENV WANDB_CACHE_DIR=/cephyr/NOBACKUP/groups/snic2021-6-9/
-
-# Usage Examples -------------------------------------------------------------------------------------------------------
-
-# Build and Push
-# t=ultralytics/yolov5:latest && sudo docker build -t $t . && sudo docker push $t
-
-# Pull and Run
-# t=ultralytics/yolov5:latest && sudo docker pull $t && sudo docker run -it --ipc=host --gpus all $t
-
-# Pull and Run with local directory access
-# t=ultralytics/yolov5:latest && sudo docker pull $t && sudo docker run -it --ipc=host --gpus all -v "$(pwd)"/datasets:/usr/src/datasets $t
-
-# Kill all
-# sudo docker kill $(sudo docker ps -q)
-
-# Kill all image-based
-# sudo docker kill $(sudo docker ps -qa --filter ancestor=ultralytics/yolov5:latest)
-
-# Bash into running container
-# sudo docker exec -it 5a9b5863d93d bash
-
-# Bash into stopped container
-# id=$(sudo docker ps -qa) && sudo docker start $id && sudo docker exec -it $id bash
-
-# Clean up
-# docker system prune -a --volumes
 
 ## Binder setup
 
@@ -69,7 +45,6 @@ RUN adduser --disabled-password \
     ${NB_USER}
 
 # Make sure the contents of our repo are in ${HOME}
-
 COPY . ${HOME}
 USER root
 RUN chown ${NB_USER} -R ${HOME}
