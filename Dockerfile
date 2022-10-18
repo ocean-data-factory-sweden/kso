@@ -23,7 +23,7 @@ ADD https://api.github.com/repos/ocean-data-factory-sweden/koster_yolov4/git/ref
 RUN git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
 # Copy files with minor changes from main repository
 RUN cp /usr/src/app/koster_yolov4/src/nn_matching.py /usr/src/app/koster_yolov4/yolov5_tracker/strong_sort/sort/nn_matching.py
-RUN cp /usr/src/app/koster_yolov4/src/track.py /usr/src/app/koster_yolov4/yolov5_tracker/tracker.py
+RUN cp /usr/src/app/koster_yolov4/src/track.py /usr/src/app/koster_yolov4/yolov5_tracker/track.py
 
 # Copy contents
 # COPY . /usr/src/app
