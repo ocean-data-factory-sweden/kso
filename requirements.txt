@@ -5,7 +5,7 @@ panoptes-client==1.5.0
 python-magic==0.4.24
 -e git+https://github.com/julian-r/python-magic.git#egg=python-magic-bin
 opencv-python==4.5.5.64
-opencv-python-headless==4.5.5.64
+opencv-python-headless==4.6.0.66
 opencv-contrib-python==4.5.5.64
 matplotlib>=3.2.2
 numpy>=1.18.5
