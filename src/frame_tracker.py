@@ -48,7 +48,9 @@ def createTrackerByName(trackerType: str):
     return tracker
 
 
-def track_objects(video, class_ids: list, bboxes: list, start_frame: int, last_frame: int):
+def track_objects(
+    video, class_ids: list, bboxes: list, start_frame: int, last_frame: int
+):
     """
     It takes a video, a list of bounding boxes, and a start and end frame, and returns a list of tuples
     containing the frame number, and the bounding box coordinates

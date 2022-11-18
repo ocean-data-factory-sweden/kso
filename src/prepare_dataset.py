@@ -9,7 +9,7 @@ def prepare(data_path, percentage_test, out_path):
     It takes a path to a folder containing images, a percentage of the images to be used for testing,
     and a path to the output folder. It then creates two files, train.txt and test.txt, which contain
     the paths to the images to be used for training and testing, respectively
-    
+
     :param data_path: the path to the dataset
     :param percentage_test: The percentage of the images that we want to be in the test set
     :param out_path: The path to the output directory

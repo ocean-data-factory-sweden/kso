@@ -9,6 +9,7 @@ from kso_utils.koster_utils import unswedify
 # globals
 frame_device = cv.cuda_GpuMat()
 
+
 def clearImage(frame: np.ndarray):
     """
     We take the maximum value of each channel, and then take the minimum value of the three channels.
@@ -16,7 +17,7 @@ def clearImage(frame: np.ndarray):
     Then we take the maximum value of the difference between the channel and the maximum value of the
     channel, divided by the blurred image, and the maximum value of the channel. Then we divide the
     result by the maximum value of the channel and multiply by 255
-    
+
     :param frame: the image to be processed
     :return: The clear image
     """
@@ -59,7 +60,7 @@ def ProcFrames(proc_frame_func: Callable, frames_path: str):
     """
     It takes a function that processes a single frame and a path to a folder containing frames, and
     applies the function to each frame in the folder
-    
+
     :param proc_frame_func: The function that will be applied to each frame
     :type proc_frame_func: Callable
     :param frames_path: The path to the directory containing the frames
@@ -87,7 +88,7 @@ def ProcVid(proc_frame_func: Callable, vidPath: str):
     """
     It takes a function that processes a frame and a video path, and returns the average time it takes
     to process a frame and the number of frames in the video
-    
+
     :param proc_frame_func: This is the function that will be called on each frame
     :type proc_frame_func: Callable
     :param vidPath: The path to the video file
@@ -115,7 +116,7 @@ def ProcVid(proc_frame_func: Callable, vidPath: str):
 def ProcFrameCuda(frame: np.ndarray, size=(416, 416), use_gpu=False):
     """
     It takes a frame, resizes it to a smaller size, converts it to RGB, and then clears it
-    
+
     :param frame: the frame to be processed
     :type frame: np.ndarray
     :param size: the size of the image to be processed

@@ -33,7 +33,7 @@ logger.setLevel(logging.DEBUG)
 def process_frames(frames_path: str, size: tuple = (416, 416)):
     """
     It takes a path to a directory containing frames, and returns a list of processed frames
-    
+
     :param frames_path: the path to the directory containing the frames
     :param size: The size of the image to be processed
     """
@@ -114,7 +114,7 @@ def frame_aggregation(
     species to include, an image size, an output format, a boolean to remove null annotations, a boolean
     to track frames, and the number of frames to track, and it returns a dataset of frames with bounding
     boxes for the specified species
-    
+
     :param project: the project object
     :param db_info_dict: a dictionary containing the path to the database and the database name
     :type db_info_dict: dict
