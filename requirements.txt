@@ -1,7 +1,7 @@
 # pip install -r requirements.txt
 
 # base ----------------------------------------
-panoptes-client==1.5.0
+panoptes-client==1.6.0
 python-magic==0.4.24
 -e git+https://github.com/julian-r/python-magic.git#egg=python-magic-bin
 opencv-python==4.6.0.66
