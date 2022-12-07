@@ -22,8 +22,7 @@ WORKDIR /usr/src/app
 ADD https://api.github.com/repos/ocean-data-factory-sweden/koster_yolov4/git/refs/heads/master version.json
 RUN git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
 # Copy files with minor changes from main repository
-RUN cp /usr/src/app/koster_yolov4/src/nn_matching.py /usr/src/app/koster_yolov4/yolov5_tracker/strong_sort/sort/nn_matching.py
-RUN cp /usr/src/app/koster_yolov4/src/track.py /usr/src/app/koster_yolov4/yolov5_tracker/track.py
+RUN cp /usr/src/app/koster_yolov4/src/multi_tracker_zoo.py /usr/src/app/koster_yolov4/yolov5_tracker/trackers/strong_sort/multi_tracker_zoo.py
 
 # Copy contents
 # COPY . /usr/src/app
