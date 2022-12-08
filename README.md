@@ -66,7 +66,11 @@ Navigate to the folder where you have cloned the repository or unzipped the manu
 cd kso-object-detection
 ```
 
-Then install the requirements by running.
+We recommend using a clean virtual environment to install requirements. If you are using conda, feel free to run:
+```python
+conda env create -f conda_env.yaml
+```
+If you are using another virtual environment package, run the following inside your fresh environment (Python 3.8).
 ```python
 pip install -r requirements.txt
 ```
