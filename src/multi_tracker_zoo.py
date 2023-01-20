@@ -9,10 +9,10 @@ ROOT = FILE.parents[0]
 
 
 def create_tracker(tracker_type, appearance_descriptor_weights, device, half):
-    if tracker_type == 'strongsort':
+    if tracker_type == "strongsort":
         # initialize StrongSORT
         cfg = get_config()
-        cfg.merge_from_file(str(ROOT / 'strong_sort/configs/strong_sort.yaml'))
+        cfg.merge_from_file(str(ROOT / "strong_sort/configs/strong_sort.yaml"))
 
         strongsort = StrongSORT(
             appearance_descriptor_weights,
@@ -25,24 +25,16 @@ def create_tracker(tracker_type, appearance_descriptor_weights, device, half):
             nn_budget=cfg.STRONGSORT.NN_BUDGET,
             mc_lambda=cfg.STRONGSORT.MC_LAMBDA,
             ema_alpha=cfg.STRONGSORT.EMA_ALPHA,
-
         )
         return strongsort
-    elif tracker_type == 'ocsort':
-        ocsort = OCSort(
-            det_thresh=0.45,
-            iou_threshold=0.2,
-            use_byte=False 
-        )
+    elif tracker_type == "ocsort":
+        ocsort = OCSort(det_thresh=0.45, iou_threshold=0.2, use_byte=False)
         return ocsort
-    elif tracker_type == 'bytetrack':
+    elif tracker_type == "bytetrack":
         bytetracker = BYTETracker(
-            track_thresh=0.6,
-            track_buffer=30,
-            match_thresh=0.8,
-            frame_rate=30
+            track_thresh=0.6, track_buffer=30, match_thresh=0.8, frame_rate=30
         )
         return bytetracker
     else:
-        print('No such tracker')
+        print("No such tracker")
         exit()
