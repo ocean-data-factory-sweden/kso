@@ -3,6 +3,8 @@ FROM nvcr.io/nvidia/pytorch:21.05-py3 AS build
 
 RUN apt update
 RUN apt install -y zip htop screen libgl1-mesa-glx
+RUN apt-get autoremove
+RUN apt-get clean
 
 # Install python dependencies
 COPY requirements.txt .
@@ -11,6 +13,9 @@ RUN python -m pip install --upgrade pip
 # Create working directory
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
+
+# Copy contents
+COPY . /usr/src/app
 
 ADD https://api.github.com/repos/ocean-data-factory-sweden/koster_yolov4/git/refs/heads/master version.json
 RUN git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
@@ -28,9 +33,6 @@ RUN python -m pip install --no-cache torch==1.9.0+cu111 torchvision==0.10.0+cu11
 # Install SNIC requirements
 RUN jupyter nbextension install --user --py widgetsnbextension
 RUN jupyter nbextension install --user --py jupyter_bbox_widget
-
-# Copy contents
-# COPY . /usr/src/app
 
 # Set environment variables
 ENV HOME=/usr/src/app/koster_yolov4
