@@ -8,10 +8,6 @@ RUN apt install -y zip htop screen libgl1-mesa-glx
 COPY requirements.txt .
 RUN python -m pip install --upgrade pip
 
-# Install SNIC requirements
-RUN jupyter nbextension install --user --py widgetsnbextension
-RUN jupyter nbextension install --user --py jupyter_bbox_widget
-
 # Create working directory
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
@@ -28,6 +24,10 @@ RUN python -m pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlpr
 RUN python -m pip install --no-cache -r /usr/src/app/requirements.txt coremltools onnx gsutil notebook
 RUN pip uninstall -y torch torchvision
 RUN python -m pip install --no-cache torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+
+# Install SNIC requirements
+RUN jupyter nbextension install --user --py widgetsnbextension
+RUN jupyter nbextension install --user --py jupyter_bbox_widget
 
 # Copy contents
 # COPY . /usr/src/app
