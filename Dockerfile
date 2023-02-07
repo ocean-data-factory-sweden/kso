@@ -1,15 +1,12 @@
 # Start FROM Nvidia PyTorch image https://ngc.nvidia.com/catalog/containers/nvidia:pytorch
-FROM nvcr.io/nvidia/pytorch:21.05-py3
+FROM nvcr.io/nvidia/pytorch:21.05-py3 AS build
 
-RUN apt update && apt install -y zip htop screen libgl1-mesa-glx
+RUN apt update
+RUN apt install -y zip htop screen libgl1-mesa-glx
 
 # Install python dependencies
 COPY requirements.txt .
 RUN python -m pip install --upgrade pip
-RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
-RUN pip install --no-cache -r requirements.txt coremltools onnx gsutil notebook
-RUN pip uninstall -y torch torchvision
-RUN pip install --no-cache torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
 # Install SNIC requirements
 RUN jupyter nbextension install --user --py widgetsnbextension
@@ -23,6 +20,14 @@ ADD https://api.github.com/repos/ocean-data-factory-sweden/koster_yolov4/git/ref
 RUN git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
 # Copy files with minor changes from main repository
 RUN cp /usr/src/app/koster_yolov4/src/multi_tracker_zoo.py /usr/src/app/koster_yolov4/yolov5_tracker/trackers/strong_sort/multi_tracker_zoo.py
+
+FROM nvcr.io/nvidia/pytorch:21.05-py3
+COPY --from=build /usr/src/app /usr/src/app
+
+RUN python -m pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
+RUN python -m pip install --no-cache -r /usr/src/app/requirements.txt coremltools onnx gsutil notebook
+RUN pip uninstall -y torch torchvision
+RUN python -m pip install --no-cache torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
 # Copy contents
 # COPY . /usr/src/app
