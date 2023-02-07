@@ -55,5 +55,6 @@ gdown==3.13.0
 itables==0.3.0
 scp==0.14.1
 dataclass-csv==1.4.0
+split-folders==0.5.1
 # getpass
 
