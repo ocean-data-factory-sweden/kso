@@ -36,8 +36,8 @@ RUN jupyter nbextension install --user --py jupyter_bbox_widget
 
 # Set environment variables
 ENV HOME=/usr/src/app/koster_yolov4
-ENV WANDB_DIR=/cephyr/NOBACKUP/groups/snic2021-6-9/
-ENV WANDB_CACHE_DIR=/cephyr/NOBACKUP/groups/snic2021-6-9/
+ENV WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/
+ENV WANDB_CACHE_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/
 
 ## Binder setup
 
