@@ -149,8 +149,8 @@ We are always excited to collaborate and help other marine scientists. Please fe
 [binder_tut_3]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-data-management/main
 [colab_tut_4]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-data-management/blob/main/tutorials/04_Upload_frames_to_Zooniverse.ipynb
 [binder_tut_4]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-data-management/main
-[colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/05_Train_ML_models.ipynb
-[binder_tut_5]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-data-management/main
+[colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/dev/tutorials/05_Train_ML_models.ipynb
+[binder_tut_5]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-data-management/dev
 [colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/06_Evaluate_ML_Models.ipynb
 [binder_tut_6]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-data-management/main
 [colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/07_Transfer_ML_Models.ipynb
