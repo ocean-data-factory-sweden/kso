@@ -59,3 +59,5 @@ split-folders==0.5.1
 openpyxl==3.1.0
 # getpass
 
+# fixing text encoding ------------------------
+ftfy==6.1.1
