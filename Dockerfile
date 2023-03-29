@@ -28,6 +28,7 @@ COPY --from=build /usr/src/app /usr/src/app
 RUN python -m pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 RUN python -m pip install --no-cache -r /usr/src/app/requirements.txt coremltools onnx gsutil notebook
 RUN python -m pip install --no-cache -r /usr/src/app/koster_yolov4/yolov5_tracker/requirements.txt
+RUN python -m pip install --no-cache -r /usr/src/app/koster_yolov4/yolov5_tracker/yolov5/requirements.txt
 RUN pip uninstall -y torch torchvision
 RUN python -m pip install --no-cache torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
