@@ -5,8 +5,8 @@ panoptes-client==1.5.0
 python-magic==0.4.24
 -e git+https://github.com/julian-r/python-magic.git#egg=python-magic-bin
 opencv-python==4.6.0.66
-opencv-python-headless
-opencv-contrib-python
+opencv-python-headless==4.5.5.64
+opencv-contrib-python==4.7.0.72
 matplotlib>=3.2.2
 numpy>=1.18.5
 PyYAML>=5.3.1
@@ -51,6 +51,7 @@ thop  # FLOPs computation
 
 #tutorial extras
 ipyfilechooser==0.4.4
+ipywidgets==7.7.2
 gdown==4.6.4
 itables==0.3.0
 scp==0.14.1
