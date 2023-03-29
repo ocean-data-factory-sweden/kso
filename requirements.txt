@@ -52,7 +52,7 @@ thop  # FLOPs computation
 #tutorial extras
 ipyfilechooser==0.4.4
 ipywidgets==7.7.2
-gdown==4.6.4
+gdown==4.7.1
 itables==0.3.0
 scp==0.14.1
 dataclass-csv==1.4.0
