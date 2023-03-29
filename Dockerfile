@@ -15,7 +15,7 @@ RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
 # Copy contents
-# COPY . /usr/src/app
+#COPY . /usr/src/app
 
 ADD https://api.github.com/repos/ocean-data-factory-sweden/koster_yolov4/git/refs/heads/master version.json
 RUN git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
@@ -26,7 +26,7 @@ FROM nvcr.io/nvidia/pytorch:21.05-py3
 COPY --from=build /usr/src/app /usr/src/app
 
 RUN python -m pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
-RUN python -m pip install --no-cache -r /usr/src/app/requirements.txt coremltools onnx gsutil notebook
+RUN python -m pip install --no-cache -r /usr/src/app/koster_yolov4/requirements.txt coremltools onnx gsutil notebook
 RUN python -m pip install --no-cache -r /usr/src/app/koster_yolov4/yolov5_tracker/requirements.txt
 RUN python -m pip install --no-cache -r /usr/src/app/koster_yolov4/yolov5_tracker/yolov5/requirements.txt
 RUN pip uninstall -y torch torchvision
