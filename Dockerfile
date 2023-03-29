@@ -15,7 +15,7 @@ RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
 # Copy contents
-COPY . /usr/src/app
+# COPY . /usr/src/app
 
 ADD https://api.github.com/repos/ocean-data-factory-sweden/koster_yolov4/git/refs/heads/master version.json
 RUN git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
