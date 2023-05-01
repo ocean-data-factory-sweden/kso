@@ -18,7 +18,7 @@ jupyter==1.0.0
 PIMS==0.6.1
 av==8.1.0
 fastapi==0.73.0
-uvicorn==0.17.2
+uvicorn==0.22.0
 #streamlit==1.5.0
 protobuf==3.15.8
 python-multipart==0.0.5
