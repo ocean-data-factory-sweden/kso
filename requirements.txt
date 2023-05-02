@@ -1,2 +1,4 @@
 # pip install -r requirements.txt
 
+jupyter_bbox_widget==0.5.0
+
