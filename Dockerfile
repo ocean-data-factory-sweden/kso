@@ -22,7 +22,7 @@ RUN cp /usr/src/app/koster_yolov4/src/multi_tracker_zoo.py /usr/src/app/koster_y
 FROM nvcr.io/nvidia/pytorch:21.05-py3
 COPY --from=build /usr/src/app /usr/src/app
 
-RUN python -m pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof torch torchvision
+RUN python -m pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 # Install numpy first to avoid lap build error
 RUN python -m pip install --upgrade pip
 RUN python -m pip install numpy
