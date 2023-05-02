@@ -25,8 +25,8 @@ COPY --from=build /usr/src/app /usr/src/app
 RUN python -m pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof torch torchvision
 # Install numpy first to avoid lap build error
 RUN python -m pip install numpy
-RUN python -m pip install --no-cache -r /usr/src/app/koster_yolov4/yolov5_tracker/requirements.txt --no-cache -r /usr/src/app/koster_yolov4/yolov5_tracker/yolov5/requirements.txt --no-cache -r /usr/src/app/koster_yolov4/kso_utils/requirements.txt --no-cache torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
-
+RUN python -m pip install --no-cache torch==1.9.0+cu111 torchvision==0.10.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+RUN python -m pip install --no-cache -r /usr/src/app/koster_yolov4/yolov5_tracker/requirements.txt --no-cache -r /usr/src/app/koster_yolov4/yolov5_tracker/yolov5/requirements.txt --no-cache -r /usr/src/app/koster_yolov4/kso_utils/requirements.txt
 # Install SNIC requirements
 RUN jupyter nbextension install --user --py widgetsnbextension
 RUN jupyter nbextension install --user --py jupyter_bbox_widget
