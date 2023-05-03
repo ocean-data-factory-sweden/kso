@@ -24,6 +24,7 @@ COPY --from=build /usr/src/app /usr/src/app
 
 RUN python -m pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 # Install numpy first to avoid lap build error
+RUN python -m pip install --upgrade pip
 RUN python -m pip install numpy
 RUN python -m pip install -r /usr/src/app/koster_yolov4/requirements.txt -r /usr/src/app/koster_yolov4/yolov5_tracker/requirements.txt -r /usr/src/app/koster_yolov4/yolov5_tracker/yolov5/requirements.txt -r /usr/src/app/koster_yolov4/kso_utils/requirements.txt
 # Install SNIC requirements
