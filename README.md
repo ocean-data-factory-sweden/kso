@@ -25,7 +25,9 @@ This Object Detection module contains scripts and resources to train and evaluat
 
 ![object_detection_module][object_detection_module]
 
-The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to Koster pipelines (src folder) and utils (kso_utils). It is not recommended to simply clone this repository as many dependencies are resolved using the supplied Dockerfile. The notebooks rely on the [koster utility functions][koster_utils_repo].
+The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to Koster pipelines (src folder) and utils (kso_utils). The notebooks rely on the [koster utility functions][koster_utils_repo].
+
+Users can run these tutorials via Google Colab (by clicking on the colab links in the table below), locally  or on SNIC.
 
 ### Tutorials
 | Name                                              | Description                                                                                 | Try it!  | 
@@ -44,39 +46,61 @@ The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytic
   
 \* Project-specific tutorial
 
-## Dev Installation
+## Local Installation
 If you want to fully use our system (Binder has computing limitations), you will need to download this repository on your local computer or server.
 
 ### Requirements
-* [Python 3.7+](https://www.python.org/)
+* [Python 3.8](https://www.python.org/)
 * [Anaconda](https://docs.anaconda.com/anaconda/install/index.html)
 * [GIT](https://git-scm.com/downloads)
 
-### Option 1: Local / Cloud Installation
------------------
+
 #### Download this repository
 Clone this repository using
 ```python
 git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/kso-object-detection.git
 ``` 
+#### Prepare your system
+* Windows: If you will run it on a windows computer, you need to install the microsoft build tools C++ with a version that is higher than 14.0. You can install it from https://visualstudio.microsoft.com/visual-cpp-build-tools/. In the install menu, you only need to select the "Windows <your version> SDK".
+* Linux: ...upcoming...
+* Apple: ...upcominb...
 
-#### Install dependecies
-Navigate to the folder where you have cloned the repository or unzipped the manually downloaded repository. 
-```python
-cd kso-object-detection
-```
+#### Set up the environment with conda
+1. Open the anaconda prompt
+2. Navigate to the folder where you have cloned the repository or unzipped the manually downloaded repository. Then go into the kso-object-detection folder. (```cd kso-object-detection ```)
+3. Create an anaconda environment with python 3.8:
 
-We recommend using a clean virtual environment to install requirements. If you are using conda, feel free to run:
-```python
-conda env create -f conda_env.yaml
-```
-If you are using another virtual environment package, run the following inside your fresh environment (Python 3.8).
-```python
-pip install -r requirements.txt
-```
-### Option 2: SNIC Users (VPN required)
+```conda create -n <name env> python=3.8 ```
 
------------------
+4. Enter the environment: 
+
+```conda activate <name env>```
+
+5. Install numpy to prevent an error that will otherwise occur in the next step.
+
+```pip install numpy==1.22```
+
+6. Install all the requirements. Do you NOT have a GPU, run the following:
+
+```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r kso_utils/requirements.txt```
+
+Do you have a GPU? Find here (https://pytorch.org/) which pytorch installation you need depending on your device and cuda version. Add the recommended command to the gpu_requirements_user.txt in the same way as the current example is added. Then run:
+
+```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r kso_utils/requirements.txt -r gpu_requirements_user.txt```
+
+
+#### Set up the environment with another virtual environment package
+If you are using another virtual environment package, install the same requirements inside your fresh environment (Python 3.8).
+
+
+#### Link your environment to jupyter notebooks
+After installing all the requirements, run from your environment the following command:
+
+```ipython kernel install --user --name=<name env>```
+
+Now open the jupyter notebook and select/change kernel to run the notebooks from your environment.
+
+## SNIC Users (VPN required)
 
 **Before using Option 2, users should have login credentials and have setup the Chalmers VPN on their local computers**
 
@@ -100,6 +124,26 @@ This will directly queue a server session using the correct container image, fir
 
 Important note: The remaining time for the server is shown in green window as well. If you have finished using the notebook server before the alloted time runs out, please select **"Delete"** so that the resources can be released for use by others within the project. 
 
+## Starting a new project
+If you will work in a new project you will need to:
+1. Create initial information for the database: Input the information about the underwater footage files, sites and species of interest. You can use a [template of the csv files](https://drive.google.com/file/d/1PZGRoSY_UpyLfMhRphMUMwDXw4yx1_Fn/view?usp=sharing) and move the directory to the "db_starter" folder.
+2. Link your footage to the database: You will need files of underwater footage to run this system. You can [download some samples](https://drive.google.com/drive/folders/1t2ce8euh3SEU2I8uhiZN1Tu-76ZDqB6w?usp=sharing) and move them to `db_starter`. You can also store your own files and specify their directory in the tutorials.
+
+
+## Developer instructions
+If you would like to expand and improve the KSO cpabilities, pleas follow the instructions above to set the project up on your own local computer.
+
+When you start adding changes, please create your own branch on top of dev. Before submitting a Merge Request, please:
+* run Black on the code you have edited 
+```shell
+black filename 
+```
+* update the timestamp on the notebook
+```shell
+python update_ts.py filename 
+```
+Remember to follow the [conventional commits guidelines](https://www.conventionalcommits.org/en/v1.0.0/) to facilitate code sharing. 
+
 
 ## Citation
 
@@ -112,16 +156,13 @@ You can find out more about the project at https://www.zooniverse.org/projects/v
 
 We are always excited to collaborate and help other marine scientists. Please feel free to [contact us](matthias.obst@marine.gu.se) with your questions.
 
-## Dev instructions
+## Troubleshooting
 
-- Installing conda 
-- Create new environment (e.g. "new environment")
-- Install git and pip (with conda)
-- Clone kso repo
-- pip install ipykernel
-- python -m ipykernel install --user --name="new_environment"
-- from the jupyter notebook select kernel/change kernel
-
+If you experience issues uploading movies to Zooniverse, it might be related to the libmagic package. In Windows, the following commands seem to work:
+```python
+pip install python-libmagic
+pip install python-magic-bin
+```
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
