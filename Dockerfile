@@ -15,7 +15,7 @@ RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
 ADD https://api.github.com/repos/ocean-data-factory-sweden/koster_yolov4/git/refs/heads/master version.json
-RUN git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
+RUN git clone -b master --single-branch --recurse-submodules https://github.com/ocean-data-factory-sweden/koster_yolov4.git
 # Copy files with minor changes from main repository
 RUN cp /usr/src/app/koster_yolov4/src/multi_tracker_zoo.py /usr/src/app/koster_yolov4/yolov5_tracker/trackers/multi_tracker_zoo.py
 
