@@ -17,17 +17,17 @@ The Koster Seafloor Observatory is an open-source, citizen science and machine l
 [![GPL License][license-shield]][license-url]
 
 ### KSO Information architecture
-The system processes underwater footage and its associatead metadata into biologically-meaningfull information. The format of the underwater media is standard (.mp4 or .png) and the associated metadata should be captured in three csv files (“movies”, “sites” and “species”) following  the [Darwin Core standards (DwC)](https://dwc.tdwg.org/simple/). 
+The system processes underwater footage and its associatead metadata into biologically-meaningful information. The format of the underwater media is standardised (typically .mp4 or .jpg) and the associated metadata should be captured in three csv files (“movies”, “sites” and “species”) following  the [Darwin Core standards (DwC)](https://dwc.tdwg.org/simple/). 
 ![koster_info_diag][high-level-overview]
 
 ## Module Overview
-This Object Detection module contains scripts and resources to train and evaluate object detection models.
+This module contains scripts and resources to train and evaluate machine learning models.
 
 ![object_detection_module][object_detection_module]
 
-The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to Koster pipelines (src folder) and utils (kso_utils). The notebooks rely on the [koster utility functions][koster_utils_repo].
+The tutorials enable users to customise [Yolov5][YoloV5] models using Ultralytics. The repository contains both model-specific files (same structure as Ultralytics) as well as specific source files related to KSO pipelines (see 'src' folder) and utilities to facilitate common workflows (kso_utils). The notebooks rely on the [koster utility functions][koster_utils_repo].
 
-Users can run these tutorials via Google Colab (by clicking on the colab links in the table below), locally  or on SNIC.
+Users can run these tutorials via Google Colab (by clicking on the Colab links in the table below), locally or on SNIC.
 
 ### Tutorials
 | Name                                              | Description                                                                                 | Try it!  | 
@@ -61,14 +61,14 @@ Clone this repository using
 git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/kso-object-detection.git
 ``` 
 #### Prepare your system
-* Windows: If you will run it on a windows computer, you need to install the microsoft build tools C++ with a version that is higher than 14.0. You can install it from https://visualstudio.microsoft.com/visual-cpp-build-tools/. In the install menu, you only need to select the "Windows <your version> SDK".
+* Windows: If you will run it on a Windows system, you need to install the Microsoft Build Tools C++ with a version higher than 14.0. You can install it from https://visualstudio.microsoft.com/visual-cpp-build-tools/. In the install menu, you only need to select the "Windows <your version> SDK".
 * Linux: ...upcoming...
-* Apple: ...upcominb...
+* MacOS: ...upcoming...
 
-#### Set up the environment with conda
-1. Open the anaconda prompt
+#### Set up the environment with Conda
+1. Open the Anaconda Prompt
 2. Navigate to the folder where you have cloned the repository or unzipped the manually downloaded repository. Then go into the kso-object-detection folder. (```cd kso-object-detection ```)
-3. Create an anaconda environment with python 3.8:
+3. Create an Anaconda environment with python 3.8:
 
 ```conda create -n <name env> python=3.8 ```
 
@@ -80,11 +80,11 @@ git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/kso-
 
 ```pip install numpy==1.22```
 
-6. Install all the requirements. Do you NOT have a GPU, run the following:
+6. Install all the requirements. If you do not have a GPU, run the following:
 
 ```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r kso_utils/requirements.txt```
 
-Do you have a GPU? Find here (https://pytorch.org/) which pytorch installation you need depending on your device and cuda version. Add the recommended command to the gpu_requirements_user.txt in the same way as the current example is added. Then run:
+Have a GPU? Find out which pytorch installation you need here (https://pytorch.org/), depending on your device and CUDA version. Add the recommended command to the gpu_requirements_user.txt file in the same way as the current example. Then run:
 
 ```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r kso_utils/requirements.txt -r gpu_requirements_user.txt```
 
@@ -93,12 +93,12 @@ Do you have a GPU? Find here (https://pytorch.org/) which pytorch installation y
 If you are using another virtual environment package, install the same requirements inside your fresh environment (Python 3.8).
 
 
-#### Link your environment to jupyter notebooks
-After installing all the requirements, run from your environment the following command:
+#### Link your environment to Jupyter notebooks
+After installing all the requirements, run the following command in your environment:
 
 ```ipython kernel install --user --name=<name env>```
 
-Now open the jupyter notebook and select/change kernel to run the notebooks from your environment.
+Now open the Jupyter notebook and select/change kernel to run the notebooks from your environment.
 
 ## SNIC Users (VPN required)
 
@@ -131,18 +131,14 @@ If you will work in a new project you will need to:
 
 
 ## Developer instructions
-If you would like to expand and improve the KSO cpabilities, pleas follow the instructions above to set the project up on your own local computer.
+If you would like to expand and improve the KSO capabilities, please follow the instructions above to set the project up on your own local computer.
 
-When you start adding changes, please create your own branch on top of dev. Before submitting a Merge Request, please:
+When you start adding changes, please create your own branch on top of the current 'dev' branch. Before submitting a Merge Request, please:
 * run Black on the code you have edited 
 ```shell
 black filename 
 ```
-* update the timestamp on the notebook
-```shell
-python update_ts.py filename 
-```
-Remember to follow the [conventional commits guidelines](https://www.conventionalcommits.org/en/v1.0.0/) to facilitate code sharing. 
+We ask that you please follow the [conventional commits guidelines](https://www.conventionalcommits.org/en/v1.0.0/) to facilitate code sharing. 
 
 
 ## Citation
