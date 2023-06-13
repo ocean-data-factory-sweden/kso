@@ -37,11 +37,9 @@ jobs:
         with:
           # relative path to the place where source code with Dockerfile is located
           context: .
-          # Note: tags has to be all lower-case
-          tags: |
-            jannesg/koster-yolov4:latest 
-          # build on feature branches, push only on main branch
-          push: ${{ github.ref == 'refs/heads/master' }}
+          # build on feature branches, push only on master branch or pull request
+          push: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/pull/') }}  # Push for master branch and pull requests
+          tags: ${{ github.ref == 'refs/heads/master' && 'jannesg/koster-yolov4:latest' || 'jannesg/koster-yolov4:PR' }}
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
