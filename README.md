@@ -113,9 +113,9 @@ To use the Jupyter Notebooks within the Alvis HPC cluster, please visit [Alvis P
 
 Once you have been authorized, click on "Interactive Apps" and then "Jupyter". This open the server creation options. 
 
-Creating a Jupyter session requires a custom environment file, which is available on our shared drive */mimer/NOBACKUP/groups/snic2022-22-1210/jupter_envs*. Please copy these files to your **Home Directory** in order to use the custom environments we have created.
+Creating a Jupyter session requires a custom environment file, which is available on our shared drive */mimer/NOBACKUP/groups/snic2022-22-1210/jupter_envs*. Please copy this file (kso-jupyter.sh) to your **Home Directory** in order to use the custom environment we have created.
 
-Here you can keep the settings as default, apart from the "Number of hours" which you can set to the desired limit. Then choose either **Data Management (Runtime (User specified jupyter1.sh))** or **Machine Learning (Runtime (User specified jupyter2.sh))** from the Runtime dropdown options.
+Here you can keep the settings as default, apart from the "Number of hours" which you can set to the desired limit. Then choose kso-jupyter.sh from the Runtime dropdown options.
 
 ![screenshot_load][screenshot_loading]
 
