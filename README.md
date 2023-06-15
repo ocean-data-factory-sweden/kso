@@ -1,4 +1,4 @@
-# KSO - Machine Learning models
+# KSO System
 
 The Koster Seafloor Observatory is an open-source, citizen science and machine learning approach to analyse subsea movies.
 
