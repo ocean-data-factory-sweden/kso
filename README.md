@@ -178,7 +178,7 @@ pip install python-magic-bin
 [license-shield]: https://img.shields.io/github/license/ocean-data-factory-sweden/kso-object-detection.svg?style=for-the-badge
 [license-url]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/LICENSE.txt
 [high-level-overview2]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/high-level-overview-2.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
-[high-level-overview]: https://github.com/ocean-data-factory-sweden/koster_data_management/blob/master/assets/high-level-overview.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
+[high-level-overview]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/high-level-overview.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
 [Data_management_module]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/Koster_data_management_module.png?raw=true
 [object_detection_module]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/Koster_object_detection_module.png?raw=true
 [koster_utils_repo]: https://github.com/ocean-data-factory-sweden/kso_utils
