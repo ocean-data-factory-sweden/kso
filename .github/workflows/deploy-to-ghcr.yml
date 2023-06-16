@@ -16,6 +16,10 @@ jobs:
       contents: read
       packages: write
     steps:
+      - name: Free disk space (specific to ubuntu-20.04 images)
+        run: |
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
       - name: Checkout repository
         uses: actions/checkout@v3
 
