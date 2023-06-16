@@ -4,6 +4,7 @@ FROM nvcr.io/nvidia/cuda:12.0.1-cudnn8-devel-ubuntu20.04 as builder
 ARG DEBIAN_FRONTEND=noninteractive      # So that we are not asked for user input during the build
 
 RUN apt-get update && \
+    apt-get clean && \
     apt-get upgrade -y && \
     apt-get install -y make automake gcc g++ subversion git && \
     apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev build-essential yasm cmake libtool libc6 libc6-dev unzip wget libnuma1 libnuma-dev pkg-config && \
