@@ -16,12 +16,16 @@ jobs:
 
     # steps to perform in job
     steps:
+      - name: Free disk space (specific to ubuntu-20.04 images)
+        run: |
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           submodules: true
 
-      # setup Docker buld action
+      # setup Docker build action
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
@@ -37,11 +41,10 @@ jobs:
         with:
           # relative path to the place where source code with Dockerfile is located
           context: .
-          # Note: tags has to be all lower-case
-          tags: |
-            jannesg/koster-yolov4:latest 
-          # build on feature branches, push only on main branch
-          push: ${{ github.ref == 'refs/heads/master' }}
+          tags: ${{ github.ref == 'refs/heads/master' && 'jannesg/koster-yolov4:latest' || 'jannesg/koster-yolov4:PR' }}
+          # build on feature branches, push only on master branch or pull request
+          push: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/pull/') }}  # Push for master branch and pull requests
+          
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
