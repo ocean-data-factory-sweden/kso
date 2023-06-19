@@ -20,8 +20,17 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet || true
           sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+      
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /var/lib/docker
+          key: ${{ runner.os }}-docker-${{ github.sha }}
 
       - name: Get tag
         id: repository
@@ -38,6 +47,5 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-            #platforms: linux/amd64
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ env.tag }}
