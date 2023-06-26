@@ -2,8 +2,8 @@ name: Build and Publish
 
 on:
   # run it on push to the default repository branch
-  push:
-    branches: [master, dev]
+  #push:
+  #  branches: [master, dev]
   # run it during pull request
   workflow_dispatch:
   #pull_request:
