@@ -44,4 +44,4 @@ jobs:
         with:
           context: .
           push: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/pull/') }}  # Push for master branch and pull requests
-          tags: ${{ github.ref == 'refs/heads/master' && ghcr.io/${{ github.repository }}:${{ env.tag }} || ghcr.io/${{ github.repository }}:PR }}
+          tags: ${{ github.ref == 'refs/heads/master' && 'ghcr.io/${{ github.repository }}:${{ env.tag }}' || 'ghcr.io/${{ github.repository }}:PR' }}
