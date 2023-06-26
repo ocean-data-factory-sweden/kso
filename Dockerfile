@@ -8,9 +8,10 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y make automake gcc g++ subversion git && \
     apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev build-essential yasm cmake libtool libc6 libc6-dev unzip wget libnuma1 libnuma-dev pkg-config && \
-    apt-get install -y libmagic-dev && \
-	# --- Build ffmpeg with CUDA support from source ---
-	git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
+    apt-get install -y libmagic-dev
+
+# --- Build ffmpeg with CUDA support from source ---
+RUN	git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
     cd nv-codec-headers && \
     make install && \
     cd .. && \
