@@ -36,12 +36,11 @@ jobs:
         id: set-tag
         run: |
           if [ "${{ github.ref }}" == "refs/heads/master" ]; then
-            echo "::set-output name=tag::${{ env.tag }}"
+            echo "IMGTAG=${{ env.tag }}" >> "$GITHUB_OUTPUT"
           else
-            echo "::set-output name=tag::PR"
+            echo "IMGTAG=PR" >> "$GITHUB_OUTPUT"
           fi
 
-      
       - name: Log in to the Container registry
         uses: docker/login-action@v2
         with:
@@ -54,4 +53,4 @@ jobs:
         with:
           context: .
           push: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/pull/') }}  # Push for master branch and pull requests
-          tags: ghcr.io/${{ github.repository }}:${{ steps.set-tag.outputs.tag }}
+          tags: ghcr.io/${{ github.repository }}:${{ steps.set-tag.outputs.IMGTAG }}
