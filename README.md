@@ -61,7 +61,7 @@ If you want to fully use our system (Binder has computing limitations), you will
 #### Download this repository
 Clone this repository using
 ```python
-git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/kso-object-detection.git
+git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/kso.git
 ``` 
 #### Prepare your system
 Depending on which system you are using (Windows/Linux/MacOS), you might need to install some extra tools. If this is the case, you will get a message of what you need to install in the next steps. 
@@ -69,7 +69,7 @@ For example, on a windows system it will request you to install the Microsoft Bu
 
 #### Set up the environment with Conda
 1. Open the Anaconda Prompt
-2. Navigate to the folder where you have cloned the repository or unzipped the manually downloaded repository. Then go into the kso-object-detection folder. (```cd kso-object-detection ```)
+2. Navigate to the folder where you have cloned the repository or unzipped the manually downloaded repository. Then go into the kso folder. (```cd kso ```)
 3. Create an Anaconda environment with python 3.8:
 
 ```conda create -n <name env> python=3.8 ```
@@ -113,7 +113,7 @@ To use the Jupyter Notebooks within the Alvis HPC cluster, please visit [Alvis P
 
 Once you have been authorized, click on "Interactive Apps" and then "Jupyter". This open the server creation options. 
 
-Creating a Jupyter session requires a custom environment file, which is available on our shared drive */mimer/NOBACKUP/groups/snic2022-22-1210/jupter_envs*. Please copy this file (kso-jupyter.sh) to your **Home Directory** in order to use the custom environment we have created.
+Creating a Jupyter session requires a custom environment file, which is available on our shared drive */mimer/NOBACKUP/groups/snic2022-22-1210/jupter_envs*. Please copy this file (jupyter-kso.sh) to your **Home Directory** in order to use the custom environment we have created.
 
 Here you can keep the settings as default, apart from the "Number of hours" which you can set to the desired limit. Then choose kso-jupyter.sh from the Runtime dropdown options.
 
@@ -167,46 +167,46 @@ pip install python-magic-bin
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/ocean-data-factory-sweden/kso-object-detection.svg?style=for-the-badge
-[contributors-url]: https://https://github.com/ocean-data-factory-sweden/kso-object-detection/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/ocean-data-factory-sweden/kso-object-detection.svg?style=for-the-badge
-[forks-url]: https://github.com/ocean-data-factory-sweden/kso-object-detection/network/members
-[stars-shield]: https://img.shields.io/github/stars/ocean-data-factory-sweden/kso-object-detection.svg?style=for-the-badge
-[stars-url]: https://github.com/ocean-data-factory-sweden/kso-object-detection/stargazers
-[issues-shield]: https://img.shields.io/github/issues/ocean-data-factory-sweden/kso-object-detection.svg?style=for-the-badge
-[issues-url]: https://github.com/ocean-data-factory-sweden/kso-object-detection/issues
-[license-shield]: https://img.shields.io/github/license/ocean-data-factory-sweden/kso-object-detection.svg?style=for-the-badge
-[license-url]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/LICENSE.txt
-[high-level-overview2]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/high-level-overview-2.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
-[high-level-overview]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/high-level-overview.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
-[Data_management_module]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/Koster_data_management_module.png?raw=true
-[object_detection_module]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/Koster_object_detection_module.png?raw=true
+[contributors-shield]: https://img.shields.io/github/contributors/ocean-data-factory-sweden/kso.svg?style=for-the-badge
+[contributors-url]: https://https://github.com/ocean-data-factory-sweden/kso/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/ocean-data-factory-sweden/kso.svg?style=for-the-badge
+[forks-url]: https://github.com/ocean-data-factory-sweden/kso/network/members
+[stars-shield]: https://img.shields.io/github/stars/ocean-data-factory-sweden/kso.svg?style=for-the-badge
+[stars-url]: https://github.com/ocean-data-factory-sweden/kso/stargazers
+[issues-shield]: https://img.shields.io/github/issues/ocean-data-factory-sweden/kso.svg?style=for-the-badge
+[issues-url]: https://github.com/ocean-data-factory-sweden/kso/issues
+[license-shield]: https://img.shields.io/github/license/ocean-data-factory-sweden/kso.svg?style=for-the-badge
+[license-url]: https://github.com/ocean-data-factory-sweden/kso/blob/master/LICENSE.txt
+[high-level-overview2]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/high-level-overview-2.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
+[high-level-overview]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/high-level-overview.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
+[Data_management_module]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/Koster_data_management_module.png?raw=true
+[object_detection_module]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/Koster_object_detection_module.png?raw=true
 [koster_utils_repo]: https://github.com/ocean-data-factory-sweden/kso_utils
 [colablogo]: https://colab.research.google.com/assets/colab-badge.svg
 [binderlogo]: https://mybinder.org/badge_logo.svg
-[colab_tut_1]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/01_Check_and_update_csv_files.ipynb
-[binder_tut_1]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-object-detection/master
-[colab_tut_2]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/02_Upload_new_footage.ipynb
-[binder_tut_2]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-object-detection/master
-[colab_tut_3]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/03_Upload_clips_to_Zooniverse.ipynb
-[binder_tut_3]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-object-detection/master
-[colab_tut_4]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/04_Upload_frames_to_Zooniverse.ipynb
-[binder_tut_4]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-object-detection/master
-[colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/05_Train_ML_models.ipynb
-[binder_tut_5]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-object-detection/master
-[colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/06_Evaluate_ML_Models.ipynb
-[binder_tut_6]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-object-detection/master
-[colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/07_Transfer_ML_Models.ipynb
-[binder_tut_7]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-object-detection/master
-[colab_tut_8]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/08_Analyse_Aggregate_Zooniverse_Annotations.ipynb
-[binder_tut_8]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-object-detection/master
-[colab_tut_11]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/11_Concatenate_videos_from_AWS.ipynb
-[binder_tut_11]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-object-detection/master
-[colab_tut_12]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso-object-detection/blob/master/tutorials/12_Display_movies_available_on_the_server.ipynb
-[binder_tut_12]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso-object-detection/master
-[objdecmodule]: https://github.com/ocean-data-factory-sweden/kso-object-detection
+[colab_tut_1]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/01_Check_and_update_csv_files.ipynb
+[binder_tut_1]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[colab_tut_2]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/02_Upload_new_footage.ipynb
+[binder_tut_2]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[colab_tut_3]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/03_Upload_clips_to_Zooniverse.ipynb
+[binder_tut_3]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[colab_tut_4]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/04_Upload_frames_to_Zooniverse.ipynb
+[binder_tut_4]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/05_Train_ML_models.ipynb
+[binder_tut_5]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/06_Evaluate_ML_Models.ipynb
+[binder_tut_6]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/07_Transfer_ML_Models.ipynb
+[binder_tut_7]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[colab_tut_8]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/08_Analyse_Aggregate_Zooniverse_Annotations.ipynb
+[binder_tut_8]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[colab_tut_11]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/11_Concatenate_videos_from_AWS.ipynb
+[binder_tut_11]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[colab_tut_12]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/12_Display_movies_available_on_the_server.ipynb
+[binder_tut_12]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[objdecmodule]: https://github.com/ocean-data-factory-sweden/kso
 [YoloV5]: https://github.com/ultralytics/yolov5
 [OBIS-site]: https://www.gbif.org/network/2b7c7b4f-4d4f-40d3-94de-c28b6fa054a6
-[Koster_info_diagram]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/Koster_information_flow.png?raw=true "Information architecture of the Koster Seafloor Observatory"
-[screenshot_loading]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/screenshot_loading.png?raw=true
-[screenshot_started]: https://github.com/ocean-data-factory-sweden/kso-object-detection/blob/master/assets/screenshot_started.png?raw=true
+[Koster_info_diagram]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/Koster_information_flow.png?raw=true "Information architecture of the Koster Seafloor Observatory"
+[screenshot_loading]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/screenshot_loading.png?raw=true
+[screenshot_started]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/screenshot_started.png?raw=true

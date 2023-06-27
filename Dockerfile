@@ -8,9 +8,10 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y make automake gcc g++ subversion git && \
     apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev build-essential yasm cmake libtool libc6 libc6-dev unzip wget libnuma1 libnuma-dev pkg-config && \
-    apt-get install -y libmagic-dev && \
-	# --- Build ffmpeg with CUDA support from source ---
-	git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
+    apt-get install -y libmagic-dev
+
+# --- Build ffmpeg with CUDA support from source ---
+RUN	git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
     cd nv-codec-headers && \
     make install && \
     cd .. && \
@@ -36,17 +37,17 @@ RUN apt-get update && \
 	python3 -m pip install --upgrade pip --user && \
     apt-get clean && \
 	# --- Clone git and replace the files in the submodules with ones created by us, to make it work for our repo. ---
-	git clone --recurse-submodules -b master https://github.com/ocean-data-factory-sweden/koster_yolov4.git && \
-	cp /usr/src/app/koster_yolov4/src/multi_tracker_zoo.py /usr/src/app/koster_yolov4/yolov5_tracker/trackers/multi_tracker_zoo.py && \
+	git clone --recurse-submodules -b master https://github.com/ocean-data-factory-sweden/kso.git && \
+	cp /usr/src/app/kso/src/multi_tracker_zoo.py /usr/src/app/kso/yolov5_tracker/trackers/multi_tracker_zoo.py && \
 	# --- Installing all python packages, numpy needs to be installed first to avoid the lap build error ---
 	python3 -m pip install numpy && \
-    python3 -m pip install -r /usr/src/app/koster_yolov4/yolov5_tracker/requirements.txt -r /usr/src/app/koster_yolov4/yolov5_tracker/yolov5/requirements.txt -r /usr/src/app/koster_yolov4/kso_utils/requirements.txt 
+    python3 -m pip install -r /usr/src/app/kso/yolov5_tracker/requirements.txt -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt -r /usr/src/app/kso/kso_utils/requirements.txt 
 	
 # --- Set environment variables ---
-ENV HOME=/usr/src/app/koster_yolov4 \
+ENV HOME=/usr/src/app/kso \
 	WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
 	WANDB_CACHE_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
-	PYTHONPATH=$PYTHONPATH:/usr/src/app/koster_yolov4
+	PYTHONPATH=$PYTHONPATH:/usr/src/app/kso
  
 # --- Set everything up to work with the jupyter notebooks --- 
 ARG NB_USER=jovyan 
