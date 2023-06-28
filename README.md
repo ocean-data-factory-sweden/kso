@@ -159,7 +159,7 @@ We are always excited to collaborate and help other marine scientists. Please fe
 
 ## Troubleshooting
 
-If you experience issues uploading movies to Zooniverse, it might be related to the libmagic package. In Windows, the following commands seem to work:
+If you experience issues with the Panoptes package and/or uploading movies to Zooniverse, it might be related to the libmagic package. In Windows, the following commands might fix the issue:
 ```python
 pip install python-libmagic
 pip install python-magic-bin
