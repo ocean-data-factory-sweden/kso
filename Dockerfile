@@ -21,8 +21,8 @@ RUN	git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
     make install
 	
 # --- Start over from the docker image with cuda 12.0, since we only want the final result from the previous run and we copy that. ---
-# Now we could use the runtime cuda image, since that is smaller, but then we run out of disk, so we use the devel image again. See github issue #198 in kso-object-detection
-FROM nvcr.io/nvidia/cuda:12.0.1-cudnn8-devel-ubuntu20.04
+# Now we can use the runtime cuda image, since we do not need to build anything from scratch. This is better, since the runtime image is smaller
+FROM nvcr.io/nvidia/cuda:12.0.1-cudnn8-runtime-ubuntu20.04
 COPY --from=builder /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
 ARG DEBIAN_FRONTEND=noninteractive      # So that we are not asked for user input during the build
 
