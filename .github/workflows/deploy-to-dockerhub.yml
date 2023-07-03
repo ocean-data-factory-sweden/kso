@@ -37,7 +37,7 @@ jobs:
       
       - name: Run notebook tests
         id: tests
-        run: pytest --disable-warnings test/notebook-tests.py
+        run: pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }} --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py
 
       # setup Docker build action
       - name: Set up Docker Buildx
