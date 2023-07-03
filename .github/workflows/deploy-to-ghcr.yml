@@ -26,7 +26,7 @@ jobs:
         with:
           python-version: 3.8
       - name: Install dependencies
-        run: pip install --upgrade pip && pip install pytest && pip install -r kso_utils/requirements.txt -r yolov5/requirements.txt  -r yolov5_tracker/requirements.txt 
+        run: pip install --upgrade pip && pip install numpy && pip install pytest && pip install -r kso_utils/requirements.txt -r yolov5/requirements.txt  -r yolov5_tracker/requirements.txt 
       - name: Run notebook tests
         id: tests
         run: >-
