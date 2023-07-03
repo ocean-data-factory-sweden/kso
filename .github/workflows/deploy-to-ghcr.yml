@@ -22,12 +22,25 @@ jobs:
         with:
           submodules: true
       - name: Set up Python
+        if: github.ref != 'refs/heads/master'
         uses: actions/setup-python@v4
         with:
           python-version: 3.8
+      - name: Setup ffmpeg
+        if: github.ref != 'refs/heads/master'
+        id: setup-ffmpeg
+        run: sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -y ffmpeg
       - name: Install dependencies
+        if: github.ref != 'refs/heads/master'
         run: pip install pip==21.1.1 && pip install numpy && pip install pytest && pip install -r kso_utils/requirements.txt -r yolov5_tracker/requirements.txt 
+      - name: Login W&B
+        if: github.ref != 'refs/heads/master'
+        shell: bash
+        env:
+          WANDB_API: ${{ secrets.WANDB_KEY }}
+        run: wandb login "$WANDB_API"
       - name: Run notebook tests
+        if: github.ref != 'refs/heads/master'
         id: tests
         run: >-
           pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }}
