@@ -19,7 +19,7 @@ import os
 import sys
 
 # for when we are running it on git, the yaml file will install the docker image. then we do need to go to the correct directory
-os.chdir("../tutorials")
+os.chdir("tutorials")
 
 # https://stackoverflow.com/questions/15044447/how-do-i-unit-testing-my-gui-program-with-python-and-pyqt
 # for if we want to test the widgets
