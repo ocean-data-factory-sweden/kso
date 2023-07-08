@@ -17,7 +17,7 @@ The Koster Seafloor Observatory is an open-source, citizen science and machine l
 [![GPL License][license-shield]][license-url]
 
 ### KSO Information architecture
-The system processes underwater footage and its associatead metadata into biologically-meaningful information. The format of the underwater media is standardised (typically .mp4 or .jpg) and the associated metadata should be captured in three csv files (“movies”, “sites” and “species”) following  the [Darwin Core standards (DwC)](https://dwc.tdwg.org/simple/). 
+The system processes underwater footage and its associated metadata into biologically-meaningful information. The format of the underwater media is standardised (typically .mp4 or .jpg) and the associated metadata should be captured in three csv files (“movies”, “sites” and “species”) following  the [Darwin Core standards (DwC)](https://dwc.tdwg.org/simple/). 
 ![koster_info_diag][high-level-overview2]
 
 ## Repository Overview
@@ -28,23 +28,22 @@ This repository contains scripts and resources to:
 
 ![high-level][high-level-overview]
 
-The system is built around a series of easy-to-use Jupyter notebook tutorials. Each tutorial allows users to perform a specific task of the system (e.g. upload footage to the citizen science platform or analyse the classified data). The notebooks rely on the [koster utility functions][koster_utils_repo].
+The system is built around a series of easy-to-use Jupyter Notebook tutorials. Each tutorial allows users to perform a specific task of the system (e.g. upload footage to the citizen science platform or analyse the classified data). The notebooks rely on the [koster utility functions][koster_utils_repo].
 
 Users can run these tutorials via Google Colab (by clicking on the Colab links in the table below), locally or on SNIC.
 
 ### Tutorials
 | Name                                              | Description                                                                                 | Try it!  | 
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------|
-| 1. Check footage and metadata                     | Check format and contents of footage and sites, media and species csv files                 | [![Open In Colab][colablogo]][colab_tut_1] [![binder][binderlogo]][binder_tut_1] | 
-| 2. Upload new media to the system*                | Upload new underwater media to the cloud/server and update the csv files                    | [![Open In Colab][colablogo]][colab_tut_2] [![binder][binderlogo]][binder_tut_2] | 
-| 3. Upload clips to Zooniverse                     | Prepare original footage and upload short clips to Zooniverse                               | [![Open In Colab][colablogo]][colab_tut_3] [![binder][binderlogo]][binder_tut_3] |
-| 4. Upload frames to Zooniverse                    | Extract frames of interest from original footage and upload them to Zooniverse              | [![Open In Colab][colablogo]][colab_tut_4] [![binder][binderlogo]][binder_tut_4] |
-| 5. Train ML models                                | Prepare the training and test data, set model parameters and train models                   | [![Open In Colab][colablogo]][colab_tut_5] [![binder][binderlogo]][binder_tut_5] | 
-| 6. Evaluate ML models                            | Use ecologically-relevant metrics to test the models                                        | [![Open In Colab][colablogo]][colab_tut_6] [![binder][binderlogo]][binder_tut_6]   |
-| 7. Publish ML models                               | Publish the model to a public repository                                                   | [![Open In Colab][colablogo]][colab_tut_7] [![binder][binderlogo]][binder_tut_7]  | 
-| 8. Analyse Zooniverse classifications             | Pull up-to-date classifications from Zooniverse and report summary stats/graphs             | [![Open In Colab][colablogo]][colab_tut_8] [![binder][binderlogo]][binder_tut_8] |
-| 9. Download and format Zooniverse classifications | Pull up-to-date classifications from Zooniverse and format them for further analysis        | Coming soon  | 
-| 10. Run ML models on footage                      | Automatically classify new footage                                                          | Coming soon  |
+| 1. Check footage and metadata                     | Check format and contents of footage and sites, media and species csv files                 | [![Open In Colab][colablogo]][colab_tut_1] [![binder][binderlogo]][binder_tut] | 
+| 2. Upload new media to the system*                | Upload new underwater media to the cloud/server and update the csv files                    | [![Open In Colab][colablogo]][colab_tut_2] [![binder][binderlogo]][binder_tut] | 
+| 3. Upload clips to Zooniverse                     | Prepare original footage and upload short clips to Zooniverse                               | [![Open In Colab][colablogo]][colab_tut_3] [![binder][binderlogo]][binder_tut] |
+| 4. Upload frames to Zooniverse                    | Extract frames of interest from original footage and upload them to Zooniverse              | [![Open In Colab][colablogo]][colab_tut_4] [![binder][binderlogo]][binder_tut] |
+| 5. Train ML models                                | Prepare the training and test data, set model parameters and train models                   | [![Open In Colab][colablogo]][colab_tut_5] [![binder][binderlogo]][binder_tut] | 
+| 6. Evaluate ML models                            | Use ecologically-relevant metrics to test the models                                        | [![Open In Colab][colablogo]][colab_tut_6] [![binder][binderlogo]][binder_tut]   |
+| 7. Publish ML models                               | Publish the model to a public repository                                                   | [![Open In Colab][colablogo]][colab_tut_7] [![binder][binderlogo]][binder_tut]  | 
+| 8. Analyse Zooniverse classifications             | Pull up-to-date classifications from Zooniverse and report summary stats/graphs             | [![Open In Colab][colablogo]][colab_tut_8] [![binder][binderlogo]][binder_tut] |
+| 9. Run ML models on footage                      | Automatically classify new footage                                                          | [![Open In Colab][colablogo]][colab_tut_9] [![binder][binderlogo]][binder_tut] |
 
   
 \* Project-specific tutorial
@@ -64,13 +63,13 @@ Clone this repository using
 git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/kso.git
 ``` 
 #### Prepare your system
-Depending on which system you are using (Windows/Linux/MacOS), you might need to install some extra tools. If this is the case, you will get a message of what you need to install in the next steps. 
-For example, on a windows system it will request you to install the Microsoft Build Tools C++ with a version higher than 14.0. You can install it from https://visualstudio.microsoft.com/visual-cpp-build-tools/. In the install menu, you only need to select the "Windows <your version> SDK".
+Depending on which system you are using (Windows/Linux/MacOS), you might need to install some extra tools. If this is the case, you will get a message about what you need to install in the next steps. 
+For example, on a Windows system, it will request you to install the Microsoft Build Tools C++ with a version higher than 14.0. You can install it from https://visualstudio.microsoft.com/visual-cpp-build-tools/. You only need to select the "Windows <your version> SDK" in the install menu.
 
 #### Set up the environment with Conda
 1. Open the Anaconda Prompt
 2. Navigate to the folder where you have cloned the repository or unzipped the manually downloaded repository. Then go into the kso folder. (```cd kso ```)
-3. Create an Anaconda environment with python 3.8:
+3. Create an Anaconda environment with Python 3.8:
 
 ```conda create -n <name env> python=3.8 ```
 
@@ -92,7 +91,7 @@ Have a GPU? Find out which pytorch installation you need here (https://pytorch.o
 
 
 #### Set up the environment with another virtual environment package
-If you are using another virtual environment package, install the same requirements inside your fresh environment (Python 3.8).
+If using another virtual environment package, install the same requirements inside your fresh environment (Python 3.8).
 
 
 #### Link your environment to Jupyter notebooks
@@ -104,14 +103,13 @@ Now open the Jupyter notebook and select/change kernel to run the notebooks from
 
 ## SNIC Users (VPN required)
 
-**Before using Option 2, users should have login credentials and have setup the Chalmers VPN on their local computers**
+**Before using the VPN to connect to SNIC, users should have login credentials and set up the Chalmers VPN on their local computers**
 
-Information for Windows users: [Click here](https://it.portal.chalmers.se/itportal/NonCDAWindows/VPN)
-Information for MAC users: [Click here](https://it.portal.chalmers.se/itportal/NonCDAMac/VPN)
+Instructions to [set up the Chalmers VPN](https://www.c3se.chalmers.se/documentation/connecting/#vpn)
 
-To use the Jupyter Notebooks within the Alvis HPC cluster, please visit [Alvis Portal](https://portal.c3se.chalmers.se) and login using your SNIC credentials. 
+To use the Jupyter Notebooks within the Alvis HPC cluster, please visit [Alvis Portal](https://portal.c3se.chalmers.se) and log in using your SNIC credentials. 
 
-Once you have been authorized, click on "Interactive Apps" and then "Jupyter". This open the server creation options. 
+Once you have been authorized, click on "Interactive Apps" and then "Jupyter". This will open the server creation options. 
 
 Creating a Jupyter session requires a custom environment file, which is available on our shared drive */mimer/NOBACKUP/groups/snic2022-22-1210/jupter_envs*. Please copy this file (jupyter-kso.sh) to your **Home Directory** in order to use the custom environment we have created.
 
@@ -119,15 +117,15 @@ Here you can keep the settings as default, apart from the "Number of hours" whic
 
 ![screenshot_load][screenshot_loading]
 
-This will directly queue a server session using the correct container image, first showing a blue window and then you should see a green window when the session has been successfully started and the button **"Connect to Jupyter"** appears on the screen. Click this to launch into the Jupyter notebook environment. 
+This will directly queue a server session using the correct container image, first showing a blue window and then you should see a green window when the session has been successfully started and the button **"Connect to Jupyter"** appears on the screen. Click this to launch into the Jupyter Notebook environment. 
 
 
 ![screenshot_start][screenshot_started]
 
-Important note: The remaining time for the server is shown in green window as well. If you have finished using the notebook server before the alloted time runs out, please select **"Delete"** so that the resources can be released for use by others within the project. 
+Important note: The remaining time for the server is shown in green window as well. If you have finished using the notebook server before the allocated time runs out, please select **"Delete"** so that the resources can be released for use by others within the project. 
 
 ## Starting a new project
-If you will work in a new project you will need to:
+If you will work on a new project you will need to:
 1. Create initial information for the database: Input the information about the underwater footage files, sites and species of interest. You can use a [template of the csv files](https://drive.google.com/file/d/1PZGRoSY_UpyLfMhRphMUMwDXw4yx1_Fn/view?usp=sharing) and move the directory to the "db_starter" folder.
 2. Link your footage to the database: You will need files of underwater footage to run this system. You can [download some samples](https://drive.google.com/drive/folders/1t2ce8euh3SEU2I8uhiZN1Tu-76ZDqB6w?usp=sharing) and move them to `db_starter`. You can also store your own files and specify their directory in the tutorials.
 
@@ -152,7 +150,7 @@ If you use this code or its models in your research, please cite:
 
 Anton V, Germishuys J, Bergström P, Lindegarth M, Obst M (2021) An open-source, citizen science and machine learning approach to analyse subsea movies. Biodiversity Data Journal 9: e60548. https://doi.org/10.3897/BDJ.9.e60548
 
-## Collaborations/questions
+## Collaborations/Questions
 You can find out more about the project at https://www.zooniverse.org/projects/victorav/the-koster-seafloor-observatory.
 
 We are always excited to collaborate and help other marine scientists. Please feel free to contact us (matthias.obst(at)marine.gu.se) with your questions.
@@ -185,25 +183,15 @@ pip install python-magic-bin
 [colablogo]: https://colab.research.google.com/assets/colab-badge.svg
 [binderlogo]: https://mybinder.org/badge_logo.svg
 [colab_tut_1]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/01_Check_and_update_csv_files.ipynb
-[binder_tut_1]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[binder_tut]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
 [colab_tut_2]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/02_Upload_new_footage.ipynb
-[binder_tut_2]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
 [colab_tut_3]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/03_Upload_clips_to_Zooniverse.ipynb
-[binder_tut_3]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
 [colab_tut_4]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/04_Upload_frames_to_Zooniverse.ipynb
-[binder_tut_4]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
 [colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/05_Train_ML_models.ipynb
-[binder_tut_5]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
 [colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/06_Evaluate_ML_Models.ipynb
-[binder_tut_6]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
 [colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/07_Transfer_ML_Models.ipynb
-[binder_tut_7]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
 [colab_tut_8]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/08_Analyse_Aggregate_Zooniverse_Annotations.ipynb
-[binder_tut_8]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
-[colab_tut_11]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/11_Concatenate_videos_from_AWS.ipynb
-[binder_tut_11]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
-[colab_tut_12]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/12_Display_movies_available_on_the_server.ipynb
-[binder_tut_12]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
+[colab_tut_9]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/10_Run_ML_Models_on_footage.ipynb
 [objdecmodule]: https://github.com/ocean-data-factory-sweden/kso
 [YoloV5]: https://github.com/ultralytics/yolov5
 [OBIS-site]: https://www.gbif.org/network/2b7c7b4f-4d4f-40d3-94de-c28b6fa054a6
