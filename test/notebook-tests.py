@@ -4,7 +4,11 @@
 This auto-test does not test if everything displays what it should display. 
 It mainly tests if everything still runs without giving any errors.
 
-This test contains the test for all notebooks. 
+This collection of tests covers the following tutorial notebooks:
+ - 1, 3, 4, 5, 6, 8
+
+All other tutorials are not tested automatically and care should be taken when
+making changes as these could break existing workflows. 
 
 To run these tests manually, use pytest --disable-warnings test/notebook-tests.py
 
@@ -20,6 +24,7 @@ if "kso_utils" not in sys.modules:
     os.chdir("tutorials")
     sys.path.append("..")
     import kso_utils.kso_utils
+
     sys.modules["kso_utils"] = kso_utils.kso_utils
 
 import kso_utils.project_utils as p_utils
@@ -30,7 +35,6 @@ from kso_utils.project import ProjectProcessor, MLProjectProcessor
 
 # -----------------Initiating of the project structure -------------------------
 # Initiate project's database
-
 project = p_utils.find_project(project_name="Template project")
 pp = ProjectProcessor(project)
 mlp = MLProjectProcessor(pp, test=True)
@@ -38,11 +42,6 @@ mlp = MLProjectProcessor(pp, test=True)
 os.makedirs("../test/test_output", exist_ok=True)
 
 # ----------------Tutorial 1----------------------------------------------------
-"""
-Does not test if the changes that can be made manually to the df are applied
-Does not test if we can preview the movies
-Both widgets can't be run due to a runtime error when nothing gets selected.
-"""
 
 
 def test_t1():
@@ -52,12 +51,13 @@ def test_t1():
     pp.map_sites()
     # Retrieve and display movies
     pp.get_movie_info()
+    # Preview the media (pre-selected)
     pp.preview_media(test=True)
 
     # Check species dataframe
     pp.check_species_meta()
 
-    # --- Manually updata metadata (same for sites, movies and species)
+    # Manually updata metadata (same for sites, movies and species)
     sites_df, sites_range_rows, sites_range_columns = pp.select_meta_range(
         meta_key="sites"
     )
@@ -80,6 +80,8 @@ def test_t1():
     pp.check_movies_meta(
         review_method=review_method.value, gpu_available=gpu_available.result
     )
+    # Test for length of final sites sheet dataframe. Since each meta table uses
+    # these functions interchangeably, we only test for sites metadata.
     assert len(sites_sheet_df) == 5
 
 
@@ -99,9 +101,13 @@ def test_t3(zoo_user, zoo_pass):
 
     # Connect to zooniverse w/ Github credential
     pp.get_zoo_info(zoo_cred=[zoo_user, zoo_pass])
+    # Pre-selected test movie
     pp.movie_selected = "movie_1.mp4"
+    # Check whether movie has been uploaded previously
     pp.check_movies_uploaded(pp.movie_selected)
+    # Do not use GPU by default
     gpu_available = kso_widgets.gpu_select()
+    # Generate a default number of clips for testing
     pp.generate_zu_clips(
         movie_name=pp.movie_selected,
         movie_path=pp.movie_path,
@@ -109,7 +115,7 @@ def test_t3(zoo_user, zoo_pass):
         use_gpu=gpu_available.result,
         test=True,
     )
-
+    # Ensure that the clips are returned as part of generated_clips
     assert len(pp.generated_clips) == 1
 
 
@@ -124,8 +130,11 @@ def test_t4(zoo_user, zoo_pass):
 
     # import kso_utils.widgets as kso_widgets
 
+    # Log into Zooniverse and load relevant data from their DB
     pp.get_zoo_info(zoo_cred=[zoo_user, zoo_pass])
+    # Fetch relevant frame subjects in dataframe (by default all species for testing)
     pp.get_frames(test=True)
+    # Generate frames from based on subject metadata
     pp.generate_zu_frames(test=True)
     # input_folder = kso_widgets.choose_folder()
     # output_folder = kso_widgets.choose_folder()
@@ -138,10 +147,13 @@ def test_t4(zoo_user, zoo_pass):
     #    num_frames=10,
     #    frames_skip=None,
     # )
+    # Ensure that extracted frames are of suitable size for upload to ZU
     t_utils.check_frame_size(
         frame_paths=pp.generated_frames["modif_frame_path"].unique()
     )
+    # Compare original vs modified frames (no interactivity tested)
     t_utils.compare_frames(df=pp.generated_frames)
+    # Test that final generated frames contain 9 rows (representing a classification)
     assert len(pp.generated_frames) == 9
 
 
@@ -183,7 +195,8 @@ def test_t5():
         batch_size=batch_size.value,
         img_size=img_h.value,
     )
-
+    # Test whether last.pt and best.pt are present in the weights folder (i.e. model training
+    # was successful)
     assert len(os.listdir(os.path.join(exp_path, "weights"))) == 2
 
     # Model evaluation
@@ -219,11 +232,13 @@ def test_t6():
     from datetime import datetime
 
     dt = datetime.now()
+
     # Create a unique experiment name
     exp_name = f"custom_{dt}".replace(" ", "_").replace(".", "_").replace(":", "-")
     mlp.output_path = "../test/test_output"
     project_path = os.path.join(mlp.output_path, mlp.project_name)
     exp_path = os.path.join(project_path, exp_name)
+
     # Evaluation
     s_utils.get_ml_data(project, test=True)
     model = mlp.choose_model().options[-1][1]
@@ -256,6 +271,7 @@ def test_t6():
         conf_thres=conf_thres.value,
         img_size=(640, 640),
     )
+    # Remove any residual files
     shutil.rmtree(exp_path)
 
 
@@ -296,6 +312,8 @@ def test_t8(zoo_user, zoo_pass):
         pp.zoo_info["classifications"],
     )
 
+    # Check that all classifications are retrieved
+    # from workflows
     assert len(class_df) == 9
 
     agg_params = kso_widgets.choose_agg_parameters(workflow_checks["Subject type: #0"])
@@ -307,6 +325,7 @@ def test_t8(zoo_user, zoo_pass):
         summary=False,
     )
 
+    # Check that aggregation was successful
     assert len(agg_df) == 3
 
     # Run the preparation script
