@@ -43,8 +43,8 @@ jobs:
         if: github.ref != 'refs/heads/master'
         id: tests
         run: >-
-          pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }}
-          --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py
+          cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py && pytest --disable-warnings test/widget-tests.py && pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }}
+          --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py 
       - name: Cache Docker layers
         uses: actions/cache@v2
         with:

@@ -100,7 +100,7 @@ def test_t3(zoo_user, zoo_pass):
     import kso_utils.widgets as kso_widgets
 
     # Connect to zooniverse w/ Github credential
-    pp.get_zoo_info(zoo_cred=[zoo_user, zoo_pass])
+    pp.connect_zoo_project(zoo_cred=[zoo_user, zoo_pass])
     # Pre-selected test movie
     pp.movie_selected = "movie_1.mp4"
     # Check whether movie has been uploaded previously
@@ -108,7 +108,7 @@ def test_t3(zoo_user, zoo_pass):
     # Do not use GPU by default
     gpu_available = kso_widgets.gpu_select()
     # Generate a default number of clips for testing
-    pp.generate_zu_clips(
+    pp.generate_zoo_clips(
         movie_name=pp.movie_selected,
         movie_path=pp.movie_path,
         is_example=True,
@@ -131,11 +131,15 @@ def test_t4(zoo_user, zoo_pass):
     # import kso_utils.widgets as kso_widgets
 
     # Log into Zooniverse and load relevant data from their DB
-    pp.get_zoo_info(zoo_cred=[zoo_user, zoo_pass])
+    pp.connect_zoo_project(zoo_cred=[zoo_user, zoo_pass])
+    # Process zoo classifications
+    pp.process_zoo_classifications(test=True)
+    # Aggregate classifications
+    pp.aggregate_zoo_classifications(test=True, agg_params=[0.1, 1])
     # Fetch relevant frame subjects in dataframe (by default all species for testing)
-    pp.get_frames(test=True)
+    pp.extract_zoo_frames(test=True)
     # Generate frames from based on subject metadata
-    pp.generate_zu_frames(test=True)
+    pp.modify_zoo_frames(test=True)
     # input_folder = kso_widgets.choose_folder()
     # output_folder = kso_widgets.choose_folder()
     # Generate suitable frames for upload by modifying initial frames
@@ -257,6 +261,8 @@ def test_t6():
     eval_dir = exp_path
     mlp.save_detections_wandb(conf_thres.value, model, eval_dir)
 
+    # Note: investigating training and validation datasets is not currently tested.
+
     # Create unique tracking experiment name
     track_exp_name = (
         f"tracker_test_{dt}".replace(" ", "_").replace(".", "_").replace(":", "-")
@@ -296,8 +302,8 @@ def test_t8(zoo_user, zoo_pass):
     import kso_utils.widgets as kso_widgets
 
     # Connect to zooniverse w/ Github credential
-    pp.get_zoo_info(zoo_cred=[zoo_user, zoo_pass])
-    pp.choose_workflows(generate_export=False, zoo_cred=[zoo_user, zoo_pass])
+    pp.connect_zoo_project(zoo_cred=[zoo_user, zoo_pass])
+    # pp.choose_workflows(generate_export=False, zoo_cred=[zoo_user, zoo_pass])
 
     workflow_checks = {
         "Workflow name: #0": "Development workflow",
@@ -316,17 +322,22 @@ def test_t8(zoo_user, zoo_pass):
     # from workflows
     assert len(class_df) == 9
 
-    agg_params = kso_widgets.choose_agg_parameters(workflow_checks["Subject type: #0"])
+    import kso_utils.zooniverse_utils as zoo_utils
 
-    agg_df, raw_df = pp.process_classifications(
-        pp.zoo_info["classifications"],
-        workflow_checks["Subject type: #0"],
-        agg_params,
-        summary=False,
+    zoo_utils.process_zoo_classifications(
+        project=pp.project,
+        db_connection=pp.db_connection,
+        csv_paths=pp.csv_paths,
+        classifications_data=pp.zoo_info["classifications"],
+        subject_type=workflow_checks["Subject type: #0"],
     )
 
+    agg_params = kso_widgets.choose_agg_parameters(workflow_checks["Subject type: #0"])
+
+    pp.aggregate_zoo_classifications(agg_params, test=True)
+
     # Check that aggregation was successful
-    assert len(agg_df) == 3
+    assert len(pp.aggregated_zoo_classifications) == 3
 
     # Run the preparation script
     mlp.output_path = "../test/test_output"
