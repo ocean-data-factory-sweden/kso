@@ -4,6 +4,10 @@ name: Build and Deploy Docker Image to GHCR
     branches:
       - master
       - dev
+  pull_request:
+    branches:
+      - master
+      - dev
   workflow_dispatch: null
   pull_request: null
 jobs:
