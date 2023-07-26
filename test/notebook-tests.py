@@ -82,7 +82,7 @@ def test_t1():
     )
     # Test for length of final sites sheet dataframe. Since each meta table uses
     # these functions interchangeably, we only test for sites metadata.
-    assert len(sites_sheet_df) == 5
+    assert len(sites_sheet_df) == 25
 
 
 # -------------Tutorial 2-------------------------------------------------------
