@@ -5,7 +5,6 @@ name: Build and Deploy Docker Image to GHCR
       - master
       - dev
   workflow_dispatch: null
-  pull_request: null
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
