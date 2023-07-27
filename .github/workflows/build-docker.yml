@@ -13,20 +13,35 @@ name: Build Docker Image
     branches:
       - master
       - dev
-    paths:
-      - Dockerfile
-      - kso_utils/requirements
-      - yolov5_tracker/requirements
-      - yolov5/requirements
+    #paths:
+    #  - Dockerfile
+    #  - kso_utils/requirements
+    #  - yolov5_tracker/requirements
+    #  - yolov5/requirements
 jobs:
-  build-and-push-image:
+  build-docker-image:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
-      - name: Free disk space (specific to Ubuntu images)
-        run: |
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
-      
+      - 
+        name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - 
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - 
+        name: Build the Docker image
+        uses: docker/build-push-action@v4
+        with:
+          load: true
+          tags: test-image
+          outputs: type=docker, dest=/tmp/myimage.tar
+        #run: docker build . --file Dockerfile --tag
+      - 
+        name: Upload artifact
+        uses: actions/upload-artifacts@v3
+        with:
+          name: test-image
+          path: /tmp/test-image.tar
+  
