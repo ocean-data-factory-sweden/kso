@@ -17,7 +17,9 @@ jobs:
       credentials:
         username: '${{ github.actor }}'
         password: '${{ secrets.GHCR_TOKEN }}'
-    
+    permissions:
+      contents: read
+      packages: write
     steps:
       - 
         name: Checkout repository
@@ -34,4 +36,18 @@ jobs:
  #     -
  #       name: Pull docker image from ghcr
  #       run: docker pull ghcr.io/${{ github.repository }}:PR
+ 
+      - 
+        name: Login W&B
+        if: github.ref != 'refs/heads/master'
+        shell: bash
+        env:
+          WANDB_API: ${{ secrets.WANDB_KEY }}
+        run: wandb login "$WANDB_API"
+      - name: Run notebook tests
+        if: github.ref != 'refs/heads/master'
+        id: tests
+        run: >-
+          cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py && pytest --disable-warnings test/widget-tests.py && pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }}
+          --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py 
   
