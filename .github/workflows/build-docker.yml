@@ -21,7 +21,15 @@ name: Build Docker Image
 jobs:
   build-docker-image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
+      - 
+        name: Free disk space (specific to Ubuntu images)
+        run: |
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
       - 
         name: Checkout repository
         uses: actions/checkout@v3
