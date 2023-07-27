@@ -9,10 +9,10 @@ name: Build Docker Image
       - kso_utils/requirements
       - yolov5_tracker/requirements
       - yolov5/requirements
-  pull_request: 
-    branches:
-      - master
-      - dev
+ # pull_request: 
+ #   branches:
+ #     - master
+ #     - dev
     #paths:
     #  - Dockerfile
     #  - kso_utils/requirements
