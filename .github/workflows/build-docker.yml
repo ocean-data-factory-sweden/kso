@@ -40,7 +40,7 @@ jobs:
         #run: docker build . --file Dockerfile --tag
       - 
         name: Upload artifact
-        uses: actions/upload-artifacts@v3
+        uses: actions/upload-artifact@v3
         with:
           name: test-image
           path: /tmp/test-image.tar
