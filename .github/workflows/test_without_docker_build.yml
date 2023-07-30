@@ -51,6 +51,6 @@ jobs:
         if: github.ref != 'refs/heads/master'
         id: tests
         run: >-
-          cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py && pytest --disable-warnings test/widget-tests.py && pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }}
+          cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py && python -m pytest --disable-warnings test/widget-tests.py && python -m pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }}
           --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py 
   
