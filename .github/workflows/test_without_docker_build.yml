@@ -36,8 +36,8 @@ jobs:
         run: "uname -a && id"
         shell: bash
       -
-        name: find path
-        run: "find / -name 'libGL*' ; true"
+        name: list nvidia dirs
+        run: "ls -l /usr/local/nvidia/lib && ls -l /usr/local/nvidia/lib64"
         shell: bash
       -
         name: Checkout repository
