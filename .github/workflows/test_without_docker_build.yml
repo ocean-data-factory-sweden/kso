@@ -37,21 +37,8 @@ jobs:
         with:
           submodules: true
       -
-        name: Display the path
-        run: echo $PATH
-        shell: bash
-      -
-        name: Display the path without shell
-        run: echo $PATH
-      -
-        name: show pip list
-        run: pip list
-      -
         name: Install pytest
         run: pip install pytest 
-      - 
-        name: pip show pytest
-        run: pip show pytest
       - 
         name: Login W&B
         if: github.ref != 'refs/heads/master'
