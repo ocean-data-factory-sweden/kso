@@ -33,7 +33,7 @@ jobs:
     steps:
       -
         name: who are we
-        run: "uname -a && id"
+        run: "uname -a && id && cat /etc/os-release"
         shell: bash
       -
         name: list nvidia dirs
@@ -46,18 +46,17 @@ jobs:
           submodules: true
       -
         name: Install pytest
-        run: pip install pytest 
-      - 
+        run: pip install pytest
+      -
         name: Login W&B
         if: github.ref != 'refs/heads/master'
         shell: bash
         env:
           WANDB_API: ${{ secrets.WANDB_KEY }}
         run: wandb login "$WANDB_API"
-      - 
+      -
         name: Run notebook tests
         if: github.ref != 'refs/heads/master'
         id: tests
         run: >-
-          cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py && python3 -m pytest --disable-warnings test/widget-tests.py && python3 -m pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }} --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py 
-  
+          cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py && python3 -m pytest --disable-warnings test/widget-tests.py && python3 -m pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }} --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py
