@@ -39,7 +39,6 @@ jobs:
       -
         name: Install pytest
         run: pip install pytest 
-             pip install -e .
              pip show pytest
       - 
         name: Login W&B
