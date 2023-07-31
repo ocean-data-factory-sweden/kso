@@ -38,7 +38,9 @@ jobs:
           submodules: true
       -
         name: Install pytest
-        run: pip install --user pytest 
+        run: pip install pytest 
+             pip install -e .
+             pip show pytest
       - 
         name: Login W&B
         if: github.ref != 'refs/heads/master'
@@ -51,6 +53,6 @@ jobs:
         if: github.ref != 'refs/heads/master'
         id: tests
         run: >-
-          cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py && /.local/bin/pytest --disable-warnings test/widget-tests.py && /.local/bin/pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }}
+          pip show pytest && cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py && pytest --disable-warnings test/widget-tests.py && pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }}
           --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py 
   
