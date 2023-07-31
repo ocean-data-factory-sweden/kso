@@ -33,11 +33,11 @@ jobs:
     steps:
       -
         name: who are we
-        run: "uname -a && id && cat /etc/os-release"
+        run: "uname -a && id && cat /etc/os-release && env"
         shell: bash
       -
         name: list nvidia dirs
-        run: "ls -l /usr/local/nvidia/lib && ls -l /usr/local/nvidia/lib64"
+        run: "ls -R /usr"
         shell: bash
       -
         name: Checkout repository
