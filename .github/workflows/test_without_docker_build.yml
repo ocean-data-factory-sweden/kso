@@ -31,9 +31,10 @@ jobs:
       contents: read
       packages: write
     steps:
-      - 
+      -
         name: find path
-        run: find / -name libGL.so*
+        run: "find / -name 'libGL*' ; true"
+        shell: bash
       -
         name: Checkout repository
         uses: actions/checkout@v3
