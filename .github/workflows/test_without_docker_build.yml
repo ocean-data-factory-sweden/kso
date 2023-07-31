@@ -32,6 +32,9 @@ jobs:
       packages: write
     steps:
       - 
+        name: find path
+        run: find / -name libGL.so*
+      -
         name: Checkout repository
         uses: actions/checkout@v3
         with:
