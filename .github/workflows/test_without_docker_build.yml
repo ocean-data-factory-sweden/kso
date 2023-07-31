@@ -32,6 +32,10 @@ jobs:
       packages: write
     steps:
       -
+        name: who are we
+        run: "uname -a && id"
+        shell: bash
+      -
         name: find path
         run: "find / -name 'libGL*' ; true"
         shell: bash
