@@ -73,6 +73,8 @@ RUN apt-get update && \
     apt-get install --no-install-recommends -y \
         python3.8 \
         python3-pip \
+        python3-dev \
+	build-essential \
         git \
         vim && \
     apt-get clean && \
@@ -89,7 +91,8 @@ RUN apt-get update && \
     python3 -m pip --no-cache-dir install \
         -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
         -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
-        -r /usr/src/app/kso/kso_utils/requirements.txt
+        -r /usr/src/app/kso/kso_utils/requirements.txt && \
+    apt-get remove --autoremove -y git python3-dev build-essential
 
 # Set environment variables
 ENV HOME=/usr/src/app/kso \
