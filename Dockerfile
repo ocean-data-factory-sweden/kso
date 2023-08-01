@@ -3,46 +3,39 @@
 # Only having the python package is not enough. ---
 # To build from source we need the devel cuda image.
 FROM nvcr.io/nvidia/cuda:12.0.1-cudnn8-devel-ubuntu20.04 as builder
-ARG DEBIAN_FRONTEND=noninteractive      # So that we are not asked for user input during the build
+# So that we are not asked for user input during the build
+ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get clean && \
     apt-get upgrade -y && \
-    apt-get install -y \
-        make \
+    apt-get install --no-install-recommends -y \
         automake \
-        gcc \
-        g++ \
-        subversion \
-        git \
-        libglib2.0-0 \
-        libsm6 \
-        libxext6 \
-        libxrender-dev \
+        autoconf \
         build-essential \
-        yasm \
-        cmake \
-        libtool \
-        libc6 \
+        git \
         libc6-dev \
-        unzip \
-        wget \
-        libnuma1 \
-        libnuma-dev \
+        libtool \
+        libxcb1-dev \
+        libxau-dev \
+        libxdmcp-dev \
         pkg-config \
-        libmagic-dev
+        yasm && \
+    apt-get clean
 
 # Build ffmpeg with CUDA support from source
 RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
     cd nv-codec-headers && \
     make install && \
     cd .. && \
-    git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg/ && \
+    git clone https://git.ffmpeg.org/ffmpeg.git --depth 1 ffmpeg/ && \
     cd ffmpeg && \
     ./configure \
         --enable-nonfree \
         --enable-cuda-nvcc \
         --enable-libnpp \
+        --disable-doc \
+        --disable-ffplay \
+        --disable-ffprobe \
         --extra-cflags=-I/usr/local/cuda/include \
         --extra-ldflags=-L/usr/local/cuda/lib64 && \
     make -j 8 && \
@@ -54,28 +47,28 @@ RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
 # from scratch. This is better, since the runtime image is smaller
 FROM nvcr.io/nvidia/cuda:12.0.1-cudnn8-runtime-ubuntu20.04
 COPY --from=builder /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
-ARG DEBIAN_FRONTEND=noninteractive      # So that we are not asked for user input during the build
+# So that we are not asked for user input during the build
+ARG DEBIAN_FRONTEND=noninteractive
 
 # Create a working directory
 WORKDIR /usr/src/app
 
 # Install everything that is needed
 RUN apt-get update && \
-    apt-get install -y \
-        libglib2.0-0 \
-        libsm6 \
-        libxext6 \
+    apt-get install --no-install-recommends -y \
         libc6 \
-        libnuma1 \
-        libmagic1 \
-        libxrender1 && \
+        libgl1 \
+        libxau6 \
+        libxcb1 \
+        libxdmcp6 && \
     # Install python and git and upgrade pip
-    apt-get install -y \
+    apt-get install --no-install-recommends -y \
         python3.8 \
         python3-pip \
+        python3-dev \
+        build-essential \
         git \
         vim && \
-    python3 -m pip install --upgrade pip --user && \
     apt-get clean && \
     # Clone git and replace the files in the submodules
     # with ones created by us, to make it work for our repo.
@@ -85,11 +78,13 @@ RUN apt-get update && \
         /usr/src/app/kso/yolov5_tracker/trackers/multi_tracker_zoo.py && \
     # Install all python packages, numpy needs to be installed
     # first to avoid the lap build error
-    python3 -m pip install numpy && \
-    python3 -m pip install \
+    python3 -m pip --no-cache-dir install --upgrade pip && \
+    python3 -m pip --no-cache-dir install numpy && \
+    python3 -m pip --no-cache-dir install \
         -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
         -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
-        -r /usr/src/app/kso/kso_utils/requirements.txt
+        -r /usr/src/app/kso/kso_utils/requirements.txt && \
+    apt-get remove --autoremove -y git python3-dev build-essential
 
 # Set environment variables
 ENV HOME=/usr/src/app/kso \
