@@ -57,6 +57,7 @@ WORKDIR /usr/src/app
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
         libc6 \
+        libgl1 \
         libxau6 \
         libxcb1 \
         libxdmcp6 && \
