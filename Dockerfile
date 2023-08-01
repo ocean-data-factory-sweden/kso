@@ -6,9 +6,8 @@ FROM nvcr.io/nvidia/cuda:12.0.1-cudnn8-devel-ubuntu20.04 as builder
 ARG DEBIAN_FRONTEND=noninteractive      # So that we are not asked for user input during the build
 
 RUN apt-get update && \
-    apt-get clean && \
     apt-get upgrade -y && \
-    apt-get install -y \
+    apt-get install --no-install-recommends -y \
         make \
         automake \
         gcc \
@@ -30,7 +29,8 @@ RUN apt-get update && \
         libnuma1 \
         libnuma-dev \
         pkg-config \
-        libmagic-dev
+        libmagic-dev && \
+    apt-get clean
 
 # Build ffmpeg with CUDA support from source
 RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
@@ -61,7 +61,7 @@ WORKDIR /usr/src/app
 
 # Install everything that is needed
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install --no-install-recommends -y \
         libglib2.0-0 \
         libsm6 \
         libxext6 \
@@ -70,12 +70,11 @@ RUN apt-get update && \
         libmagic1 \
         libxrender1 && \
     # Install python and git and upgrade pip
-    apt-get install -y \
+    apt-get install --no-install-recommends -y \
         python3.8 \
         python3-pip \
         git \
         vim && \
-    python3 -m pip install --upgrade pip --user && \
     apt-get clean && \
     # Clone git and replace the files in the submodules
     # with ones created by us, to make it work for our repo.
@@ -85,8 +84,9 @@ RUN apt-get update && \
         /usr/src/app/kso/yolov5_tracker/trackers/multi_tracker_zoo.py && \
     # Install all python packages, numpy needs to be installed
     # first to avoid the lap build error
-    python3 -m pip install numpy && \
-    python3 -m pip install \
+    python3 -m pip --no-cache-dir install --upgrade pip && \
+    python3 -m pip --no-cache-dir install numpy && \
+    python3 -m pip --no-cache-dir install \
         -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
         -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
         -r /usr/src/app/kso/kso_utils/requirements.txt
