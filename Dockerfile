@@ -79,7 +79,7 @@ RUN apt-get update && \
     python3 -m pip --no-cache-dir install --upgrade pip && \
     python3 -m pip --no-cache-dir install numpy && \
     python3 -m pip --no-cache-dir install \
-        jupyter_contrib_nbextensions jupyter==1.0.0 \
+        jupyter_contrib_nbextensions==0.7.0 jupyter==1.0.0 av==8.1.0 more-itertools==9.1.0 notebook==6.5.4\
         -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
         -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
         -r /usr/src/app/kso/kso_utils/requirements.txt && \
