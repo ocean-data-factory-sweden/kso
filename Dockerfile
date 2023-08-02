@@ -53,6 +53,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Create a working directory
 WORKDIR /usr/src/app
 
+COPY . ./kso
 # Install everything that is needed
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
@@ -70,9 +71,6 @@ RUN apt-get update && \
         git \
         vim && \
     apt-get clean && \
-    # Clone git and replace the files in the submodules
-    # with ones created by us, to make it work for our repo.
-    git clone --recurse-submodules -b master https://github.com/ocean-data-factory-sweden/kso.git && \
     cp \
         /usr/src/app/kso/src/multi_tracker_zoo.py \
         /usr/src/app/kso/yolov5_tracker/trackers/multi_tracker_zoo.py && \
@@ -81,34 +79,29 @@ RUN apt-get update && \
     python3 -m pip --no-cache-dir install --upgrade pip && \
     python3 -m pip --no-cache-dir install numpy && \
     python3 -m pip --no-cache-dir install \
+        jupyter_contrib_nbextensions \
         -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
         -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
         -r /usr/src/app/kso/kso_utils/requirements.txt && \
     apt-get remove --autoremove -y git python3-dev build-essential
 
 # Set environment variables
-ENV HOME=/usr/src/app/kso \
-        WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
-        WANDB_CACHE_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
-        PYTHONPATH=$PYTHONPATH:/usr/src/app/kso
+ENV WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
+    WANDB_CACHE_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
+    PYTHONPATH=$PYTHONPATH:/usr/src/app/kso
 
 # Set everything up to work with the jupyter notebooks
 ARG NB_USER=jovyan
 ARG NB_UID=1000
 ENV USER=${NB_USER} \
-	NB_UID=${NB_UID} \
-	HOME=/home/${NB_USER}
+    NB_UID=${NB_UID} \
+    HOME=/home/${NB_USER}
 RUN adduser --disabled-password \
     --gecos "Default user" \
     --uid ${NB_UID} \
     ${NB_USER} && \
     # Ensure widget extensions are activated
-    jupyter nbextension enable --user --py widgetsnbextension && \
-    jupyter nbextension enable --user --py jupyter_bbox_widget
+    jupyter contrib nbextension enable --user --py widgetsnbextension && \
+    jupyter contrib nbextension enable --user --py jupyter_bbox_widget
 
-# Make sure that the contents of our repo are in ${HOME}
-COPY . ${HOME}
-USER root
-RUN chown ${NB_USER} -R ${HOME}
 USER ${NB_USER}
-WORKDIR ${HOME}
