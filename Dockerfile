@@ -79,7 +79,7 @@ RUN apt-get update && \
     python3 -m pip --no-cache-dir install --upgrade pip && \
     python3 -m pip --no-cache-dir install numpy && \
     python3 -m pip --no-cache-dir install \
-        jupyter_contrib_nbextensions \
+        jupyter_contrib_nbextensions==0.7.0 jupyter==1.0.0 av==8.1.0 more-itertools==9.1.0 notebook==6.5.4\
         -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
         -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
         -r /usr/src/app/kso/kso_utils/requirements.txt && \
@@ -101,7 +101,8 @@ RUN adduser --disabled-password \
     --uid ${NB_UID} \
     ${NB_USER} && \
     # Ensure widget extensions are activated
-    jupyter contrib nbextension enable --user --py widgetsnbextension && \
-    jupyter contrib nbextension enable --user --py jupyter_bbox_widget
+    jupyter contrib nbextension install --user && \
+    jupyter nbextension enable --user --py widgetsnbextension && \
+    jupyter nbextension enable --user --py jupyter_bbox_widget
 
 USER ${NB_USER}
