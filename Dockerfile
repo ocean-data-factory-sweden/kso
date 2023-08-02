@@ -101,7 +101,8 @@ RUN adduser --disabled-password \
     --uid ${NB_UID} \
     ${NB_USER} && \
     # Ensure widget extensions are activated
-    jupyter contrib nbextension enable --user --py widgetsnbextension && \
-    jupyter contrib nbextension enable --user --py jupyter_bbox_widget
+    jupyter contrib nbextension install --user && \
+    jupyter nbextension enable --user --py widgetsnbextension && \
+    jupyter nbextension enable --user --py jupyter_bbox_widget
 
 USER ${NB_USER}
