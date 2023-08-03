@@ -41,7 +41,8 @@ jobs:
         shell: bash
       -
         name: Install git on container
-        run: pip install git
+        run: |
+          apt install -y git
       -
         name: Checkout repository
         uses: actions/checkout@v3
