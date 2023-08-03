@@ -40,10 +40,21 @@ jobs:
         run: "ls -R /usr"
         shell: bash
       -
+        name: get git version
+        run: git --version
+      -
+        name: Install git on container
+        run: |
+          apt update
+          apt install -y git
+      -
+        name: get git version after install
+        run: git --version
+      -
         name: Checkout repository
         uses: actions/checkout@v3
         with:
-          submodules: true
+          submodules: 'recursive'
       -
         name: Install pytest
         run: pip install pytest
