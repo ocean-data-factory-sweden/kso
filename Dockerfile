@@ -14,7 +14,10 @@ RUN apt-get update && \
         build-essential \
         git \
         libc6-dev \
+        libssl-dev \
         libtool \
+        # The next package is needed to support -libx246 for ffmpeg
+        libx264-dev \
         libxcb1-dev \
         libxau-dev \
         libxdmcp-dev \
@@ -33,9 +36,12 @@ RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
         --enable-nonfree \
         --enable-cuda-nvcc \
         --enable-libnpp \
+        --enable-openssl \
         --disable-doc \
         --disable-ffplay \
-        --disable-ffprobe \
+        # The libx246 encoder is used in the project, therefore we need to enable libx246 and gpl
+        --enable-libx264 \
+        --enable-gpl \
         --extra-cflags=-I/usr/local/cuda/include \
         --extra-ldflags=-L/usr/local/cuda/lib64 && \
     make -j 8 && \
@@ -58,10 +64,15 @@ COPY . ./kso
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
         libc6 \
+        # The libgl1 and libglib2.0-0 are needed for the CV2 python dependency
         libgl1 \
+        libglib2.0-0 \
+        # libx264-155 is needed to run ffmpeg with --enable-libx264
+        libx264-155 \
         libxau6 \
         libxcb1 \
-        libxdmcp6 && \
+        libxdmcp6 \
+        openssl && \
     # Install python and git and upgrade pip
     apt-get install --no-install-recommends -y \
         python3.8 \
@@ -83,7 +94,7 @@ RUN apt-get update && \
         -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
         -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
         -r /usr/src/app/kso/kso_utils/requirements.txt && \
-    apt-get remove --autoremove -y git python3-dev build-essential
+    apt-get remove --autoremove -y python3-dev build-essential
 
 # Set environment variables
 ENV WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
