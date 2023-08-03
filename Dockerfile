@@ -83,7 +83,7 @@ RUN apt-get update && \
         -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
         -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
         -r /usr/src/app/kso/kso_utils/requirements.txt && \
-    apt-get remove --autoremove -y git python3-dev build-essential
+    apt-get remove --autoremove -y python3-dev build-essential
 
 # Set environment variables
 ENV WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
