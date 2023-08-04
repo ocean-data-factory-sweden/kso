@@ -59,4 +59,5 @@ jobs:
         if: github.ref != 'refs/heads/master'
         id: tests
         run: >-
+          export "WANDB_DIR=$(mktemp -d)" && export WANDB_CACHE_DIR="$WANDB_DIR" &&
           cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py && python3 -m pytest --disable-warnings test/widget-tests.py && python3 -m pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }} --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py
