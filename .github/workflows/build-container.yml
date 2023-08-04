@@ -35,4 +35,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: 'ghcr.io/${{ github.repository }}:test3'
+          tags: 'ghcr.io/${{ github.repository }}:test4'
