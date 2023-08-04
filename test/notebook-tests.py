@@ -193,7 +193,7 @@ def test_t5():
     mlp.modules["wandb"].finish()
     mlp.train_yolov5(
         exp_name=exp_name,
-        weights=weights.value,
+        weights=weights.artifact_path,
         project=project_path,
         epochs=epochs.value,
         batch_size=batch_size.value,
