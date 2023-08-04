@@ -14,6 +14,7 @@ RUN apt-get update && \
         build-essential \
         git \
         libc6-dev \
+        libssl-dev \
         libtool \
         # The next package is needed to support -libx246 for ffmpeg
         libx264-dev \
@@ -35,6 +36,7 @@ RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
         --enable-nonfree \
         --enable-cuda-nvcc \
         --enable-libnpp \
+        --enable-openssl \
         --disable-doc \
         --disable-ffplay \
         # The libx246 encoder is used in the project, therefore we need to enable libx246 and gpl
@@ -63,13 +65,14 @@ RUN apt-get update && \
     apt-get install --no-install-recommends -y \
         libc6 \
         # The libgl1 and libglib2.0-0 are needed for the CV2 python dependency
-        libgl1 \ 
-        libglib2.0-0 \ 
+        libgl1 \
+        libglib2.0-0 \
         # libx264-155 is needed to run ffmpeg with --enable-libx264
         libx264-155 \
         libxau6 \
         libxcb1 \
-        libxdmcp6 && \
+        libxdmcp6 \
+        openssl && \
     # Install python and git and upgrade pip
     apt-get install --no-install-recommends -y \
         python3.8 \
