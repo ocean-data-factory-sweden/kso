@@ -35,7 +35,6 @@ RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
         --enable-libnpp \
         --disable-doc \
         --disable-ffplay \
-        --disable-ffprobe \
         --extra-cflags=-I/usr/local/cuda/include \
         --extra-ldflags=-L/usr/local/cuda/lib64 && \
     make -j 8 && \
