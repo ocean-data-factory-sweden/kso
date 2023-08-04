@@ -15,6 +15,8 @@ RUN apt-get update && \
         git \
         libc6-dev \
         libtool \
+		# The next package is needed to support -libx246 for ffmpeg
+		libx264-dev \
         libxcb1-dev \
         libxau-dev \
         libxdmcp-dev \
@@ -35,6 +37,7 @@ RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
         --enable-libnpp \
         --disable-doc \
         --disable-ffplay \
+		--enable-libx264 \
         --extra-cflags=-I/usr/local/cuda/include \
         --extra-ldflags=-L/usr/local/cuda/lib64 && \
     make -j 8 && \
@@ -60,6 +63,8 @@ RUN apt-get update && \
 		# The libgl1 and libglib2.0-0 are needed for the CV2 python dependency
         libgl1 \ 
 		libglib2.0-0 \ 
+		# libx264-155 is needed to run ffmpeg with --enable-libx264
+		libx264-155 \
         libxau6 \
         libxcb1 \
         libxdmcp6 && \
