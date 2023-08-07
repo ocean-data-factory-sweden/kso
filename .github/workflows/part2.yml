@@ -1,0 +1,39 @@
+name: part 2
+on:
+  push:
+    branches:
+      - master
+      - dev
+    paths-ignore:
+      - Dockerfile
+      - kso_utils/requirements
+      - yolov5_tracker/requirements
+      - yolov5/requirements
+  pull_request: 
+    branches:
+      - master
+      - dev
+    paths-ignore:
+      - Dockerfile
+      - kso_utils/requirements
+      - yolov5_tracker/requirements
+      - yolov5/requirements
+  workflow_run:
+    workflows: [part1]
+    types: [completed]
+jobs:
+  part2:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      -
+        name: on workflow_run
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        run: echo 'triggering by workflow_run'
+      - 
+        name: on PR or push
+        if: ${{ github.event.workflow_run.conclusion != 'success' }}
+        run: echo 'triggering by PR or push'
+  

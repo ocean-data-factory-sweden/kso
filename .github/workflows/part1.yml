@@ -1,0 +1,32 @@
+name: part 1
+on:
+  push:
+    branches:
+      - master
+      - dev
+    paths:
+      - Dockerfile
+      - kso_utils/requirements
+      - yolov5_tracker/requirements
+      - yolov5/requirements
+  pull_request: 
+    branches:
+      - master
+      - dev
+    paths:
+      - Dockerfile
+      - kso_utils/requirements
+      - yolov5_tracker/requirements
+      - yolov5/requirements
+jobs:
+  part1:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      -
+        name: who are we
+        run: "uname -a && id && cat /etc/os-release && env"
+        shell: bash
+  
