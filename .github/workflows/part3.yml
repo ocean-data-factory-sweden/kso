@@ -1,5 +1,5 @@
-name: part 3
-'on':
+name: part3
+on:
   workflow_run:
     workflows: [part2]
     types: [completed]

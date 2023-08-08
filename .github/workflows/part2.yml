@@ -1,4 +1,4 @@
-name: part 2
+name: part2
 on:
   push:
     branches:
