@@ -1,32 +1,28 @@
-name: part 1
+name: part 3
 'on':
-  push:
-    branches:
-      - master
-      - dev
-    paths:
-      - Dockerfile
-      - kso_utils/requirements
-      - yolov5_tracker/requirements
-      - yolov5/requirements
-  pull_request: 
-    branches:
-      - master
-      - dev
-    paths:
-      - Dockerfile
-      - kso_utils/requirements
-      - yolov5_tracker/requirements
-      - yolov5/requirements
+  workflow_run:
+    workflows: [part2]
+    types: [completed]
 jobs:
-  part1:
+  part3:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       -
-        name: who are we
-        run: "uname -a && id && cat /etc/os-release && env"
-        shell: bash
-  
+        name: if the workflow was successfull, then check if the docker exists, if so, upload
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        run: echo 'tests were successfull'
+      -
+        name: Check docker exists, first get tag list
+        run: |
+             curl -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/USER/IMAGE/tags/list    
+        
+     # - name: Delete image from ghcr.io
+     #   needs: Check docker exists
+     #   uses: chipkent/action-cleanup-package@v1.0.1
+     #   with:
+     #     package-name: ${{ github.event.repository.name }}
+     #     tag: pr-${{ github.event.pull_request.number }}
+     #     github-token: ${{ secrets.CI_ACTION_TOKEN }}
