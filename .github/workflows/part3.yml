@@ -1,7 +1,11 @@
 name: part3
 on:
+  pull_request: 
+    branches:
+      - master
+      - dev
   workflow_run:
-    workflows: [part2]
+    workflows: ['part2']
     types: 
       - completed
 jobs:
@@ -15,6 +19,9 @@ jobs:
         name: if the workflow was successfull, then check if the docker exists, if so, upload
         if: ${{ github.event.workflow_run.conclusion == 'success' }}
         run: echo 'tests were successfull'
+      -
+        name: print last commit code    
+        run: echo ${{ github.event.after }} # the commit code of the last commit
       -
         name: Check docker exists, first get tag list
         run: |
