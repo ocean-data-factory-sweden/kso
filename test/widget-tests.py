@@ -101,7 +101,7 @@ def test_choose_movie_review():
     widget = kso_widgets.choose_movie_review()
     assert (
         widget.value
-        == "Basic: Automatic check for empty fps/duration and sampling start/end cells in the movies.csv"
+        == "Basic: Checks for available movies and empty cells in movies.csv"
     )
 
 
