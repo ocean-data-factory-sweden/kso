@@ -138,6 +138,10 @@ def test_t4(zoo_user, zoo_pass):
     pp.aggregate_zoo_classifications(test=True, agg_params=[0.1, 1])
     # Fetch relevant frame subjects in dataframe (by default all species for testing)
     pp.extract_zoo_frames(test=True)
+    # Review the size of the clips
+    t_utils.check_frame_size(
+        frame_paths=pp.generated_frames["frame_path"].unique()
+    )
     # Generate frames from based on subject metadata
     pp.modify_zoo_frames(test=True)
     # input_folder = kso_widgets.choose_folder()
@@ -151,14 +155,14 @@ def test_t4(zoo_user, zoo_pass):
     #    num_frames=10,
     #    frames_skip=None,
     # )
-    # Ensure that extracted frames are of suitable size for upload to ZU
+    # Ensure that extracted and modified frames are of suitable size for upload to ZU
     t_utils.check_frame_size(
-        frame_paths=pp.generated_frames["modif_frame_path"].unique()
+        frame_paths=pp.modified_frames["modif_frame_path"].unique()
     )
     # Compare original vs modified frames (no interactivity tested)
-    t_utils.compare_frames(df=pp.generated_frames)
+    t_utils.compare_frames(df=pp.modified_frames)
     # Test that final generated frames contain 9 rows (representing a classification)
-    assert len(pp.generated_frames) == 9
+    assert len(pp.modified_frames) == 6
 
 
 # # #-------------Tutorial 5-------------------------------------------------------
