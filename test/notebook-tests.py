@@ -125,7 +125,6 @@ def test_t3(zoo_user, zoo_pass):
 # since we do not want to upload things to them all the time.
 # """
 def test_t4(zoo_user, zoo_pass):
-
     import kso_utils.tutorials_utils as t_utils
 
     # import kso_utils.widgets as kso_widgets
@@ -139,9 +138,7 @@ def test_t4(zoo_user, zoo_pass):
     # Fetch relevant frame subjects in dataframe (by default all species for testing)
     pp.extract_zoo_frames(test=True)
     # Review the size of the clips
-    t_utils.check_frame_size(
-        frame_paths=pp.generated_frames["frame_path"].unique()
-    )
+    t_utils.check_frame_size(frame_paths=pp.generated_frames["frame_path"].unique())
     # Generate frames from based on subject metadata
     pp.modify_zoo_frames(test=True)
     # input_folder = kso_widgets.choose_folder()
@@ -162,7 +159,7 @@ def test_t4(zoo_user, zoo_pass):
     # Compare original vs modified frames (no interactivity tested)
     t_utils.compare_frames(df=pp.modified_frames)
     # Test that final generated frames contain 9 rows (representing a classification)
-    assert len(pp.modified_frames) == 6
+    assert len(pp.modified_frames) == 9
 
 
 # # #-------------Tutorial 5-------------------------------------------------------
@@ -170,7 +167,6 @@ def test_t4(zoo_user, zoo_pass):
 # # ...
 # # """
 def test_t5():
-
     import kso_utils.tutorials_utils as t_utils
     import kso_utils.yolo_utils as y_utils
     import kso_utils.server_utils as s_utils
