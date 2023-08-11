@@ -54,8 +54,10 @@ def test_choose_species():
 
 
 def test_choose_folder():
-    widget = kso_widgets.choose_folder("../test/test_output", "test_title")
-    assert widget.title == "Choose location of test_title"
+    widget = kso_widgets.choose_species(
+        df=DataFrame(columns=["label"], data=[["BLUECOD"], ["SNAPPER"]])
+    )
+    assert widget.value == ("BLUECOD",)
 
 
 def test_choose_footage():
@@ -99,7 +101,7 @@ def test_choose_movie_review():
     widget = kso_widgets.choose_movie_review()
     assert (
         widget.value
-        == "Basic: Automatic check for empty fps/duration and sampling start/end cells in the movies.csv"
+        == "Basic: Checks for available movies and empty cells in the movies.csv"
     )
 
 
