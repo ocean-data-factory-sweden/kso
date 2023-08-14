@@ -45,7 +45,7 @@ jobs:
       -
         name: Check docker exists, new
         run: |
-             curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/${{ github.repository }}/tags/list
+             curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/${{ github.repository }}/manifest/ghcr.io/${{ github.repository }}:test5
 
              
              
