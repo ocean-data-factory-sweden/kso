@@ -47,7 +47,7 @@ jobs:
         #run: |
         #     curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/${{ github.repository }}/manifest/ghcr.io/${{ github.repository }}:test5
       - name: Check docker exists Pablo
-        run:|
+        run: |
           echo 'curl https://ghcr.io/token\?scope\="repository:ocean-data-factory-sweden/kso:pull"'
           #echo TOKEN
           #echo TOKEN['token']
