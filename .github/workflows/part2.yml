@@ -45,4 +45,4 @@ jobs:
       -
         name: Check docker exists, new
         run: |
-             curl -H "Authorization: Bearer ${secrets.GITHUB_TOKEN}" https://ghcr.io/${{ github.repository }}/tags/list  
+             curl -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/${{ github.repository }}/tags/list  
