@@ -49,6 +49,7 @@ jobs:
       - name: Check docker exists Pablo
         run: |
           curl https://ghcr.io/token\?scope\="repository:ocean-data-factory-sweden/kso:pull"
+          echo '${GHCR_TOKEN}'
           #echo TOKEN
           #echo TOKEN['token']
              
