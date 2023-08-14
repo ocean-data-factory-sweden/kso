@@ -42,3 +42,7 @@ jobs:
         run: echo "$GITHUB_CONTEXT"
       - name: print sha
         run: echo ${{ github.sha }} 
+      -
+        name: Check docker exists, new
+        run: |
+             curl -H "Authorization: Bearer ${secrets.GITHUB_TOKEN}" https://ghcr.io/${{ github.repository }}/tags/list  
