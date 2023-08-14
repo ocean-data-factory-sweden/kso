@@ -42,11 +42,15 @@ jobs:
         run: echo "$GITHUB_CONTEXT"
       - name: print sha
         run: echo ${{ github.sha }} 
-      -
-        name: Check docker exists, new
-        run: |
-             curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/${{ github.repository }}/manifest/ghcr.io/${{ github.repository }}:test5
-
+      #-
+        #name: Check docker exists, old
+        #run: |
+        #     curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/${{ github.repository }}/manifest/ghcr.io/${{ github.repository }}:test5
+      - name: Check docker exists Pablo
+        run:|
+          TOKEN = curl https://ghcr.io/token\?scope\="repository:ocean-data-factory-sweden/kso:pull"
+          echo TOKEN
+          echo TOKEN['token']
              
              
              #curl -H "Authorization: Bearer ${secrets.GITHUB_TOKEN}" https://ghcr.io/${{ github.repository }}/tags/list  
