@@ -26,6 +26,12 @@ jobs:
         name: Check docker exists, first get tag list
         run: |
              curl -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/USER/IMAGE/tags/list    
+      - name: Show GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
+      - name: print sha
+        run: echo ${{ github.sha }} 
         
      # - name: Delete image from ghcr.io
      #   needs: Check docker exists
