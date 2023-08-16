@@ -49,7 +49,7 @@ jobs:
       - name: Check docker exists Pablo
         run: |
           GHCR_TOKEN=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)
-          curl -H "Authorization: Bearer ${{GHCR_TOKEN}}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/tags/list
+          curl -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/tags/list
              
              
              #curl -H "Authorization: Bearer ${secrets.GITHUB_TOKEN}" https://ghcr.io/${{ github.repository }}/tags/list  
