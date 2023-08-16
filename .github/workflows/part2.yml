@@ -48,4 +48,5 @@ jobs:
           tags = curl -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/tags/list
           echo ${tags}
       - name: Check only specifi tag exists
+          run: |
           curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/manifests/test5
