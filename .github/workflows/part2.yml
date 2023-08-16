@@ -62,7 +62,7 @@ jobs:
           package-name: ${{ github.event.repository.name }}
           tag: test3
           github-token: ${{ secrets.CI_ACTION_TOKEN }}
-     - name: Check docker exists Pablo get list (2nd time to see if deleted)
+      - name: Check docker exists Pablo get list (2nd time to see if deleted)
         run: |
           GHCR_TOKEN=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)
           curl -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/tags/list
