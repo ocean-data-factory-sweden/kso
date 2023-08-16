@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      packages: [write, delete]
     steps:
       -
         name: on workflow_run
@@ -65,7 +65,7 @@ jobs:
         #  github-token: ${{ secrets.CI_ACTION_TOKEN }}
         run : |
           GHCR_TOKEN=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)
-          curl -L -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GHCR_TOKEN}" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/orgs/ocean-data-factory-sweden/packages/container/test3
+          curl -L -X DELETE -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GHCR_TOKEN}" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/orgs/ocean-data-factory-sweden/packages/container/test3_newtag
           
       - name: give different tag
         if: steps.tag-exists.outcome == 'success' 
@@ -76,7 +76,7 @@ jobs:
           MANIFEST=$(curl -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/manifests/$OLD_TAG)
           # To push a new tag
           CONTENT_TYPE="application/vnd.docker.distribution.manifest.v2+json"
-          NEW_TAG=test3_newtag
+          NEW_TAG=test3_newtag2
           curl -f -X PUT -H "Content-Type: ${CONTENT_TYPE}" -H "Authorization: Bearer ${GHCR_TOKEN}"  -d "${MANIFEST}" "https://ghcr.io/v2/ocean-data-factory-sweden/kso/manifests/$NEW_TAG"
       - name: Check docker exists Pablo get list (2nd time to see if deleted)
         run: |
