@@ -50,11 +50,22 @@ jobs:
         id: tag-exists
         run: |
           GHCR_TOKEN=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)
-          curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/manifests/test6
+          curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/manifests/test3
         continue-on-error: true
       - name: if check tag was successfull
         if: steps.tag-exists.outcome == 'success'
         run: echo 'the tag exists'
+      - name: Delete image from ghcr.io
+        if: steps.tag-exists.outcome == 'success' 
+        uses: chipkent/action-cleanup-package@v1.0.1
+        with:
+          package-name: ${{ github.event.repository.name }}
+          tag: test3
+          github-token: ${{ secrets.CI_ACTION_TOKEN }}
+     - name: Check docker exists Pablo get list (2nd time to see if deleted)
+        run: |
+          GHCR_TOKEN=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)
+          curl -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/tags/list
       - name: if check tag failed
         if: steps.tag-exists.outcome == 'failure'
         run: echo 'the tag does not exist'
