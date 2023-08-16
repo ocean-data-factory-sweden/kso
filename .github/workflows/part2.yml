@@ -26,9 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: 
-        - write
-        - delete
+      packages: write|delete
     steps:
       -
         name: on workflow_run
