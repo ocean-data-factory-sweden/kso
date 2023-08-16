@@ -53,9 +53,9 @@ jobs:
           curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/manifests/test6
           continue-on-error: true
       - name: if check tag was successfull
-        needs: [tag-exists]
+        if: steps.tag-exists.outcome == 'success'
         run: echo 'the tag exists'
       - name: if check tag failed
-        if: steps.tag-exists.outcome == 'failure
+        if: steps.tag-exists.outcome == 'failure'
         run: echo 'the tag does not exist'
         
