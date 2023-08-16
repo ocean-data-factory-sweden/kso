@@ -49,4 +49,6 @@ jobs:
       - name: Check only specifi tag exists
         run: |
           GHCR_TOKEN=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)
-          curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/manifests/test5
+          curl --head --fail -H "Authorization: Bearer ${GHCR_TOKEN}" https://ghcr.io/v2/ocean-data-factory-sweden/kso/manifests/test6
+      - name: see if next step is executed if tag does not exist
+        run: echo 'it worked!'
