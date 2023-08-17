@@ -28,7 +28,7 @@ jobs:
       contents: read
       packages: write
     outputs:
-      tag: $ {{ steps.findimagetag.outputs.tag }}
+      tag: ${{ steps.findimagetag.outputs.tag }}
     steps:
       - name: findimagetag
         id: findimagetag
