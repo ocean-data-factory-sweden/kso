@@ -46,14 +46,14 @@ jobs:
     needs: check-image
     steps:
       - env: 
-          TAG: ${{needs.check-image.outputs.tag}}
+          TAG: ${{ needs.check-image.outputs.tag }}
         run: set -x ; echo "$TAG"
      # # echo "tag=test5" >> "$GITHUB_OUTPUT"   
   load-image:
     runs-on: ubuntu-latest
     needs: check-image
     container:
-      image: ghcr.io/${{ github.repository }}:${{needs.check-image.outputs.tag}}
+      image: ghcr.io/${{ github.repository }}:${{ needs.check-image.outputs.tag }}
       options: --user ${{ needs.configure.outputs.uid_gid }}
       credentials:
         username: '${{ github.actor }}'
