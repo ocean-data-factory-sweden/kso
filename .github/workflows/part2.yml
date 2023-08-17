@@ -36,7 +36,7 @@ jobs:
           if [${{github.event_name}} == 'workflow_run']; then 
             echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           else 
-           echo ::set-output name=tag::"test5"
+           echo "::set-output name=tag::"test5""
           fi 
         shell: bash
   print-output-check-image:
