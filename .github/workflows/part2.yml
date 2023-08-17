@@ -33,9 +33,9 @@ jobs:
       - name: find-image-tag
         id: find-image-tag
         run: |
-          if github.event_name == 'workflow_run':
+          if: github.event_name == 'workflow_run'
             echo "tag=test5" >> "$GITHUB_OUTPUT"
-          if github.event_name != 'workflow_run':
+          if: github.event_name != 'workflow_run'
             echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
   load-image:
     runs-on: ubuntu-latest
