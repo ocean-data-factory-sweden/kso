@@ -45,8 +45,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: check-image
     steps:
-      - name: print output
-        run: echo "${{needs.check_image.outputs.tag}}"
+      - env: 
+          TAG: ${{needs.check_image.outputs.tag}}
+        run: echo "$TAG"
      # # echo "tag=test5" >> "$GITHUB_OUTPUT"   
   load-image:
     runs-on: ubuntu-latest
