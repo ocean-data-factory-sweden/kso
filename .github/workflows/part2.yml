@@ -22,16 +22,16 @@ on:
     workflows: [part1]
     types: [completed]
 jobs:
-  checkimage:
+  check-image:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     outputs:
-      tag: ${{ steps.findimagetag.outputs.tag }}
+      tag: ${{ steps.find-image-tag.outputs.tag }}
     steps:
-      - name: findimagetag
-        id: findimagetag
+      - name: find-image-tag
+        id: find-image-tag
         #run: |
         #  set -x
         #  if [ "${{github.event_name}}" = "workflow_run" ] ; then 
@@ -43,17 +43,17 @@ jobs:
         run: echo "tag=test5" >> "$GITHUB_OUTPUT" 
   print-output-check-image:
     runs-on: ubuntu-latest
-    needs: checkimage
+    needs: check-image
     steps:
       - env: 
-          TAG: ${{ needs.checkimage.outputs.tag }}
+          TAG: ${{ needs.check-image.outputs.tag }}
         run: set -x ; echo "$TAG"
      # # echo "tag=test5" >> "$GITHUB_OUTPUT"   
   load-image:
     runs-on: ubuntu-latest
-    needs: checkimage
+    needs: check-image
     container:
-      image: ghcr.io/${{ github.repository }}:${{ needs.checkimage.outputs.tag }}
+      image: ghcr.io/${{ github.repository }}:${{ needs.check-image.outputs.tag }}
       options: --user ${{ needs.configure.outputs.uid_gid }}
       credentials:
         username: '${{ github.actor }}'
