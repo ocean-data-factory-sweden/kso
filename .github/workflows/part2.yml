@@ -33,10 +33,11 @@ jobs:
       - name: find-image-tag
         id: find-image-tag
         run: |
-          if [${{github.event_name}} == 'workflow_run']; then 
+          set -x
+          if [ "${{github.event_name}}" = "workflow_run" ] ; then 
             echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           else 
-           echo "::set-output name=tag::"test5""
+            echo "tag=test5" >> "$GITHUB_OUTPUT" 
           fi 
         shell: bash
   print-output-check-image:
