@@ -37,7 +37,7 @@ jobs:
           if [ "${{github.event_name}}" = "workflow_run" ] ; then 
             echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           else 
-            echo "tag=test5" >> "$GITHUB_OUTPUT" 
+            echo "tag=${{ github.base_ref }}" >> "$GITHUB_OUTPUT" 
           fi 
         shell: bash
         #run: echo "tag=test5" >> "$GITHUB_OUTPUT" 
@@ -54,7 +54,6 @@ jobs:
     needs: check-image
     container:
       image: ghcr.io/${{ github.repository }}:${{ needs.check-image.outputs.tag }}
-      options: --user ${{ needs.configure.outputs.uid_gid }}
       credentials:
         username: '${{ github.actor }}'
         password: '${{ secrets.GHCR_TOKEN }}'
