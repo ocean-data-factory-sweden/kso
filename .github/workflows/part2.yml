@@ -46,7 +46,7 @@ jobs:
     needs: check-image
     steps:
       - env: 
-          TAG: ${{needs.check_image.outputs.tag}}
+          TAG: ${{needs.check-image.outputs.tag}}
         run: set -x ; echo "$TAG"
      # # echo "tag=test5" >> "$GITHUB_OUTPUT"   
   load-image:
