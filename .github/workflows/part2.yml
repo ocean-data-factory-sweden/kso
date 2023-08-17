@@ -22,6 +22,40 @@ on:
     workflows: [part1]
     types: [completed]
 jobs:
+  check-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: $ {{ steps.find-image-tag.outputs.tag }}
+    steps:
+      - name: find-image-tag
+        id: find-image-tag
+        run: |
+          if github.event_name == 'workflow_run':
+            echo "tag=test5" >> "$GITHUB_OUTPUT"
+          if github.event_name != 'workflow_run':
+            echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+  load-image:
+    runs-on: ubuntu-latest
+    needs: check-image
+    container:
+      image: ghcr.io/${{ github.repository }}:${{needs.check_image.outputs.tag}}
+      options: --user ${{ needs.configure.outputs.uid_gid }}
+      credentials:
+        username: '${{ github.actor }}'
+        password: '${{ secrets.GHCR_TOKEN }}'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      -
+        name: who are we
+        run: "uname -a && id && cat /etc/os-release && env"
+        shell: bash
+      
+      
   part2:
     runs-on: ubuntu-latest
     permissions:
