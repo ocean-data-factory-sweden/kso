@@ -152,7 +152,7 @@ def test_t4(zoo_user, zoo_pass):
     #    num_frames=10,
     #    frames_skip=None,
     # )
-    # Ensure that extracted frames are of suitable size for upload to ZU
+    # Ensure that extracted and modified frames are of suitable size for upload to ZU
     t_utils.check_frame_size(
         frame_paths=pp.modified_frames["modif_frame_path"].unique()
     )
