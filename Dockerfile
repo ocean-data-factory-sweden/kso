@@ -25,8 +25,8 @@ RUN apt-get update && \
         yasm && \
     apt-get clean
 
-# Build ffmpeg with CUDA support from source
-RUN git clone https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
+# --- Build ffmpeg with CUDA support from source ---
+RUN	git clone --depth 1 --branch n12.0.16.0 https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
     cd nv-codec-headers && \
     make install && \
     cd .. && \
