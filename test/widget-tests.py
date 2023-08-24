@@ -50,9 +50,8 @@ def test_select_movie():
 
 def test_choose_species():
     widget = kso_widgets.choose_species(
-        df=pd.DataFrame(columns=["label"], data=[["BLUECOD"], ["SNAPPER"]])
-    )
-    assert widget.value == ("BLUECOD",)
+        project=pp.project)
+    assert widget.value == ('Banded weedfish',)
 
 
 def test_choose_folder():
