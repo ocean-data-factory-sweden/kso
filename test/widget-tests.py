@@ -49,9 +49,8 @@ def test_select_movie():
 
 
 def test_choose_species():
-    widget = kso_widgets.choose_species(
-        project=pp.project)
-    assert widget.value == ('Banded weedfish',)
+    widget = kso_widgets.choose_species(project=pp.project)
+    assert widget.value == ("Banded weedfish",)
 
 
 def test_choose_folder():

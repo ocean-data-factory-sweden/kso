@@ -64,6 +64,8 @@ COPY . ./kso
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
         libc6 \
+        # libmagic is needed for panoptes
+        libmagic1 \
         # The libgl1 and libglib2.0-0 are needed for the CV2 python dependency
         libgl1 \
         libglib2.0-0 \
