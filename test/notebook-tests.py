@@ -324,12 +324,24 @@ def test_t8(zoo_user, zoo_pass):
 
     import kso_utils.zooniverse_utils as zoo_utils
 
+    # Retrieve a subset of the subjects from the workflows of interest and
+    # populate the sql subjects table
+    selected_zoo_workflows = zoo_utils.sample_subjects_from_workflows(
+        project=pp.project,
+        server_connection=pp.server_connection,
+        db_connection=pp.db_connection,
+        workflow_widget_checks=workflow_checks,
+        workflows_df=pp.zoo_info["workflows"],
+        subjects_df=pp.zoo_info["subjects"],
+    )
+
     zoo_utils.process_zoo_classifications(
         project=pp.project,
         db_connection=pp.db_connection,
         csv_paths=pp.csv_paths,
         classifications_data=pp.zoo_info["classifications"],
         subject_type=workflow_checks["Subject type: #0"],
+        selected_zoo_workflows=selected_zoo_workflows,
     )
 
     agg_params = kso_widgets.choose_agg_parameters(workflow_checks["Subject type: #0"])
