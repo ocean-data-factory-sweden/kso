@@ -49,13 +49,32 @@ jobs:
             echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
         shell: bash
-        
+
+  check-strategy:
+    # This is for the case where we want to update the code in the master container, while nothing else to the container has changed. 
+    # NOTE THAT THIS IS A HACK! The way this gets updated now, is by adding an extra layer to the container with the new code. The old layer of code still exists and this will cause the image size to increase. However, this is an easy solution for now and it is unknown how much the image size increases. So for now we will leave it like this. More info on how to avoid this Hack is in issue #244.
+    runs-on: ubuntu-latest
+    needs: [check-image, changed-files]
+    outputs:
+      strategy: ${{ steps.build-strategy.outputs.strategy }}
+    steps:
+      - name: Determine Build Strategy
+        id: build-strategy
+        run: |
+          if [ "${{ needs.changed-files.outputs.changed }}" = "true" ] ; then
+            echo "strategy=rebuild" >> "$GITHUB_OUTPUT"
+          else
+            echo "strategy=update" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+               
        
   build-and-push-image:
     runs-on: ubuntu-latest
-    needs: [changed-files, check-image]
+    needs: [changed-files, check-image, check-strategy]
     # We always want to update image master on a push, so that the code in the container on SNIC is up to date
-    if: needs.changed-files.outputs.changed == 'true' || "${{ github.ref_name }}" = "master" 
+    # if: ${{ needs.changed-files.outputs.changed == 'true' || github.ref_name == 'master' }}
+    # HACK: WHEN WE HAVE A STABLE MASTER, UNCOMMENT THE LINE ABOVE!! THE COMMENT IS TEMPORARY SO THAT EMIL CAN TEST THINGS OUT ON DEV
     permissions:
       contents: read
       packages: write
@@ -74,14 +93,33 @@ jobs:
           registry: ghcr.io
           username: '${{ github.actor }}'
           password: '${{ secrets.GITHUB_TOKEN }}'
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:${{ needs.check-image.outputs.tag }}
-            ghcr.io/${{ github.repository }}:latest
+      
+      - name: Build Docker Image
+        # It will only go into the else statement, when we build a new container for master when nothing to the docker environment has changed.
+        # In that case we only want to update the code inside of the container. NOTE THAT THIS IS A HACK, see explanation above.
+        run: |
+          if [[ "${{ needs.check-strategy.outputs.strategy }}" == "rebuild" ]] ; then
+            docker build \
+              -t ghcr.io/${{ github.repository }}:${{ needs.check-image.outputs.tag }} \
+              -t ghcr.io/${{ github.repository }}:latest .
+          else
+            echo "FROM ghcr.io/${{ github.repository }}:${{ needs.check-image.outputs.tag }}" > Dockerfile.update
+            echo "COPY . ./kso" >> Dockerfile.update
+            docker pull ghcr.io/${{ github.repository }}:latest
+            docker build \
+              -t ghcr.io/${{ github.repository }}:${{ needs.check-image.outputs.tag }} \
+              -t ghcr.io/${{ github.repository }}:latest \
+              -f Dockerfile.update .
+          fi
+          
+        # For future, after docker file is optimized more, in the first if statement, add:
+        # docker pull ghcr.io/${{ github.repository }}:${{ needs.check-image.outputs.tag }}
+        # This is to reuse layers. 
+
+
+      - name: Push Docker Image
+        run: docker push ghcr.io/${{ github.repository }}:${{ needs.check-image.outputs.tag }}
+
 
   # Get the gitlab runner id to be able to checkout the repository.
   # Otherwise you do not have permission.
