@@ -1,0 +1,28 @@
+name: Code quality test 
+
+on: [push, pull_request, workflow_dispatch]
+
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - name: Install dependencies
+        run: |
+          python3 -m pip --no-cache-dir install --upgrade pip
+          python3 -m pip --no-cache-dir install numpy 
+          python3 -m pip --no-cache-dir install \
+            -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
+            -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
+            -r /usr/src/app/kso/kso_utils/requirements.txt
+      - name: Install pylint
+        run: python3 -m pip install pylint
+      - name: Analyse all .py files with pylint
+        run: pylint --errors-only --output-format=colorized **/*.py
+
