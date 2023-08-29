@@ -1,7 +1,13 @@
 name: Code quality test 
-
-on: [push, pull_request, workflow_dispatch]
-
+on:
+  push:
+    branches:
+      - master
+      - dev
+  pull_request:
+    branches:
+      - master
+      - dev
 jobs:
   pytest:
     runs-on: ubuntu-latest
@@ -16,6 +22,8 @@ jobs:
           python-version: 3.8
       - name: Install dependencies
         run: |
+          echo $PATH
+          echo readlink -f .
           python3 -m pip --no-cache-dir install --upgrade pip
           python3 -m pip --no-cache-dir install numpy 
           python3 -m pip --no-cache-dir install \
