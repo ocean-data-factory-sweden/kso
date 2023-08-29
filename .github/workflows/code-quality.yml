@@ -25,6 +25,7 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install numpy 
           python3 -m pip install \
+            numpy \
             -r yolov5_tracker/requirements.txt \
             -r yolov5_tracker/yolov5/requirements.txt \
             -r kso_utils/requirements.txt
