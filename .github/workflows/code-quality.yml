@@ -19,9 +19,9 @@ jobs:
           python3 -m pip --no-cache-dir install --upgrade pip
           python3 -m pip --no-cache-dir install numpy 
           python3 -m pip --no-cache-dir install \
-            -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
-            -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
-            -r /usr/src/app/kso/kso_utils/requirements.txt
+            -r kso/yolov5_tracker/requirements.txt \
+            -r kso/yolov5_tracker/yolov5/requirements.txt \
+            -r kso/kso_utils/requirements.txt
       - name: Install pylint
         run: python3 -m pip install pylint
       - name: Analyse all .py files with pylint
