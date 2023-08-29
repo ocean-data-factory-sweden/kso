@@ -2,6 +2,7 @@ name: Code quality test
 
 on: [push, pull_request, workflow_dispatch]
 
+jobs:
   pytest:
     runs-on: ubuntu-latest
     steps:
