@@ -118,7 +118,7 @@ jobs:
 
 
       - name: Push Docker Image
-        run: docker push ghcr.io/${{ github.repository }}:${{ needs.check-image.outputs.tag }}
+        run: docker push --all-tags ghcr.io/${{ github.repository }}
 
 
   # Get the gitlab runner id to be able to checkout the repository.
