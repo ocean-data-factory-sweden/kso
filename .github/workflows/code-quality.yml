@@ -1,4 +1,5 @@
 name: Code quality test 
+
 on:
   push:
     branches:
