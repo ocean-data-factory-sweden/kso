@@ -40,4 +40,5 @@ jobs:
       - name: Install pylint ana analyse all .py files
         run: |
           python3 -m pip install pylint
-          pylint **/*.py
+          /github/home/.local/bin/pylint **/*.py
+        # HACK: add pylint to requirements later, then we can just have pylint here instead of this path.
