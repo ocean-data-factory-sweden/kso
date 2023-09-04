@@ -24,4 +24,4 @@ jobs:
       - name: Install pylint
         run: python3 -m pip install pylint
       - name: Analyse all .py files with pylint
-        run: pylint --errors-only --output-format=colorized **/*.py
+        run: pylint --errors-only --source-roots kso_utils --output-format=colorized **/*.py
