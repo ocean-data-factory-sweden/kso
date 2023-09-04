@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: 'recursive'
-      - name: Install pylint
-        run: python3 -m pip install pylint
-      - name: Analyse all .py files with pylint
-        run: pylint **/*.py
+      - name: Install pylint ana analyse all .py files
+        run: |
+          python3 -m pip install pylint
+          pylint **/*.py
