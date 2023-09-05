@@ -40,5 +40,5 @@ jobs:
       - name: Install pylint and analyse all .py and .ipynb files
         run: |
           python3 -m pip install pylint
-          /github/home/.local/bin/pylint .
+          /github/home/.local/bin/pylint **/*.py
         # HACK: add pylint to requirements later, then we can just have pylint here instead of this path.
