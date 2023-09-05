@@ -1,16 +1,16 @@
 [MAIN]
 
 # Add paths to the list of the source roots so that we can import from kso_utils
-source-roots=kso_utils
+#source-roots=kso_utils # Turn off because otherwise the pytest do not work. 
 
 # Set the output format so it is easy to read
 output-format=colorized
 
 # Do not check any files in the directories listed here below
-# ignore-paths=yolov5, yolov5_tracker, src
+ignore-paths=yolov5, yolov5_tracker, src
 
 # Discover python modules and packages in the file system subtree.
-recursive=yes
+#recursive=yes
 
 
 [CHECKER]
