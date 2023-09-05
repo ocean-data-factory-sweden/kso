@@ -9,6 +9,9 @@ output-format=colorized
 # Do not check any files in the directories listed here below
 # ignore-paths=yolov5, yolov5_tracker, src
 
+# Discover python modules and packages in the file system subtree.
+recursive=yes
+
 
 [CHECKER]
 
