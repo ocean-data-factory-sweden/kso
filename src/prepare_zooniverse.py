@@ -269,7 +269,7 @@ def frame_aggregation(
         )["spath"]
 
         train_rows["movie_path"] = train_rows["movie_path"].apply(
-            lambda x: get_movie_url(project, db_info_dict, x)
+            lambda x: get_movie_path(project, db_info_dict, x)
         )
 
         video_dict = {}
