@@ -303,7 +303,6 @@ def test_t8(zoo_user, zoo_pass):
 
     # Connect to zooniverse w/ Github credential
     pp.connect_zoo_project(zoo_cred=[zoo_user, zoo_pass])
-    # pp.choose_workflows(generate_export=False, zoo_cred=[zoo_user, zoo_pass])
 
     workflow_checks = {
         "Workflow name: #0": "Development workflow",
