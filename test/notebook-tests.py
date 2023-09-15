@@ -23,9 +23,7 @@ if "kso_utils" not in sys.modules:
     # for when we are running it on git, the yaml file will install the docker image. then we do need to go to the correct directory
     os.chdir("tutorials")
     sys.path.append("..")
-    import kso_utils.kso_utils
-
-    sys.modules["kso_utils"] = kso_utils.kso_utils
+    import kso_utils
 
 import kso_utils.project_utils as p_utils
 from kso_utils.project import ProjectProcessor, MLProjectProcessor

@@ -26,7 +26,7 @@ jobs:
         with:
           files: |
             Dockerfile
-            kso_utils/requirements
+            requirements
             yolov5_tracker/requirements
             yolov5/requirements
             
