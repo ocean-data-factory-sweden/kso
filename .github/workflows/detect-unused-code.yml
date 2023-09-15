@@ -29,5 +29,4 @@ jobs:
         run: |
           jupytext --to script tutorials/*
           vulture .
-        continue-on-error: true
 
