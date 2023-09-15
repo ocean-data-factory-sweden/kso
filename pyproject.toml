@@ -78,3 +78,8 @@ generated-members = ["cv2.*"]
 # Note: it is using the config, just does not display in color
 [tool.nbqa.config] 
 pylint = "pyproject.toml"
+
+
+
+[tool.vulture]
+exclude = ["yolov5_tracker/", "yolov5/", "src/", "assets/"]

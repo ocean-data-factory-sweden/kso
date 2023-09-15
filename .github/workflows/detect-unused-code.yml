@@ -1,0 +1,33 @@
+name: Find unused code
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+  pull_request:
+    branches:
+      - master
+      - dev
+  
+jobs:
+  vulture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+      - name: Initialize Python 3.8
+        uses: actions/setup-python@v4
+        with: 
+          python-version: '3.8'
+      - name: Install jupytext and vulture
+        run: |
+          python -m pip install jupytext vulture
+      - name: Find unused code with Vulture
+        run: |
+          jupytext --to script tutorials/*
+          vulture .
+        continue-on-error: true
+
