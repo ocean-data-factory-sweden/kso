@@ -46,6 +46,9 @@ build-backend = "poetry.core.masonry.api"
 # Add paths to the list of the source roots so that we can import from kso_utils
 source-roots = ["kso_utils"]
 
+# Do not check any files in the directories listed here below
+ignore-paths=["yolov5", "yolov5_tracker", "src", "assets"]
+
 # Set the output format so it is easy to read
 output-format="colorized"
 
