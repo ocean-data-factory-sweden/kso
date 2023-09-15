@@ -73,8 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [changed-files, check-image, check-strategy]
     # We always want to update image master on a push, so that the code in the container on SNIC is up to date
-    # if: ${{ needs.changed-files.outputs.changed == 'true' || github.ref_name == 'master' }}
-    # HACK: WHEN WE HAVE A STABLE MASTER, UNCOMMENT THE LINE ABOVE!! THE COMMENT IS TEMPORARY SO THAT EMIL CAN TEST THINGS OUT ON DEV
+    if: ${{ needs.changed-files.outputs.changed == 'true' || github.ref_name == 'master' }}
     permissions:
       contents: read
       packages: write
