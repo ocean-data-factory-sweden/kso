@@ -131,7 +131,7 @@ jobs:
       - id: get-user
         run: echo "uid_gid=$(id -u):$(id -g)" >> $GITHUB_OUTPUT
 
-  test-notebooks-and-widgets:
+  tests:
     runs-on: ubuntu-latest
     if: ${{ always() }}
     needs: [build-and-push-image, configure, check-image]
@@ -149,17 +149,36 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: 'recursive'
-      - name: Install pytest
-        run: pip install pytest
+      - name: Install pytest, pylint and nbqa
+        run: pip install pytest pylint nbqa
+      - name: Pylint Test kso_utils
+        run: |
+          /github/home/.local/bin/pylint kso_utils
+          /github/home/.local/bin/pylint test/*
+          /github/home/.local/bin/nbqa pylint tutorials
+        # HACK: add pylint to requirements later, then we can just have pylint here instead of this path. Below as well!
+      - name: Pylint Test tests
+        if: success() || failure()
+        run: |
+          /github/home/.local/bin/pylint test/*
+      - name: Pylint Test NB tutorials
+        if: success() || failure()
+        run: |
+          /github/home/.local/bin/nbqa pylint tutorials
+        # If one of the pylint steps fails, there are errors and we do not need to run the test below.
       - name: Login W&B
         shell: bash
         env:
           WANDB_API: ${{ secrets.WANDB_KEY }}
         run: wandb login "$WANDB_API"
       - name: Run notebook and widget tests
-        id: tests
+        id: nb-tests
         run: >-
           export "WANDB_DIR=$(mktemp -d)" && export WANDB_CACHE_DIR="$WANDB_DIR" &&
           cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py &&
           python3 -m pytest --disable-warnings test/widget-tests.py &&
           python3 -m pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }} --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py
+
+          
+  pylint:
+  
