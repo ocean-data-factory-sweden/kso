@@ -179,6 +179,3 @@ jobs:
           python3 -m pytest --disable-warnings test/widget-tests.py &&
           python3 -m pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }} --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py
 
-          
-  pylint:
-  
