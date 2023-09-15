@@ -43,11 +43,17 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pylint.main]
-# Add paths to the list of the source roots so that we can import from kso_utils
+# Add paths to the list of the source roots so that we can import from kso_utils from any path
 source-roots = ["kso_utils"]
+
+# Do not check any files in the directories listed here below
+ignore-paths=["yolov5", "yolov5_tracker", "src", "assets"]
 
 # Set the output format so it is easy to read
 output-format="colorized"
+
+# to ignore errors for certain imports
+ignored-modules=["google"]
 
 [tool.pylint.logging]
 # The type of string formatting that logging methods do. `old` means using %
@@ -66,3 +72,9 @@ errors-only = true # To not get a grade for code, remove this when W is turned o
 # cv2 is a C-extension, but it has too many dynamically generated members, due to which it does not work to just put it on the extension-pkg-allow-list. 
 # See: https://pylint.pycqa.org/en/latest/user_guide/messages/error/no-member.html
 generated-members = ["cv2.*"]
+
+
+# For running pylint on .ipynb we need to use the package nbqa, here we define the config it should use for pylint.
+# Note: it is using the config, just does not display in color
+[tool.nbqa.config] 
+pylint = "pyproject.toml"

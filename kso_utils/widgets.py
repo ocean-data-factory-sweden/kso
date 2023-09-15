@@ -98,13 +98,13 @@ def choose_species(db_connection, species_list=None):
 
 
 def choose_project(
-    projects_csv: str = "../kso_utils/kso_utils/db_starter/projects_list.csv",
+    projects_csv: str = "../kso_utils/db_starter/projects_list.csv",
 ):
     """
     > This function takes a csv file with a list of projects and returns a dropdown menu with the
     projects listed
 
-    :param projects_csv: str = "../kso_utils/kso_utils/db_starter/projects_list.csv", defaults to ../kso_utils/db_starter/projects_list.csv
+    :param projects_csv: str = "../kso_utils/db_starter/projects_list.csv", defaults to ../kso_utils/db_starter/projects_list.csv
     :type projects_csv: str (optional)
     :return: A dropdown widget with the project names as options.
     """
