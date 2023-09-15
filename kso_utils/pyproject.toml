@@ -1,0 +1,68 @@
+[tool.poetry]
+name = "kso_utils"
+version = "0.1.0"
+description = "A package containing utility scripts for use with KSO analysis notebooks."
+authors = ["Jurie Germishuys <jurie.germishuys@combine.se>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "kso_utils"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+requests = "2.28.2"
+pandas = "1.5.3"
+boto3 = "1.26.64"
+dataclass-csv = "1.4.0"
+ffmpeg = "1.4"
+ffmpeg-python = "0.2.0"
+folium = "0.12.1"
+ftfy = "6.1.1"
+gdown = "4.6.4"
+imagesize = "1.4.1"
+ipyfilechooser = "0.4.4"
+ipysheet = "0.4.4"
+ipython = "8.11.0"
+ipywidgets = "7.7.2"
+jupyter-bbox-widget = "0.5.0"
+natsort = "8.1.0"
+opencv-python = "4.5.4.60"
+panoptes-client = "1.6.0"
+pillow = "9.4.0"
+pims = "0.6.1"
+pyyaml = "6.0"
+scikit-learn = "1.2.2"
+scp = "0.14.1"
+split-folders = "0.5.1"
+torch = "1.8.0"
+tqdm = "4.64.1"
+wandb = "0.13.2"
+csv-diff = "^1.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pylint.main]
+# Add paths to the list of the source roots so that we can import from kso_utils
+source-roots = ["kso_utils"]
+
+# Set the output format so it is easy to read
+output-format="colorized"
+
+[tool.pylint.logging]
+# The type of string formatting that logging methods do. `old` means using %
+# formatting, `new` is for `{}` formatting.
+logging-format-style = "new"
+
+[tool.pylint."messages control"]
+# For now we only want to see the errors (F and E), next step would be to turn on W
+disable = ["C","R","W"]
+errors-only = true # To not get a grade for code, remove this when W is turned on
+
+[tool.pylint.typecheck]
+# List of members which are set dynamically and missed by pylint inference
+# system, and so shouldn't trigger E1101 when accessed. Python regular
+# expressions are accepted.
+# cv2 is a C-extension, but it has too many dynamically generated members, due to which it does not work to just put it on the extension-pkg-allow-list. 
+# See: https://pylint.pycqa.org/en/latest/user_guide/messages/error/no-member.html
+generated-members = ["cv2.*"]
