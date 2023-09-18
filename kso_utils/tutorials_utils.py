@@ -433,7 +433,7 @@ def extract_clips(
         full_prompt = init_prompt
         mod_prompt = ""
         output_prompt = ""
-        def_output_prompt = f".output('{str(output_clip_path)}', ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', crf=20, pix_fmt='yuv420p', vcodec='libx264')"
+        def_output_prompt = f".output('{str(output_clip_path)}', ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', pix_fmt='yuv420p')"
 
         # Set up modification
         for transform in modification_details.values():
@@ -444,7 +444,7 @@ def extract_clips(
                 # Unnest the modification detail dict
                 df = pd.json_normalize(modification_details, sep="_")
                 crf = df.filter(regex="crf$", axis=1).values[0][0]
-                output_prompt = f".output('{str(output_clip_path)}', crf={crf}, ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', preset='veryfast', pix_fmt='yuv420p', vcodec='libx264')"
+                output_prompt = f".output('{str(output_clip_path)}', crf={crf}, ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', preset='veryfast', pix_fmt='yuv420p')"
 
         # Run the modification
         try:
@@ -457,8 +457,12 @@ def extract_clips(
             eval(full_prompt).run(capture_stdout=True, capture_stderr=True)
             os.chmod(str(output_clip_path), 0o777)
         except ffmpeg_python.Error as e:
-            logging.info("stdout: {}", e.stdout.decode("utf8"))
-            logging.info("stderr: {}", e.stderr.decode("utf8"))
+            logging.info(
+                f"stdout: {e.stdout.decode('utf8')}",
+            )
+            logging.info(
+                f"stderr: {e.stderr.decode('utf8')}",
+            )
             raise e
 
         logging.info("Clips extracted successfully")
