@@ -83,11 +83,11 @@ For example, on a Windows system, it will request you to install the Microsoft B
 
 6. Install all the requirements. If you do not have a GPU, run the following:
 
-```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r kso_utils/requirements.txt```
+```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r requirements.txt```
 
 Have a GPU? Find out which pytorch installation you need here (https://pytorch.org/), depending on your device and CUDA version. Add the recommended command to the gpu_requirements_user.txt file in the same way as the current example. Then run:
 
-```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r kso_utils/requirements.txt -r gpu_requirements_user.txt```
+```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r requirements.txt -r gpu_requirements_user.txt```
 
 
 #### Set up the environment with another virtual environment package
