@@ -153,9 +153,6 @@ jobs:
       - name: Pylint Test kso_utils
         run: |
           /github/home/.local/bin/pylint kso_utils
-          /github/home/.local/bin/pylint test/*
-          /github/home/.local/bin/nbqa pylint tutorials
-        # HACK: add pylint to requirements later, then we can just have pylint here instead of this path. Below as well!
       - name: Pylint Test tests
         if: success() || failure()
         run: |
