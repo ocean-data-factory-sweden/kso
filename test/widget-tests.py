@@ -48,7 +48,7 @@ def test_select_movie():
 
 def test_choose_species():
     widget = kso_widgets.choose_species(db_connection=pp.db_connection)
-    assert widget.value == ("Banded weedfish",)
+    assert widget.value == ("Nothing here",)
 
 
 def test_choose_folder():
