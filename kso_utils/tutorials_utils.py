@@ -1354,6 +1354,9 @@ def create_clips(
 
     # Specify the temp folder to host the clips
     movie_path_folder = Path(movie_path).parent
+    # Test output file fix for template project
+    if "http" in movie_path_folder:
+        movie_path_folder = "."
     clips_folder = str(Path(movie_path_folder, "tmp_dir", movie_i + "_zooniverseclips"))
 
     # Set the filename of the clips
