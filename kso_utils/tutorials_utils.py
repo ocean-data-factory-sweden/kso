@@ -433,7 +433,7 @@ def extract_clips(
         full_prompt = init_prompt
         mod_prompt = ""
         output_prompt = ""
-        def_output_prompt = f".output('{str(output_clip_path)}', ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', pix_fmt='yuv420p')"
+        def_output_prompt = f".output('{str(output_clip_path)}', ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', crf=20, pix_fmt='yuv420p', vcodec='libx264')"
 
         # Set up modification
         for transform in modification_details.values():
@@ -444,7 +444,7 @@ def extract_clips(
                 # Unnest the modification detail dict
                 df = pd.json_normalize(modification_details, sep="_")
                 crf = df.filter(regex="crf$", axis=1).values[0][0]
-                output_prompt = f".output('{str(output_clip_path)}', crf={crf}, ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', preset='veryfast', pix_fmt='yuv420p')"
+                output_prompt = f".output('{str(output_clip_path)}', crf={crf}, ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', preset='veryfast', pix_fmt='yuv420p', vcodec='libx264')"
 
         # Run the modification
         try:
@@ -1355,7 +1355,7 @@ def create_clips(
     # Specify the temp folder to host the clips
     movie_path_folder = Path(movie_path).parent
     # Test output file fix for template project
-    if "http" in movie_path_folder:
+    if "http" in str(movie_path_folder):
         movie_path_folder = "."
     clips_folder = str(Path(movie_path_folder, "tmp_dir", movie_i + "_zooniverseclips"))
 
