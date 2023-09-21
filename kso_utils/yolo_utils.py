@@ -358,8 +358,10 @@ def frame_aggregation(
         return
 
     # Select the aggregated classifications from the species of interest
-    clean_list = [clean_label(label) for label in class_list]
-    train_rows = agg_df[agg_df.label.isin(clean_list)]
+    # Commenting this out for now as it seems that we have the correct label in the agg_df already (to be confirmed for different workflows)
+    # clean_list = [clean_label(label) for label in class_list]
+    train_rows = agg_df
+    # [agg_df.label.isin(clean_list)]
 
     # Rename columns if in different format
     train_rows = train_rows.rename(
@@ -448,9 +450,9 @@ def frame_aggregation(
         yaml.dump(hyp_data, outfile, default_flow_style=None)
 
     # Clean species names
-    species_df = pd.read_sql_query("SELECT id, label FROM species", conn)
-    species_df["clean_label"] = species_df.label.apply(clean_species_name)
-    species_df["zoo_label"] = species_df.label.apply(clean_label)
+    species_df = pd.read_sql_query("SELECT id, commonName FROM species", conn)
+    species_df["clean_label"] = species_df.commonName.apply(clean_species_name)
+    species_df["zoo_label"] = species_df.commonName.apply(clean_label)
 
     # Add species_id to train_rows
     if "species_id" not in train_rows.columns:
