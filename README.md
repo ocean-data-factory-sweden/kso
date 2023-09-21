@@ -28,15 +28,15 @@ This repository contains scripts and resources to:
 
 ![high-level][high-level-overview]
 
-The system is built around a series of easy-to-use Jupyter Notebook tutorials. Each tutorial allows users to perform a specific task of the system (e.g. upload footage to the citizen science platform or analyse the classified data). The notebooks rely on the [koster utility functions][koster_utils_repo].
+The system is built around a series of easy-to-use Jupyter Notebook tutorials. Each tutorial allows users to perform a specific task of the system (e.g. upload footage to the citizen science platform or analyse the classified data).
 
-Users can run these tutorials via Google Colab (by clicking on the Colab links in the table below), locally or on SNIC.
+Users can run these tutorials via Google Colab (by clicking on the Colab links in the table below), locally or on a High Performance Computer environment.
 
 ### Tutorials
 | Name                                              | Description                                                                                 | Try it!  | 
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------|
 | 1. Check footage and metadata                     | Check format and contents of footage and sites, media and species csv files                 | [![Open In Colab][colablogo]][colab_tut_1] [![binder][binderlogo]][binder_tut] | 
-| 2. Upload new media to the system*                | Upload new underwater media to the cloud/server and update the csv files                    | [![Open In Colab][colablogo]][colab_tut_2] [![binder][binderlogo]][binder_tut] | 
+| 2. Upload new media to the system*                | Upload new underwater media to the cloud/server and update the csv files                    | WIP | 
 | 3. Upload clips to Zooniverse                     | Prepare original footage and upload short clips to Zooniverse                               | [![Open In Colab][colablogo]][colab_tut_3] [![binder][binderlogo]][binder_tut] |
 | 4. Upload frames to Zooniverse                    | Extract frames of interest from original footage and upload them to Zooniverse              | [![Open In Colab][colablogo]][colab_tut_4] [![binder][binderlogo]][binder_tut] |
 | 5. Train ML models                                | Prepare the training and test data, set model parameters and train models                   | [![Open In Colab][colablogo]][colab_tut_5] [![binder][binderlogo]][binder_tut] | 
