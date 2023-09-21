@@ -360,8 +360,7 @@ def frame_aggregation(
     # Select the aggregated classifications from the species of interest
     # Commenting this out for now as it seems that we have the correct label in the agg_df already (to be confirmed for different workflows)
     # clean_list = [clean_label(label) for label in class_list]
-    train_rows = agg_df
-    # [agg_df.label.isin(clean_list)]
+    train_rows = agg_df[agg_df.label.isin(class_list)]
 
     # Rename columns if in different format
     train_rows = train_rows.rename(
@@ -457,7 +456,10 @@ def frame_aggregation(
     # Add species_id to train_rows
     if "species_id" not in train_rows.columns:
         train_rows["species_id"] = train_rows["label"].apply(
-            lambda x: species_df[species_df.zoo_label == x].id.values[0], 1
+            lambda x: species_df[species_df.commonName == x].id.values[0]
+            if x != "empty"
+            else "empty",
+            1,
         )
         train_rows.drop(columns=["label"], axis=1, inplace=True)
 
@@ -784,7 +786,8 @@ def frame_aggregation(
         )
 
     # Pre-process frames
-    process_frames(out_path + "/images", size=tuple(img_size))
+    # Comment out for the moment as we do not typically need this for all cases
+    # process_frames(out_path + "/images", size=tuple(img_size))
 
     # Create training/test sets
     split_frames(out_path, perc_test)
