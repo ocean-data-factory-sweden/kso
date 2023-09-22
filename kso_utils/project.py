@@ -13,12 +13,9 @@ import ffmpeg
 import shutil
 from itertools import chain
 from pathlib import Path
-from tqdm import tqdm
-from ast import literal_eval
 import imagesize
 import ipysheet
 from IPython.display import display, clear_output
-from IPython.core.display import HTML
 
 # util imports
 import kso_utils.tutorials_utils as t_utils
@@ -66,6 +63,7 @@ class ProjectProcessor:
     def __repr__(self):
         return repr(self.__dict__)
 
+    @property
     def keys(self):
         """Log keys of ProjectProcessor object"""
         logging.debug("Stored variable names.")
@@ -155,7 +153,7 @@ class ProjectProcessor:
         # Select only attributes of the propjectprocessor that are df of local csvs
         local_dfs = [
             key
-            for key in self.keys()
+            for key in self.keys
             if key.startswith("local_") and key.split("_")[1] in table_names
         ]
 
@@ -1041,71 +1039,13 @@ class MLProjectProcessor(ProjectProcessor):
         self.modules = g_utils.import_modules([])
         self.modules.update(g_utils.import_modules(["yolo_utils"], utils=True))
         self.modules.update(
-            g_utils.import_modules(["torch", "wandb", "yaml", "yolov5"], utils=False)
+            g_utils.import_modules(
+                ["torch", "wandb", "yaml", "ultralytics"],
+                utils=False,
+            )
         )
 
         self.team_name = "koster"
-
-        model_selected = t_utils.choose_model_type()
-
-        if test:
-            self.model_type = 1
-            self.modules.update(self.load_yolov5_modules())
-            if all(["train", "detect", "val"]) in self.modules:
-                self.train, self.run, self.test = (
-                    self.modules["train"],
-                    self.modules["detect"],
-                    self.modules["val"],
-                )
-        else:
-
-            async def load_mods():
-                output = widgets.Output()
-
-                def update_model(change):
-                    with output:
-                        clear_output(wait=True)
-                        x = change.new
-                        self.model_type = x
-                        self.modules.update(self.load_yolov5_modules())
-                        if all(["train", "detect", "val"]) in self.modules:
-                            self.train, self.run, self.test = (
-                                self.modules["train"],
-                                self.modules["detect"],
-                                self.modules["val"],
-                            )
-
-                model_selected.observe(model_selected, "value")
-                display(model_selected, output)
-                await asyncio.Event().wait()  # Wait indefinitely for user interaction
-
-            loop = asyncio.get_event_loop()
-            loop.create_task(load_mods())
-
-    def load_yolov5_modules(self):
-        # Model-specific imports
-        if self.model_type == 1:
-            module_names = ["yolov5.train", "yolov5.detect", "yolov5.val"]
-            logging.info("Object detection model loaded")
-            return g_utils.import_modules(module_names, utils=False, models=True)
-        elif self.model_type == 2:
-            logging.info("Image classification model loaded")
-            module_names = [
-                "yolov5.classify.train",
-                "yolov5.classify.predict",
-                "yolov5.classify.val",
-            ]
-            return g_utils.import_modules(module_names, utils=False, models=True)
-        elif self.model_type == 3:
-            logging.info("Image segmentation model loaded")
-            module_names = [
-                "yolov5.segment.train",
-                "yolov5.segment.predict",
-                "yolov5.segment.val",
-            ]
-            return g_utils.import_modules(module_names, utils=False, models=True)
-        else:
-            logging.info("Invalid model specification")
 
     def prepare_dataset(
         self,
@@ -1269,6 +1209,30 @@ class MLProjectProcessor(ProjectProcessor):
     def choose_train_params(self):
         return t_utils.choose_train_params(self.model_type)
 
+    def train_yolo(
+        self,
+        exp_name: str,
+        weights: str,
+        project: str,
+        epochs: int = 1,
+        batch_size: int = 16,
+        imgsize: int = 128,
+    ):
+        # Disable wandb (not necessary yet)
+        # self.modules["ultralytics"].settings.update({"wandb": False})
+        try:
+            model = self.modules["ultralytics"].YOLO(weights)
+            model.train(
+                data=self.data_path,
+                project=project,
+                name=exp_name,
+                epochs=epochs,
+                batch=batch_size,
+                imgsz=imgsize,
+            )
+        except Exception as e:
+            logging.info(f"Training failed due to: {e}")
+
     def train_yolov5(
         self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
     ):
@@ -1301,6 +1265,20 @@ class MLProjectProcessor(ProjectProcessor):
         else:
             logging.error("Segmentation model training not yet supported.")
 
+    def eval_yolo(self, exp_name: str, conf_thres: float):
+        # Find trained model weights
+        project_path = os.path.join(self.output_path, self.project_name, exp_name)
+        self.tuned_weights = f"{Path(project_path, 'weights', 'best.pt')}"
+        try:
+            model = self.modules["ultralytics"].YOLO(self.tuned_weights)
+            model.val(
+                data=self.data_path,
+                conf=conf_thres,
+            )
+        except Exception as e:
+            logging.error(f"Encountered {e}, terminating run...")
+        logging.info("Run succeeded, finishing run...")
+
     def eval_yolov5(self, exp_name: str, conf_thres: float):
         # Find trained model weights
         project_path = os.path.join(self.output_path, self.project_name, exp_name)
@@ -1320,6 +1298,33 @@ class MLProjectProcessor(ProjectProcessor):
             self.modules["wandb"].finish()
         logging.info("Run succeeded, finishing run...")
         self.modules["wandb"].finish()
+
+    def detect_yolo(
+        self,
+        source: str,
+        conf_thres: float,
+        artifact_dir: str,
+        img_size: int = 640,
+        save_output: bool = True,
+    ):
+        model = self.modules["ultralytics"].YOLO(
+            [
+                f
+                for f in Path(artifact_dir).iterdir()
+                if f.is_file()
+                and str(f).endswith((".pt", ".model"))
+                and "osnet" not in str(f)
+                and "best" in str(f)
+            ][0]
+        )
+        model.predict(
+            source=source,
+            conf=conf_thres,
+            save_txt=True,
+            save_conf=True,
+            save=save_output,
+            imgsz=img_size,
+        )
 
     def detect_yolov5(
         self,

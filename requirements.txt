@@ -1,5 +1,6 @@
 av==8.1.0
 boto3==1.26.64
+csv-diff==1.1
 dataclass-csv==1.4.0
 ffmpeg==1.4
 ffmpeg-python==0.2.0
@@ -34,5 +35,5 @@ setuptools==67.6.1
 split-folders==0.5.1
 SQLAlchemy==2.0.20
 tqdm==4.64.1
+ultralytics==8.0.66
 wandb==0.13.2
-csv-diff==1.1
