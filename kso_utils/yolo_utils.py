@@ -475,7 +475,7 @@ def frame_aggregation(
         project=project,
         server_connection=server_connection,
         db_connection=db_connection,
-    )
+    )[0]
 
     # If at least one movie is linked to the project
     logging.info(f"There are {len(movie_df)} movies")
@@ -505,8 +505,17 @@ def frame_aggregation(
         )
         return None
 
+    if link_bool and movie_bool:
+        # If both movies and subject urls exist, use subject urls to speed up extraction
+        movie_bool = False
+
     if movie_bool:
         # Get movie path on the server
+        movie_df.rename(columns={"movie_id": "id"}, inplace=True)
+        # TODO: Remove weird workaround for datatype conversions (should not be done manually here)
+        movie_df["id"] = movie_df["id"].astype(float).astype(int)
+        train_rows["movie_id"] = train_rows["movie_id"].astype(float).astype(int)
+        train_rows = train_rows.reset_index(drop=True)
         train_rows["movie_path"] = train_rows.merge(
             movie_df, left_on="movie_id", right_on="id", how="left"
         )["fpath"]
@@ -514,7 +523,9 @@ def frame_aggregation(
         from kso_utils.movie_utils import get_movie_path
 
         train_rows["movie_path"] = train_rows["movie_path"].apply(
-            lambda x: get_movie_path(project, x)
+            lambda x: get_movie_path(
+                f_path=x, project=project, server_connection=server_connection
+            )
         )
 
         # Read each movie for efficient frame access
@@ -522,8 +533,11 @@ def frame_aggregation(
         for i in tqdm(train_rows["movie_path"].unique()):
             try:
                 video_dict[i] = pims.MoviePyReader(i)
-            except FileNotFoundError:
+            except Exception as e:
                 try:
+                    logging.info(
+                        f"Could not use moviepy, switching to regular pims... {e}"
+                    )
                     from kso_utils.movie_utils import unswedify
 
                     video_dict[unswedify(str(i))] = pims.Video(unswedify(str(i)))
@@ -537,6 +551,7 @@ def frame_aggregation(
 
         # Ensure key fields wrt movies are available
         key_fields = [
+            "subject_ids",
             "species_id",
             "frame_number",
             "movie_path",
@@ -584,7 +599,7 @@ def frame_aggregation(
     tboxes = {}
 
     for name, group in tqdm(train_rows.groupby(group_fields)):
-        grouped_fields = name[: len(group_fields)]
+        grouped_fields = list(name[: len(group_fields)])
         if not movie_bool:
             # Get the filenames of the images
             filename = (

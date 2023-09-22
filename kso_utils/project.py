@@ -283,18 +283,28 @@ class ProjectProcessor:
         if not test:
 
             async def f(project, server_connection, available_movies_df):
-                x = await kso_widgets.single_wait_for_change(movie_selected, "value")
-                html, movie_path = movie_utils.preview_movie(
-                    project=project,
-                    available_movies_df=available_movies_df,
-                    movie_i=x,
-                    server_connection=server_connection,
-                )
-                display(html)
-                self.movie_selected = x
-                self.movie_path = movie_path
+                output = widgets.Output()
 
-            asyncio.create_task(
+                def update_movie(change):
+                    with output:
+                        clear_output(wait=True)
+                        x = change.new
+                        html, movie_path = movie_utils.preview_movie(
+                            project=project,
+                            available_movies_df=available_movies_df,
+                            movie_i=x,
+                            server_connection=server_connection,
+                        )
+                        display(html)
+                        self.movie_selected = x
+                        self.movie_path = movie_path
+
+                movie_selected.observe(update_movie, "value")
+                display(movie_selected, output)
+                await asyncio.Event().wait()  # Wait indefinitely for user interaction
+
+            loop = asyncio.get_event_loop()
+            loop.create_task(
                 f(self.project, self.server_connection, self.available_movies_df)
             )
 
@@ -615,9 +625,9 @@ class ProjectProcessor:
                 # Temporary workaround to get both clip paths
                 self.generated_clips["modif_clip_path"] = mod_clips
                 # Temporary workaround to ensure site_id is an integer
-                self.generated_clips["site_id"] = self.generated_clips[
-                    "site_id"
-                ].astype(np.int64)
+                self.generated_clips["site_id"] = (
+                    self.generated_clips["site_id"].astype(float).astype(int)
+                )
 
             button.on_click(on_button_clicked)
             display(clip_modification)
@@ -666,7 +676,6 @@ class ProjectProcessor:
             logging.info(f"Clips temporarily stored locally has been removed")
 
         elif subject_type == "frame":
-            species_list = []
             upload_df = zoo_utils.set_zoo_frame_metadata(
                 project=self.project,
                 db_connection=self.db_connection,
@@ -756,6 +765,8 @@ class ProjectProcessor:
     def extract_zoo_frames(
         self, n_frames_subject: int = 3, subsample_up_to: int = 100, test: bool = False
     ):
+        if not isinstance(self.species_of_interest, list):
+            self.species_of_interest = self.species_of_interest.value
         if test:
             species_list = self.aggregated_zoo_classifications.label.unique().tolist()
         else:
@@ -1048,18 +1059,28 @@ class MLProjectProcessor(ProjectProcessor):
                 )
         else:
 
-            async def f():
-                x = await kso_widgets.single_wait_for_change(model_selected, "value")
-                self.model_type = x
-                self.modules.update(self.load_yolov5_modules())
-                if all(["train", "detect", "val"]) in self.modules:
-                    self.train, self.run, self.test = (
-                        self.modules["train"],
-                        self.modules["detect"],
-                        self.modules["val"],
-                    )
+            async def load_mods():
+                output = widgets.Output()
 
-            asyncio.create_task(f())
+                def update_model(change):
+                    with output:
+                        clear_output(wait=True)
+                        x = change.new
+                        self.model_type = x
+                        self.modules.update(self.load_yolov5_modules())
+                        if all(["train", "detect", "val"]) in self.modules:
+                            self.train, self.run, self.test = (
+                                self.modules["train"],
+                                self.modules["detect"],
+                                self.modules["val"],
+                            )
+
+                model_selected.observe(model_selected, "value")
+                display(model_selected, output)
+                await asyncio.Event().wait()  # Wait indefinitely for user interaction
+
+            loop = asyncio.get_event_loop()
+            loop.create_task(load_mods())
 
     def load_yolov5_modules(self):
         # Model-specific imports

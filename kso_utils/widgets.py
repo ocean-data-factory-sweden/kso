@@ -6,7 +6,6 @@ import subprocess
 import pandas as pd
 import numpy as np
 import cv2
-import math
 
 # widget imports
 import ipysheet
@@ -23,7 +22,6 @@ import asyncio
 from kso_utils.video_reader import VideoReader
 from kso_utils.project_utils import Project
 import kso_utils.movie_utils as movie_utils
-from kso_utils.db_utils import create_connection
 import kso_utils.tutorials_utils as t_utils
 
 # Logging
@@ -221,7 +219,6 @@ def select_movie(available_movies_df: pd.DataFrame):
         style={"description_width": "initial"},
     )
 
-    display(select_movie_widget)
     return select_movie_widget
 
 
