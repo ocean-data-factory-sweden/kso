@@ -458,8 +458,12 @@ def extract_clips(
             eval(full_prompt).run(capture_stdout=True, capture_stderr=True)
             os.chmod(str(output_clip_path), 0o777)
         except ffmpeg_python.Error as e:
-            logging.info("stdout: {}", e.stdout.decode("utf8"))
-            logging.info("stderr: {}", e.stderr.decode("utf8"))
+            logging.info(
+                f"stdout: {e.stdout.decode('utf8')}",
+            )
+            logging.info(
+                f"stderr: {e.stderr.decode('utf8')}",
+            )
             raise e
 
         logging.info("Clips extracted successfully")
@@ -1351,6 +1355,9 @@ def create_clips(
 
     # Specify the temp folder to host the clips
     movie_path_folder = Path(movie_path).parent
+    # Test output file fix for template project
+    if "http" in str(movie_path_folder):
+        movie_path_folder = "."
     clips_folder = str(Path(movie_path_folder, "tmp_dir", movie_i + "_zooniverseclips"))
 
     # Set the filename of the clips

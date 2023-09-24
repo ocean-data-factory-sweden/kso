@@ -28,15 +28,15 @@ This repository contains scripts and resources to:
 
 ![high-level][high-level-overview]
 
-The system is built around a series of easy-to-use Jupyter Notebook tutorials. Each tutorial allows users to perform a specific task of the system (e.g. upload footage to the citizen science platform or analyse the classified data). The notebooks rely on the [koster utility functions][koster_utils_repo].
+The system is built around a series of easy-to-use Jupyter Notebook tutorials. Each tutorial allows users to perform a specific task of the system (e.g. upload footage to the citizen science platform or analyse the classified data).
 
-Users can run these tutorials via Google Colab (by clicking on the Colab links in the table below), locally or on SNIC.
+Users can run these tutorials via Google Colab (by clicking on the Colab links in the table below), locally or on a High Performance Computer environment.
 
 ### Tutorials
 | Name                                              | Description                                                                                 | Try it!  | 
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------|
 | 1. Check footage and metadata                     | Check format and contents of footage and sites, media and species csv files                 | [![Open In Colab][colablogo]][colab_tut_1] [![binder][binderlogo]][binder_tut] | 
-| 2. Upload new media to the system*                | Upload new underwater media to the cloud/server and update the csv files                    | [![Open In Colab][colablogo]][colab_tut_2] [![binder][binderlogo]][binder_tut] | 
+| 2. Upload new media to the system*                | Upload new underwater media to the cloud/server and update the csv files                    | WIP | 
 | 3. Upload clips to Zooniverse                     | Prepare original footage and upload short clips to Zooniverse                               | [![Open In Colab][colablogo]][colab_tut_3] [![binder][binderlogo]][binder_tut] |
 | 4. Upload frames to Zooniverse                    | Extract frames of interest from original footage and upload them to Zooniverse              | [![Open In Colab][colablogo]][colab_tut_4] [![binder][binderlogo]][binder_tut] |
 | 5. Train ML models                                | Prepare the training and test data, set model parameters and train models                   | [![Open In Colab][colablogo]][colab_tut_5] [![binder][binderlogo]][binder_tut] | 
@@ -83,11 +83,11 @@ For example, on a Windows system, it will request you to install the Microsoft B
 
 6. Install all the requirements. If you do not have a GPU, run the following:
 
-```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r kso_utils/requirements.txt```
+```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r requirements.txt```
 
 Have a GPU? Find out which pytorch installation you need here (https://pytorch.org/), depending on your device and CUDA version. Add the recommended command to the gpu_requirements_user.txt file in the same way as the current example. Then run:
 
-```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r kso_utils/requirements.txt -r gpu_requirements_user.txt```
+```pip install -r yolov5_tracker/requirements.txt -r yolov5_tracker/yolov5/requirements.txt -r requirements.txt -r gpu_requirements_user.txt```
 
 
 #### Set up the environment with another virtual environment package
