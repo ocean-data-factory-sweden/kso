@@ -1519,7 +1519,7 @@ def format_to_gbif(
         commonName_labels_df = pd.concat(commonName_labels_list).drop_duplicates()
 
         # Drop the clips classified as nothing here or other
-        df = df[~df["label"].isin(["OTHER", "NOTHINGHERE"])]
+        df = df[~df["label"].isin(["OTHER", "NOTHINGHERE", "HUMANOBJECTS"])]
 
         # Combine the labels with the commonNames of the classifications
         comb_df = pd.merge(df, commonName_labels_df, how="left", on="label")
