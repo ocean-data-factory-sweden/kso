@@ -617,7 +617,7 @@ class ProjectProcessor:
                 # Temporary workaround to ensure site_id is an integer
                 self.generated_clips["site_id"] = self.generated_clips[
                     "site_id"
-                ].astype(np.int64)
+                ].astype(float).astype(np.int64)
 
             button.on_click(on_button_clicked)
             display(clip_modification)
