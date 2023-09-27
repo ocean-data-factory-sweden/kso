@@ -112,7 +112,7 @@ class ProjectProcessor:
         # Retrieve a list with all the csv files in the folder with initival csvs
         csv_folder = Path(self.project.csv_folder)
         local_csv_files = [
-            filename
+            str(filename)
             for filename in Path(csv_folder).iterdir()
             if filename.suffix == ".csv"
         ]
@@ -126,7 +126,7 @@ class ProjectProcessor:
                     csv_key = f"local_{init_key}_csv"
 
                     # Store the path of the CSV file
-                    csv_path = csv_folder / filename
+                    csv_path = filename
                     self.csv_paths[csv_key] = csv_path
 
                     # Read the local CSV file into a pandas DataFrame
