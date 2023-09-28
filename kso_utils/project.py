@@ -625,7 +625,7 @@ class ProjectProcessor:
                 self.generated_clips["modif_clip_path"] = mod_clips
                 # Temporary workaround to ensure site_id is an integer
                 self.generated_clips["site_id"] = (
-                    self.generated_clips["site_id"].astype(float).astype(int)
+                    self.generated_clips["site_id"].astype(float).astype(np.int64)
                 )
 
             button.on_click(on_button_clicked)
@@ -1181,7 +1181,7 @@ class MLProjectProcessor(ProjectProcessor):
 
             runs = api.runs(full_path)
 
-            for run in runs:
+            for run in runs[:10]:
                 model_artifacts = [
                     artifact
                     for artifact in chain(run.logged_artifacts(), run.used_artifacts())
@@ -1602,6 +1602,7 @@ class MLProjectProcessor(ProjectProcessor):
                 logging.error("No model found")
             artifact = api.artifact(full_path + "/" + model.name + ":latest")
             logging.info("Downloading model checkpoint...")
+            print(download_path)
             artifact_dir = artifact.download(root=download_path)
             logging.info("Checkpoint downloaded.")
             return Path(artifact_dir).resolve()
