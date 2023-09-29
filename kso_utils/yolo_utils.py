@@ -33,6 +33,15 @@ from natsort import index_natsorted
 # util imports
 from kso_utils.project_utils import Project
 
+# import yolov5
+try:
+    from yolov5.utils import torch_utils
+    import yolov5.detect as detect
+except ModuleNotFoundError:
+    logging.error(
+        "Modules yolov5 and yolov5_tracker are required for ML functionality."
+    )
+
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)

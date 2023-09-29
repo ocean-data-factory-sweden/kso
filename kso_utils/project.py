@@ -624,9 +624,9 @@ class ProjectProcessor:
                 # Temporary workaround to get both clip paths
                 self.generated_clips["modif_clip_path"] = mod_clips
                 # Temporary workaround to ensure site_id is an integer
-                self.generated_clips["site_id"] = self.generated_clips[
-                    "site_id"
-                ].astype(float).astype(np.int64)
+                self.generated_clips["site_id"] = (
+                    self.generated_clips["site_id"].astype(float).astype(np.int64)
+                )
 
             button.on_click(on_button_clicked)
             display(clip_modification)

@@ -36,5 +36,6 @@ setuptools==67.6.1
 split-folders==0.5.1
 SQLAlchemy==2.0.20
 tqdm==4.64.1
+yolov5==7.0.12
 ultralytics==8.0.187
 wandb==0.15.11
