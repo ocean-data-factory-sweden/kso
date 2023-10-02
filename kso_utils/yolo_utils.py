@@ -133,10 +133,10 @@ def ProcFrames(proc_frame_func: Callable, frames_path: str):
     :return: The time it took to process all the frames in the folder, and the number of frames processed.
     """
     start = time.time()
-    files = os.listdir(frames_path)
+    files = Path(frames_path).iterdir()
     for f in files:
         if f.endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
-            if os.path.exists(str(Path(frames_path, f))):
+            if Path(frames_path, f).exists():
                 new_frame = proc_frame_func(cv2.imread(str(Path(frames_path, f))))
                 cv2.imwrite(str(Path(frames_path, f)), new_frame)
             else:
@@ -219,21 +219,21 @@ def prepare(data_path, percentage_test, out_path):
 
     # Populate train.txt and test.txt
     counter = 1
-    index_test = int((1 - percentage_test) / 100 * len(os.listdir(dataset_path)))
+    index_test = int((1 - percentage_test) / 100 * len(Path(dataset_path).iterdir()))
     latest_movie = ""
-    for pathAndFilename in glob.iglob(os.path.join(dataset_path, "*.jpg")):
-        title, ext = os.path.splitext(os.path.basename(pathAndFilename))
+    for pathAndFilename in Path(dataset_path).rglob("*.jpg"):
+        title, ext = Path(pathAndFilename).name.splitext()
         movie_name = title.replace("_frame_*", "", regex=True)
 
         if counter == index_test + 1:
             if movie_name != latest_movie:
-                file_test.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+                file_test.write(out_path + Path(title).name + ".jpg" + "\n")
             else:
-                file_train.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+                file_train.write(out_path + Path(title).name + ".jpg" + "\n")
             counter += 1
         else:
             latest_movie = movie_name
-            file_train.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+            file_train.write(out_path + Path(title).name + ".jpg" + "\n")
             counter += 1
 
 
@@ -256,7 +256,7 @@ def process_path(path: str):
     """
     Process a single path
     """
-    return os.path.basename(re.split("_[0-9]+", path)[0]).replace("_frame", "")
+    return Path(re.split("_[0-9]+", path)[0]).name.replace("_frame", "")
 
 
 def clean_species_name(species_name: str):
@@ -280,13 +280,10 @@ def split_frames(data_path: str, perc_test: float):
 
     # Populate train.txt and test.txt
     counter = 1
-    index_test = int(
-        (1 - perc_test)
-        * len([s for s in os.listdir(images_path) if s.endswith(".jpg")])
-    )
+    index_test = int((1 - perc_test) * len(list(images_path.glob("*.jpg"))))
     latest_movie = ""
-    for pathAndFilename in glob.iglob(os.path.join(images_path, "*.jpg")):
-        title, ext = os.path.splitext(os.path.basename(pathAndFilename))
+    for pathAndFilename in list(images_path.rglob("*.jpg")):
+        title, ext = Path(pathAndFilename).name.splitext()
         movie_name = title.replace("_frame_*", "")
 
         if counter >= index_test + 1:
@@ -380,17 +377,17 @@ def frame_aggregation(
         return
 
     # Create output folder
-    if os.path.isdir(out_path):
+    if Path(out_path).isdir():
         shutil.rmtree(out_path)
-    os.mkdir(out_path)
+    Path(out_path).mkdir()
 
     # Set up directory structure
     img_dir = Path(out_path, "images")
     label_dir = Path(out_path, "labels")
 
     # Create image and label directories
-    os.mkdir(img_dir)
-    os.mkdir(label_dir)
+    Path(img_dir).mkdir()
+    Path(label_dir).mkdir()
 
     # Create timestamped koster yaml file with model configuration
     species_list = [clean_species_name(sp) for sp in class_list]
@@ -741,15 +738,15 @@ def frame_aggregation(
         colour="green",
     ):
         if movie_bool:
-            file, ext = os.path.splitext(name[1])
-            file_base = os.path.basename(file)
-            file_out = f"{out_path}/labels/{file_base}_frame_{name[0]}.txt"
-            img_out = f"{out_path}/images/{file_base}_frame_{name[0]}.jpg"
+            file, ext = Path(name[1]).splitext()
+            file_base = Path(file).name
+            file_out = Path(out_path, "labels", f"{file_base}_frame_{name[0]}.txt")
+            img_out = Path(out_path, "images", f"{file_base}_frame_{name[0]}.jpg")
         else:
-            file, ext = os.path.splitext(name)
-            file_base = os.path.basename(file)
-            file_out = f"{out_path}/labels/{file_base}.txt"
-            img_out = f"{out_path}/images/{file_base}.jpg"
+            file, ext = Path(name).splitext()
+            file_base = Path(file).name
+            file_out = Path(out_path, "labels", f"{file_base}.txt")
+            img_out = Path(out_path, "images", f"{file_base}.jpg")
 
         # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
         if out_format == "yolo":
@@ -933,7 +930,7 @@ def choose_baseline_model(download_path: str, test: bool = False):
                     artifact_dir = af.download(download_path)
                     artifact_file = [
                         str(Path(artifact_dir, i))
-                        for i in os.listdir(artifact_dir)
+                        for i in Path(artifact_dir).iterdir()
                         if i.endswith(".pt")
                     ][-1]
                     logging.info(
@@ -964,7 +961,7 @@ def setup_paths(output_folder: str, model_type: str):
         try:
             data_path = [
                 str(Path(output_folder, _))
-                for _ in os.listdir(output_folder)
+                for _ in Path(output_folder).iterdir()
                 if _.endswith(".yaml") and "hyp" not in _
             ][-1]
             hyps_path = str(Path(output_folder, "hyp.yaml"))
@@ -1042,7 +1039,7 @@ def generate_csv_report(evaluation_path: str, run, wandb_log: bool = False):
     :return: A dataframe with the following columns:
         filename, class_id, frame_no, x, y, w, h, conf
     """
-    labels = os.listdir(Path(evaluation_path, "labels"))
+    labels = Path(evaluation_path, "labels").iterdir()
     data_dict = {}
     for f in labels:
         frame_no = int(f.split("_")[-1].replace(".txt", ""))
@@ -1079,8 +1076,8 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
     :return: A dataframe with the following columns: filename, class_id, frame_no, tracker_id
     """
     data_dict = {}
-    if os.path.exists(tracker_dir):
-        track_files = os.listdir(tracker_dir)
+    if Path(tracker_dir).exists():
+        track_files = Path(tracker_dir).iterdir()
     else:
         track_files = []
     if len(track_files) == 0:
@@ -1096,7 +1093,7 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
                         class_id, frame_no, tracker_id = vals[0], vals[1], vals[2]
                         data_dict[track_file].append([class_id, frame_no, tracker_id])
         dlist = [
-            [os.path.splitext(key)[0] + f"_{i[1]}.txt", i[0], i[1], i[2]]
+            [Path(key).splitext()[0] + f"_{i[1]}.txt", i[0], i[1], i[2]]
             for key, value in data_dict.items()
             for i in value
         ]
@@ -1176,7 +1173,7 @@ def track_objects(
     import yolov5_tracker.track as track
 
     # Check that tracker folder specified exists
-    if not os.path.exists(tracker_folder):
+    if not Path(tracker_folder).exists():
         logging.error("The tracker folder does not exist. Please try again")
         return None
 
@@ -1220,9 +1217,9 @@ def track_objects(
             half=True,
         )
 
-    tracker_root = os.path.join(tracker_folder, "runs", "track")
-    latest_tracker = os.path.join(
-        tracker_root, sorted(os.listdir(tracker_root))[-1], "tracks"
+    tracker_root = Path(tracker_folder, "runs", "track")
+    latest_tracker = Path(
+        tracker_root, sorted(Path(tracker_root).iterdir())[-1], "tracks"
     )
     logging.info(f"Tracking saved succesfully to {latest_tracker}")
     return latest_tracker
@@ -1257,12 +1254,12 @@ def get_annotator(image_path: str, species_list: list, autolabel_model: str = No
     images = sorted(
         [
             f
-            for f in os.listdir(image_path)
-            if os.path.isfile(os.path.join(image_path, f)) and f.endswith(".jpg")
+            for f in Path(image_path).iterdir()
+            if Path(image_path, f).is_file() and f.suffix == ".jpg"
         ]
     )
 
-    annot_path = os.path.join(Path(image_path).parent, "labels")
+    annot_path = Path(Path(image_path).parent, "labels")
 
     # a progress bar to show how far we got
     w_progress = widgets.IntProgress(value=0, max=len(images), description="Progress")
@@ -1280,14 +1277,14 @@ def get_annotator(image_path: str, species_list: list, autolabel_model: str = No
             )
         label_file = [
             f
-            for f in os.listdir(annot_path)
-            if os.path.isfile(os.path.join(annot_path, f))
-            and f.endswith(".txt")
+            for f in Path(annot_path).iterdir()
+            if Path(annot_path, f).is_file()
+            and f.suffix == ".txt"
             and Path(f).stem == Path(image).stem
         ]
         if len(label_file) == 1:
             label_file = label_file[0]
-            with open(os.path.join(annot_path, label_file), "r") as f:
+            with open(Path(annot_path, label_file), "r") as f:
                 for line in f:
                     s = line.split(" ")
                     labels.append(s[0])
@@ -1310,7 +1307,7 @@ def get_annotator(image_path: str, species_list: list, autolabel_model: str = No
         return bboxes, labels
 
     # the bbox widget
-    image = os.path.join(image_path, images[0])
+    image = Path(image_path, images[0])
     width, height = imagesize.get(image)
     bboxes, labels = [], []
     if autolabel_model is not None:
@@ -1337,7 +1334,7 @@ def get_annotator(image_path: str, species_list: list, autolabel_model: str = No
 
     def on_button_clicked(b):
         w_progress.value = 0
-        image = os.path.join(image_path, images[0])
+        image = Path(image_path, images[0])
         width, height = imagesize.get(image)
         bboxes, labels = [], []
         if autolabel_model is not None:
@@ -1374,7 +1371,7 @@ def get_annotator(image_path: str, species_list: list, autolabel_model: str = No
         # open new image in the widget
         else:
             image_file = images[w_progress.value]
-            image_p = os.path.join(image_path, image_file)
+            image_p = Path(image_path, image_file)
             width, height = imagesize.get(image_p)
             w_bbox.image = encode_image(image_p)
             bboxes, labels = [], []
@@ -1396,13 +1393,13 @@ def get_annotator(image_path: str, species_list: list, autolabel_model: str = No
     # and then move on to the next file
     def on_submit():
         image_file = images[w_progress.value]
-        width, height = imagesize.get(os.path.join(image_path, image_file))
+        width, height = imagesize.get(Path(image_path, image_file))
         # save annotations for current image
         label_file = Path(image_file).name.replace(".jpg", ".txt")
         # if the label_file needs to be created
-        if not os.path.exists(annot_path):
+        if not Path(annot_path).exists():
             Path(annot_path).mkdir(parents=True, exist_ok=True)
-        open(os.path.join(annot_path, label_file), "w").write(
+        open(Path(annot_path, label_file), "w").write(
             "\n".join(
                 [
                     "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
@@ -1438,33 +1435,25 @@ def get_annotations_viewer(data_path: str, species_list: list):
     :type species_list: list
     :return: A VBox widget containing a progress bar and a BBoxWidget.
     """
-    image_path = os.path.join(data_path, "images")
-    annot_path = os.path.join(data_path, "labels")
+    image_path = Path(data_path, "images")
+    annot_path = Path(data_path, "labels")
 
     images = sorted(
-        [
-            f
-            for f in os.listdir(image_path)
-            if os.path.isfile(os.path.join(image_path, f))
-        ]
+        [f for f in Path(image_path).iterdir() if Path(image_path, f).is_file()]
     )
     annotations = sorted(
-        [
-            f
-            for f in os.listdir(annot_path)
-            if os.path.isfile(os.path.join(annot_path, f))
-        ]
+        [f for f in Path(annot_path).iterdir() if Path(annot_path, f).is_file()]
     )
 
     # a progress bar to show how far we got
     w_progress = widgets.IntProgress(value=0, max=len(images), description="Progress")
     # the bbox widget
-    image = os.path.join(image_path, images[0])
+    image = Path(image_path, images[0])
     width, height = imagesize.get(image)
     label_file = annotations[w_progress.value]
     bboxes = []
     labels = []
-    with open(os.path.join(annot_path, label_file), "r") as f:
+    with open(Path(annot_path, label_file), "r") as f:
         for line in f:
             s = line.split(" ")
             labels.append(s[0])
@@ -1498,12 +1487,12 @@ def get_annotations_viewer(data_path: str, species_list: list):
 
     def on_button_clicked(b):
         w_progress.value = 0
-        image = os.path.join(image_path, images[0])
+        image = Path(image_path, images[0])
         width, height = imagesize.get(image)
         label_file = annotations[w_progress.value]
         bboxes = []
         labels = []
-        with open(os.path.join(annot_path, label_file), "r") as f:
+        with open(Path(annot_path, label_file), "r") as f:
             for line in f:
                 s = line.split(" ")
                 labels.append(s[0])
@@ -1548,12 +1537,12 @@ def get_annotations_viewer(data_path: str, species_list: list):
         # open new image in the widget
         else:
             image_file = images[w_progress.value]
-            image_p = os.path.join(image_path, image_file)
+            image_p = Path(image_path, image_file)
             width, height = imagesize.get(image_p)
             w_bbox.image = encode_image(image_p)
             label_file = annotations[w_progress.value]
             bboxes = []
-            with open(os.path.join(annot_path, label_file), "r") as f:
+            with open(Path(annot_path, label_file), "r") as f:
                 for line in f:
                     s = line.split(" ")
                     left = (float(s[1]) - (float(s[3]) / 2)) * width
@@ -1579,9 +1568,9 @@ def get_annotations_viewer(data_path: str, species_list: list):
     # and then move on to the next file
     def on_submit():
         image_file = images[w_progress.value]
-        width, height = imagesize.get(os.path.join(image_path, image_file))
+        width, height = imagesize.get(Path(image_path, image_file))
         # save annotations for current image
-        open(os.path.join(annot_path, label_file), "w").write(
+        open(Path(annot_path, label_file), "w").write(
             "\n".join(
                 [
                     "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
@@ -1617,10 +1606,14 @@ def get_data_viewer(data_path: str):
     if "empty_string" in data_path:
         logging.info("No files.")
         return None
-    imgs = list(filter(lambda fn: fn.lower().endswith(".jpg"), os.listdir(data_path)))
+    imgs = [
+        file
+        for file in Path(data_path).iterdir()
+        if file.is_file() and file.name.lower().endswith(".jpg")
+    ]
 
     def loadimg(k, scale=0.4):
-        display(draw_box(os.path.join(data_path, imgs[k]), scale))
+        display(draw_box(Path(data_path, imgs[k]), scale))
 
     return widgets.interact(loadimg, k=(0, len(imgs) - 1), scale=(0.1, 1.0))
 
@@ -1674,7 +1667,7 @@ def choose_files(path: str):
     if path is None:
         logging.error("No path selected.")
         return
-    files = np.append([path + i for i in os.listdir(path)], "No file")
+    files = np.append([path + str(i) for i in Path(path).iterdir()], "No file")
 
     clip_path_widget = widgets.Dropdown(
         options=tuple(np.sort(files)),
@@ -1711,23 +1704,23 @@ def view_file(path: str):
     :return: A widget that displays the image or video.
     """
     # Get path of the modified clip selected
-    extension = os.path.splitext(path)[1]
+    extension = Path(path).splitext()[1]
     file = open(path, "rb").read()
     if extension.lower() in [".jpeg", ".png", ".jpg"]:
         widget = widgets.Image(value=file, format=extension)
     elif extension.lower() in [".mp4", ".mov", ".avi"]:
-        if os.path.exists("linked_content"):
+        if Path("linked_content").exists():
             shutil.rmtree("linked_content")
         try:
-            os.mkdir("linked_content")
+            Path("linked_content").mkdir()
             logging.info("Opening viewer...")
             stream = ffmpeg.input(path)
-            stream = ffmpeg.output(stream, f"linked_content/{os.path.basename(path)}")
+            stream = ffmpeg.output(stream, f"linked_content/{Path(path).name}")
             ffmpeg.run(stream)
             widget = HTML(
                 f"""
                         <video width=800 height=400 alt="test" controls>
-                            <source src="linked_content/{os.path.basename(path)}" type="video/{extension.lower().replace(".", "")}">
+                            <source src="linked_content/{Path(path).name}" type="video/{extension.lower().replace(".", "")}">
                         </video>
                     """
             )
