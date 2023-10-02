@@ -26,9 +26,9 @@ jobs:
         with:
           files: |
             Dockerfile
-            requirements
-            yolov5_tracker/requirements
-            yolov5/requirements
+            requirements.txt
+            yolov5_tracker/requirements.txt
+            yolov5/requirements.txt
             
   # Based on if the files have changed and whether we push or PR, 
   # we decide on the tag of the image.
