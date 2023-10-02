@@ -379,7 +379,7 @@ def frame_aggregation(
         return
 
     # Create output folder
-    if Path(out_path).isdir():
+    if Path(out_path).is_dir():
         shutil.rmtree(out_path)
     Path(out_path).mkdir()
 
