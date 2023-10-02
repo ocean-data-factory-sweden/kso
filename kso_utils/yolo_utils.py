@@ -1,6 +1,4 @@
 # base imports
-import glob
-import os
 import argparse
 import time
 import cv2 as cv2

@@ -1411,6 +1411,22 @@ class MLProjectProcessor(ProjectProcessor):
             eval_dir, self.run, wandb_log=True
         )
 
+    def segment_footage(self, source: str):
+        # This is a draft function for using FastSAM to identify objects
+        model = self.modules["ultralytics"].FastSAM("FastSAM-s.pt")
+        # Run inference on a frame
+        everything_results = model(
+            source, device="cpu", retina_masks=True, imgsz=128, conf=0.4, iou=0.9
+        )
+        # Prepare a Prompt Process object
+        prompt_process = self.modules["ultralytics"].models.fastsam.FastSAMPrompt(
+            source, everything_results, device="cpu"
+        )
+        # Everything prompt
+        ann = prompt_process.everything_prompt()
+        prompt_process.plot(annotations=ann, output="./")
+        return ann
+
     def track_yolo(
         self,
         source: str,
