@@ -222,7 +222,8 @@ def prepare(data_path, percentage_test, out_path):
     index_test = int((1 - percentage_test) / 100 * len(Path(dataset_path).iterdir()))
     latest_movie = ""
     for pathAndFilename in Path(dataset_path).rglob("*.jpg"):
-        title, ext = Path(pathAndFilename).name.splitext()
+        file_path = Path(pathAndFilename)
+        title, ext = file_path.name, file_path.suffix
         movie_name = title.replace("_frame_*", "", regex=True)
 
         if counter == index_test + 1:
@@ -283,7 +284,8 @@ def split_frames(data_path: str, perc_test: float):
     index_test = int((1 - perc_test) * len(list(images_path.glob("*.jpg"))))
     latest_movie = ""
     for pathAndFilename in list(images_path.rglob("*.jpg")):
-        title, ext = Path(pathAndFilename).name.splitext()
+        file_path = Path(pathAndFilename)
+        title, ext = file_path.name, file_path.suffix
         movie_name = title.replace("_frame_*", "")
 
         if counter >= index_test + 1:
@@ -738,12 +740,14 @@ def frame_aggregation(
         colour="green",
     ):
         if movie_bool:
-            file, ext = Path(name[1]).splitext()
+            file_path = Path(name[1])
+            file, ext = file_path.name, file_path.suffix
             file_base = Path(file).name
             file_out = Path(out_path, "labels", f"{file_base}_frame_{name[0]}.txt")
             img_out = Path(out_path, "images", f"{file_base}_frame_{name[0]}.jpg")
         else:
-            file, ext = Path(name).splitext()
+            file_path = Path(name[1])
+            file, ext = file_path.name, file_path.suffix
             file_base = Path(file).name
             file_out = Path(out_path, "labels", f"{file_base}.txt")
             img_out = Path(out_path, "images", f"{file_base}.jpg")
@@ -1093,7 +1097,7 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
                         class_id, frame_no, tracker_id = vals[0], vals[1], vals[2]
                         data_dict[track_file].append([class_id, frame_no, tracker_id])
         dlist = [
-            [Path(key).splitext()[0] + f"_{i[1]}.txt", i[0], i[1], i[2]]
+            [str(Path(key).parent / Path(key).stem) + f"_{i[1]}.txt", i[0], i[1], i[2]]
             for key, value in data_dict.items()
             for i in value
         ]
@@ -1704,7 +1708,7 @@ def view_file(path: str):
     :return: A widget that displays the image or video.
     """
     # Get path of the modified clip selected
-    extension = Path(path).splitext()[1]
+    extension = Path(path).suffix
     file = open(path, "rb").read()
     if extension.lower() in [".jpeg", ".png", ".jpg"]:
         widget = widgets.Image(value=file, format=extension)
