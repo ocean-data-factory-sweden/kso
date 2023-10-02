@@ -92,8 +92,6 @@ RUN apt-get update && \
     python3 -m pip --no-cache-dir install --upgrade pip && \
     python3 -m pip --no-cache-dir install numpy && \
     python3 -m pip --no-cache-dir install \
-        -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
-        -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
         -r /usr/src/app/kso/kso_utils/requirements.txt && \
     apt-get remove --autoremove -y python3-dev build-essential
 
