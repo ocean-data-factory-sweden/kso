@@ -1588,7 +1588,15 @@ def extract_frames_for_zoo(
         curr = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         temp_frames_folder = f"{curr}_various_frames/"
 
-    frames_folder = Path(project.movie_folder, temp_frames_folder)
+    if project.server == "SNIC":
+        # Specify volume allocated by SNIC
+        snic_path = "/mimer/NOBACKUP/groups/snic2021-6-9"
+        folder_name = f"{snic_path}/tmp_dir/frames/"
+        frames_folder = str(Path(folder_name, temp_frames_folder))
+    else:
+        frames_folder = temp_frames_folder
+        if hasattr(project, "output_path"):
+            mod_frames_folder = project.output_path + frames_folder
 
     # Extract the frames from the videos, store them in the temp location
     # and save the df with information about the frames in the projectprocessor
