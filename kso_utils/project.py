@@ -1,4 +1,5 @@
 # base imports
+import os
 import sys
 import logging
 import asyncio
@@ -1029,6 +1030,9 @@ class MLProjectProcessor(ProjectProcessor):
         self.best_model_path = None
         self.model_type = 1  # set as 1 for testing
         self.train, self.run, self.test = (None,) * 3
+        self.registry = (
+            "mlflow" if os.environ["MLFLOW_TRACKING_URI"] is not None else "wandb"
+        )
 
         # Before t6_utils gets loaded in, the val.py file in yolov5_tracker repository needs to be removed
         # to prevent the batch_size error, see issue kso-object-detection #187
@@ -1129,7 +1133,7 @@ class MLProjectProcessor(ProjectProcessor):
                 return t_utils.choose_entity()
 
     # Function to choose a model to evaluate
-    def choose_model(self, registry="wandb"):
+    def choose_model(self):
         """
         It takes a project name that is defined in the class and returns a dropdown widget that displays the metrics of the model
         selected
@@ -1137,22 +1141,51 @@ class MLProjectProcessor(ProjectProcessor):
         :param project_name: The name of the project you want to load the model from
         :return: The model_widget is being returned.
         """
-        if registry == "mlflow":
+        if self.registry == "mlflow":
+            # Fetch model artifact list
+            from mlflow import MlflowClient
+
             experiment = mlflow.get_experiment_by_name(self.project_name)
-            experiment_id = experiment.experiment_id if experiment else None
+            client = MlflowClient()
 
-            if experiment_id is not None:
-                # Get the list of registered models for the specified project and experiment
-                models = mlflow.search_registered_models(
-                    filter_string=f"experiment_id='{experiment_id}'"
+            if experiment is not None:
+                experiment_id = experiment.experiment_id if experiment else None
+                runs = mlflow.search_runs(
+                    experiment_ids=experiment_id, output_format="list"
                 )
-
-                # Extract model names from the DataFrame
-                model_names = models["name"].tolist()
-
+                run_ids = [run.info.run_id for run in runs][-1:]
+                # Choose only the project directory
+                try:
+                    artifacts = [
+                        (
+                            list(
+                                filter(
+                                    lambda x: x.is_dir
+                                    and "input_datasets" not in x.path,
+                                    client.list_artifacts(i),
+                                )
+                            )[0],
+                            i,
+                        )
+                        for i in run_ids
+                    ]
+                    model_names = [
+                        str(
+                            Path(
+                                experiment.artifact_location,
+                                run_id,
+                                "artifacts",
+                                artifact.path,
+                                "weights",
+                                "best.pt",
+                            )
+                        )
+                        for artifact, run_id in artifacts
+                    ]
+                except IndexError:
+                    model_names = []
             else:
                 model_names = []
-
             model_names.append("No Model")
 
             # Create the dropdown widget
@@ -1165,8 +1198,7 @@ class MLProjectProcessor(ProjectProcessor):
             display(model_widget)
             return model_widget
 
-        elif registry == "wandb":
-
+        elif self.registry == "wandb":
             model_dict = {}
             model_info = {}
             api = wandb.Api()
@@ -1261,6 +1293,28 @@ class MLProjectProcessor(ProjectProcessor):
             if "yolov5" in weights:
                 weights = Path(weights).name
             model = self.modules["ultralytics"].YOLO(weights)
+            active_run = mlflow.active_run()
+
+            from mlflow.data.pandas_dataset import PandasDataset
+
+            parent_dir = Path(self.data_path).parent
+            train_df = pd.read_csv(Path(parent_dir, "train.txt"), delimiter="\t")
+            val_df = pd.read_csv(Path(parent_dir, "valid.txt"), delimiter="\t")
+            train_dataset: PandasDataset = mlflow.data.from_pandas(
+                train_df, source=Path(parent_dir, "train.txt")
+            )
+            val_dataset: PandasDataset = mlflow.data.from_pandas(
+                val_df, source=Path(parent_dir, "valid.txt")
+            )
+            if active_run:
+                mlflow.end_run()
+
+            mlflow.start_run(run_name=exp_name)
+            mlflow.log_input(train_dataset, context="training")
+            mlflow.log_input(val_dataset, context="validation")
+            mlflow.log_artifacts(
+                Path(self.data_path).parent, artifact_path="input_datasets"
+            )
             model.train(
                 data=self.data_path,
                 project=project,
@@ -1269,6 +1323,7 @@ class MLProjectProcessor(ProjectProcessor):
                 batch=int(batch_size),
                 imgsz=img_size,
             )
+
         except Exception as e:
             logging.info(f"Training failed due to: {e}")
         # Close down run
@@ -1350,6 +1405,19 @@ class MLProjectProcessor(ProjectProcessor):
         img_size: int = 640,
         save_output: bool = True,
     ):
+        if self.registry == "mlflow":
+            active_run = mlflow.active_run()
+            if active_run:
+                mlflow.end_run()
+            experiment = mlflow.get_experiment_by_name(self.project_name)
+            mlflow.start_run(run_name=self.project_name+"_detection", experiment_id=experiment.experiment_id)
+            self.run = mlflow.active_run()
+        elif self.registry == "wandb":
+            self.run = self.modules["wandb"].init(
+            entity=self.team_name,
+            project="model-evaluations",
+            settings=self.modules["wandb"].Settings(start_method="thread"),
+        )
         model = self.modules["ultralytics"].YOLO(
             [
                 f
@@ -1402,11 +1470,22 @@ class MLProjectProcessor(ProjectProcessor):
             nosave=not save_output,
         )
 
+    def save_detections(self, conf_thres: float, model: str, eval_dir: str):
+        if self.registry == "wandb":
+            self.modules["yolo_utils"].set_config(conf_thres, model, eval_dir)
+            self.modules["yolo_utils"].add_data(eval_dir, "detection_output", self.registry, self.run)
+            self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+                eval_dir, self.run, wandb_log=True, registry=self.registry
+            )
+        elif self.registry == "mlflow":
+            self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+                eval_dir, self.run, log=True, registry=self.registry,
+            )
+            self.modules["yolo_utils"].add_data(eval_dir, "detection_output", self.registry, self.run)
+
     def save_detections_wandb(self, conf_thres: float, model: str, eval_dir: str):
         self.modules["yolo_utils"].set_config(conf_thres, model, eval_dir)
-        self.modules["yolo_utils"].add_data_wandb(
-            eval_dir, "detection_output", self.run
-        )
+        self.modules["yolo_utils"].add_data(eval_dir, "detection_output", self.run)
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
             eval_dir, self.run, wandb_log=True
         )
@@ -1469,16 +1548,20 @@ class MLProjectProcessor(ProjectProcessor):
             img_size=img_size,
             gpu=True if self.modules["torch"].cuda.is_available() else False,
         )
-        self.modules["yolo_utils"].add_data_wandb(
-            Path(latest_tracker).parent.absolute(), "tracker_output", self.run
-        )
+        
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-            eval_dir, self.run, wandb_log=True
+            eval_dir, self.run, log=True, registry=self.registry
         )
         self.tracking_report = self.modules["yolo_utils"].generate_counts(
-            eval_dir, latest_tracker, artifact_dir, self.run, wandb_log=True
+            eval_dir, latest_tracker, artifact_dir, self.run, log=True, registry=self.registry
         )
-        # self.modules["wandb"].finish()
+        self.modules["yolo_utils"].add_data(
+            Path(latest_tracker).parent.absolute(), "tracker_output", self.registry, self.run
+        )
+        if self.registry == "wandb":
+            self.modules["wandb"].finish()
+        elif self.registry == "mlflow":
+            mlflow.end_run()
 
     def enhance_yolo(
         self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
@@ -1554,7 +1637,7 @@ class MLProjectProcessor(ProjectProcessor):
         #    self.run_history, key=lambda x: x["metrics"]["metrics/"+sort_metric]
         # )
 
-    def get_model(self, model_name: str, download_path: str, registry: str = "wandb"):
+    def get_model(self, model_name: str, download_path: str):
         """
         It downloads the latest model checkpoint from the specified project and model name
 
@@ -1566,32 +1649,13 @@ class MLProjectProcessor(ProjectProcessor):
         :type download_path: str
         :return: The path to the downloaded model checkpoint.
         """
-        if registry == "mlflow":
-            # Find the registered model by name
-            try:
-                model = mlflow.search_registered_models(
-                    filter_string=f"name='{model_name}'"
-                ).iloc[0]
-            except Exception as e:
-                logging.error("No model found")
-                return
-
-            # Load the model
-            logging.info("Loading model checkpoint...")
-            loaded_model = mlflow.pyfunc.load_model(
-                f"models:/{model.name}/{model.version}"
+        if self.registry == "mlflow":
+            artifact_dir = mlflow.artifacts.download_artifacts(
+                model_name, dst_path=download_path
             )
+            return str(Path(artifact_dir).parent)
 
-            # Create the download directory if it doesn't exist
-            download_path = Path(download_path)
-            download_path.mkdir(parents=True, exist_ok=True)
-
-            # Save the model to the specified download path
-            model_path = download_path / model.name
-            mlflow.pyfunc.save_model(loaded_model, str(model_path))
-            return model_path
-
-        elif registry == "wandb":
+        elif self.registry == "wandb":
             if self.team_name == "wildlife-ai":
                 logging.info("Please note: Using models from adi-ohad-heb-uni account.")
                 full_path = "adi-ohad-heb-uni/project-wildlife-ai"
@@ -1618,7 +1682,6 @@ class MLProjectProcessor(ProjectProcessor):
                 logging.error("No model found")
             artifact = api.artifact(full_path + "/" + model.name + ":latest")
             logging.info("Downloading model checkpoint...")
-            print(download_path)
             artifact_dir = artifact.download(root=download_path)
             logging.info("Checkpoint downloaded.")
             return Path(artifact_dir).resolve()
@@ -1666,7 +1729,9 @@ class MLProjectProcessor(ProjectProcessor):
         self.best_model_path = Path(artifact_dir).resolve()
 
     def get_dataset(
-        self, model: str, team_name: str = "koster", registry: str = "wandb"
+        self,
+        model: str,
+        team_name: str = "koster",
     ):
         """
         It takes in a project name and a model name, and returns the paths to the train and val datasets
@@ -1677,10 +1742,10 @@ class MLProjectProcessor(ProjectProcessor):
         :type model: str
         :return: The return value is a list of two directories, one for the training data and one for the validation data.
         """
-        if registry == "mlflow":
+        if self.registry == "mlflow":
             logging.error("This is not currently supported for MLflow")
             return "", ""
-        elif registry == "wandb":
+        elif self.registry == "wandb":
             api = wandb.Api()
             if "_" in model:
                 run_id = model.split("_")[1]
@@ -1738,7 +1803,7 @@ class Annotator:
 
         # Add all the images in the directory to the dataset
         for filename in Path(self.images_path).iterdir():
-            if filename.endswith((".jpg", ".png")):
+            if filename.suffix in [".jpg", ".png"]:
                 image_path = self.images_path / filename
                 sample = self.modules["fiftyone"].Sample(filepath=image_path)
                 dataset.add_sample(sample)

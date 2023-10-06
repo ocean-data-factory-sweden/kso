@@ -17,6 +17,7 @@ import wandb
 import imagesize
 import base64
 import ffmpeg
+import mlflow
 import ipywidgets as widgets
 from jupyter_bbox_widget import BBoxWidget
 from IPython.display import display, clear_output, HTML
@@ -30,15 +31,6 @@ from natsort import index_natsorted
 
 # util imports
 from kso_utils.project_utils import Project
-
-# import yolov5
-try:
-    from yolov5.utils import torch_utils
-    import yolov5.detect as detect
-except ModuleNotFoundError:
-    logging.error(
-        "Modules yolov5 and yolov5_tracker are required for ML functionality."
-    )
 
 # Logging
 logging.basicConfig()
@@ -133,7 +125,7 @@ def ProcFrames(proc_frame_func: Callable, frames_path: str):
     start = time.time()
     files = Path(frames_path).iterdir()
     for f in files:
-        if f.endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
+        if str(f).endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
             if Path(frames_path, f).exists():
                 new_frame = proc_frame_func(cv2.imread(str(Path(frames_path, f))))
                 cv2.imwrite(str(Path(frames_path, f)), new_frame)
@@ -933,7 +925,7 @@ def choose_baseline_model(download_path: str, test: bool = False):
                     artifact_file = [
                         str(Path(artifact_dir, i))
                         for i in Path(artifact_dir).iterdir()
-                        if i.endswith(".pt")
+                        if str(i).endswith(".pt")
                     ][-1]
                     logging.info(
                         f"Baseline {af.name} successfully downloaded from WANDB"
@@ -962,9 +954,9 @@ def setup_paths(output_folder: str, model_type: str):
     if model_type == 1:
         try:
             data_path = [
-                str(Path(output_folder, _))
-                for _ in Path(output_folder).iterdir()
-                if _.endswith(".yaml") and "hyp" not in _
+                str(Path(output_folder, f))
+                for f in Path(output_folder).iterdir()
+                if str(f).endswith(".yaml") and "hyp" not in str(f)
             ][-1]
             hyps_path = str(Path(output_folder, "hyp.yaml"))
 
@@ -1014,9 +1006,9 @@ def set_config(conf_thres: float, model: str, eval_dir: str):
     return config
 
 
-def add_data_wandb(path: str, name: str, run):
+def add_data(path: str, name: str, registry: str, run):
     """
-    > The function `add_data_wandb` takes a path to a directory, a name for the directory, and a run
+    > The function `add_data` takes a path to a directory, a name for the directory, and a run
     object, and adds the directory to the run as an artifact
 
     :param path: the path to the directory you want to upload
@@ -1025,12 +1017,15 @@ def add_data_wandb(path: str, name: str, run):
     :type name: str
     :param run: The run object that you get from calling wandb.init()
     """
-    my_data = wandb.Artifact(name, type="raw_data")
-    my_data.add_dir(path)
-    run.log_artifact(my_data)
+    if registry == "wandb":
+        my_data = wandb.Artifact(name, type="raw_data")
+        my_data.add_dir(path)
+        run.log_artifact(my_data)
+    elif registry == "mlflow":
+        mlflow.log_artifact(path, artifact_path=name)
 
 
-def generate_csv_report(evaluation_path: str, run, wandb_log: bool = False):
+def generate_csv_report(evaluation_path: str, run, log: bool = False, registry: str = "wandb"):
     """
     > We read the labels from the `labels` folder, and create a dictionary with the filename as the key,
     and the list of labels as the value. We then convert this dictionary to a dataframe, and write it to
@@ -1044,6 +1039,8 @@ def generate_csv_report(evaluation_path: str, run, wandb_log: bool = False):
     labels = Path(evaluation_path, "labels").iterdir()
     data_dict = {}
     for f in labels:
+        # Convert PosixPath to string
+        f = str(f)
         frame_no = int(f.split("_")[-1].replace(".txt", ""))
         data_dict[f] = []
         with open(Path(evaluation_path, "labels", f), "r") as infile:
@@ -1060,9 +1057,14 @@ def generate_csv_report(evaluation_path: str, run, wandb_log: bool = False):
         by="frame_no", key=lambda x: np.argsort(index_natsorted(detect_df["filename"]))
     ).to_csv(csv_out, index=False)
     logging.info("Report created at {}".format(csv_out))
-    if wandb_log:
-        wandb.init(resume="must", id=run.id)
-        wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
+    if log:
+        if registry == "wandb":
+            wandb.init(resume="must", id=run.id)
+            wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
+        elif registry == "mlflow":
+            pass
+            # seems like csv file gets logged anyway
+            #mlflow.log_table(data=detect_df.to_dict(orient='dict'), artifact_file=str(Path("detection_output", "annotations.json")))
     return detect_df
 
 
@@ -1079,20 +1081,20 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
     """
     data_dict = {}
     if Path(tracker_dir).exists():
-        track_files = Path(tracker_dir).iterdir()
+        track_files = [str(f.name) for f in Path(tracker_dir).iterdir()]
     else:
         track_files = []
     if len(track_files) == 0:
         logging.error("No tracks found.")
     else:
         for track_file in track_files:
-            if track_file.endswith(".txt"):
+            if str(track_file).endswith(".txt"):
                 data_dict[track_file] = []
                 with open(Path(tracker_dir, track_file), "r") as infile:
                     lines = infile.readlines()
                     for line in lines:
                         vals = line.split(" ")
-                        class_id, frame_no, tracker_id = vals[0], vals[1], vals[2]
+                        class_id, frame_no, tracker_id = vals[-2], vals[0], vals[1]
                         data_dict[track_file].append([class_id, frame_no, tracker_id])
         dlist = [
             [str(Path(key).parent / Path(key).stem) + f"_{i[1]}.txt", i[0], i[1], i[2]]
@@ -1102,7 +1104,7 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
         detect_df = pd.DataFrame.from_records(
             dlist, columns=["filename", "class_id", "frame_no", "tracker_id"]
         )
-        csv_out = Path(eval_dir, "tracking.csv")
+        csv_out = Path(tracker_dir, "tracking.csv")
         detect_df.sort_values(
             by="frame_no",
             key=lambda x: np.argsort(index_natsorted(detect_df["filename"])),
@@ -1112,16 +1114,15 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
 
 
 def generate_counts(
-    eval_dir: str, tracker_dir: str, artifact_dir: str, run, wandb_log: bool = False
+    eval_dir: str, tracker_dir: str, artifact_dir: str, run, log: bool = False, registry: str = "wandb",
 ):
     import torch
-
     model = torch.load(
         Path(
             [
                 f
                 for f in Path(artifact_dir).iterdir()
-                if f.is_file() and ".pt" in str(f)
+                if f.is_file() and "best.pt" in str(f)
             ][-1]
         )
     )
@@ -1130,6 +1131,7 @@ def generate_counts(
     if tracker_df is None:
         logging.error("No tracks to count.")
     else:
+        print(tracker_df)
         tracker_df["frame_no"] = tracker_df["frame_no"].astype(int)
         tracker_df["species_name"] = tracker_df["class_id"].apply(
             lambda x: names[int(x)]
@@ -1143,9 +1145,12 @@ def generate_counts(
             .to_frame()
             .reset_index()
         )
-        if wandb_log:
-            wandb.init(resume="must", id=run.id)
-            wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
+        if log:
+            if registry == "wandb":
+                wandb.init(resume="must", id=run.id)
+                wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
+            elif registry == "mlflow":
+                pass
         return final_df
 
 
@@ -1172,7 +1177,8 @@ def track_objects(
     :return: The latest tracker folder
     """
     import torch
-    import yolov5_tracker.track as track
+    import src.track_yolo as track
+    from types import SimpleNamespace
 
     # Check that tracker folder specified exists
     if not Path(tracker_folder).exists():
@@ -1191,37 +1197,65 @@ def track_objects(
     best_model = Path(model_path)
 
     if not gpu:
-        track.run(
-            name=name,
-            source=source_dir,
-            conf_thres=conf_thres,
-            yolo_weights=best_model,
-            reid_weights=Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
-            imgsz=img_size,
-            project=Path(f"{tracker_folder}/runs/track/"),
-            save_vid=True,
-            save_conf=True,
-            save_txt=True,
-        )
+        track_dict = {
+            "name": name,
+            "source": source_dir,
+            "conf": conf_thres,
+            "yolo_model": best_model,
+            "reid_model": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
+            "imgsz": img_size,
+            "device": '0' if torch.cuda.is_available() else 'cpu',
+            "project": Path(f"{tracker_folder}/runs/track/"),
+            "save": True,
+            "save_mot": True,
+            "save_txt": True,
+            "iou": 0.7,
+            "show": False,
+            "show_conf": True,
+            "show_labels": True,
+            "verbose": True,
+            "exist_ok": True,
+            "classes": None,
+            "vid_stride": 1,
+            "line_width": None,
+            "tracking_method": 'deepocsort',
+            "half": True,
+            "per_class": False,
+            "save_id_crops": False,
+        }
     else:
-        track.run(
-            name=name,
-            source=source_dir,
-            conf_thres=conf_thres,
-            yolo_weights=best_model,
-            reid_weights=Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
-            imgsz=img_size,
-            project=Path(f"{tracker_folder}/runs/track/"),
-            device=torch_utils.select_device(""),
-            save_vid=True,
-            save_conf=True,
-            save_txt=True,
-            half=True,
-        )
+        track_dict = {
+            "name": name,
+            "source": source_dir,
+            "conf": conf_thres,
+            "yolo_weights": best_model,
+            "reid_weights": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
+            "imgsz": img_size,
+            "project": Path(f"{tracker_folder}/runs/track/"),
+            "device": '0' if torch.cuda.is_available() else 'cpu',
+            "save": True,
+            "save_mot": True,
+            "save_txt": True,
+            "half": True,
+            "iou": 0.7,
+            "show": False,
+            "show_conf": True,
+            "show_labels": True,
+            "verbose": True,
+            "exist_ok": True,
+            "classes": None,
+            "vid_stride": 1,
+            "line_width": None,
+            "tracking_method": 'deepocsort',
+            "save_id_crops": False,
+            
+        }
 
+    args = SimpleNamespace(**track_dict)
+    track.run(args)
     tracker_root = Path(tracker_folder, "runs", "track")
     latest_tracker = Path(
-        tracker_root, sorted(Path(tracker_root).iterdir())[-1], "tracks"
+        tracker_root, sorted(Path(tracker_root).iterdir())[-1], "mot"
     )
     logging.info(f"Tracking saved succesfully to {latest_tracker}")
     return latest_tracker
@@ -1669,7 +1703,7 @@ def choose_files(path: str):
     if path is None:
         logging.error("No path selected.")
         return
-    files = np.append([path + str(i) for i in Path(path).iterdir()], "No file")
+    files = np.append([str(i) for i in Path(path).iterdir()], "No file")
 
     clip_path_widget = widgets.Dropdown(
         options=tuple(np.sort(files)),
