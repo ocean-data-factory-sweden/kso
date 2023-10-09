@@ -1410,14 +1410,17 @@ class MLProjectProcessor(ProjectProcessor):
             if active_run:
                 mlflow.end_run()
             experiment = mlflow.get_experiment_by_name(self.project_name)
-            mlflow.start_run(run_name=self.project_name+"_detection", experiment_id=experiment.experiment_id)
+            mlflow.start_run(
+                run_name=self.project_name + "_detection",
+                experiment_id=experiment.experiment_id,
+            )
             self.run = mlflow.active_run()
         elif self.registry == "wandb":
             self.run = self.modules["wandb"].init(
-            entity=self.team_name,
-            project="model-evaluations",
-            settings=self.modules["wandb"].Settings(start_method="thread"),
-        )
+                entity=self.team_name,
+                project="model-evaluations",
+                settings=self.modules["wandb"].Settings(start_method="thread"),
+            )
         model = self.modules["ultralytics"].YOLO(
             [
                 f
@@ -1473,15 +1476,22 @@ class MLProjectProcessor(ProjectProcessor):
     def save_detections(self, conf_thres: float, model: str, eval_dir: str):
         if self.registry == "wandb":
             self.modules["yolo_utils"].set_config(conf_thres, model, eval_dir)
-            self.modules["yolo_utils"].add_data(eval_dir, "detection_output", self.registry, self.run)
+            self.modules["yolo_utils"].add_data(
+                eval_dir, "detection_output", self.registry, self.run
+            )
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
                 eval_dir, self.run, wandb_log=True, registry=self.registry
             )
         elif self.registry == "mlflow":
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-                eval_dir, self.run, log=True, registry=self.registry,
+                eval_dir,
+                self.run,
+                log=True,
+                registry=self.registry,
             )
-            self.modules["yolo_utils"].add_data(eval_dir, "detection_output", self.registry, self.run)
+            self.modules["yolo_utils"].add_data(
+                eval_dir, "detection_output", self.registry, self.run
+            )
 
     def save_detections_wandb(self, conf_thres: float, model: str, eval_dir: str):
         self.modules["yolo_utils"].set_config(conf_thres, model, eval_dir)
@@ -1548,15 +1558,23 @@ class MLProjectProcessor(ProjectProcessor):
             img_size=img_size,
             gpu=True if self.modules["torch"].cuda.is_available() else False,
         )
-        
+
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
             eval_dir, self.run, log=True, registry=self.registry
         )
         self.tracking_report = self.modules["yolo_utils"].generate_counts(
-            eval_dir, latest_tracker, artifact_dir, self.run, log=True, registry=self.registry
+            eval_dir,
+            latest_tracker,
+            artifact_dir,
+            self.run,
+            log=True,
+            registry=self.registry,
         )
         self.modules["yolo_utils"].add_data(
-            Path(latest_tracker).parent.absolute(), "tracker_output", self.registry, self.run
+            Path(latest_tracker).parent.absolute(),
+            "tracker_output",
+            self.registry,
+            self.run,
         )
         if self.registry == "wandb":
             self.modules["wandb"].finish()

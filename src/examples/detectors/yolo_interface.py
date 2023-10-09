@@ -8,12 +8,11 @@ from ultralytics.engine.results import Results
 
 
 class YoloInterface:
-
     def inference(self, im):
-        raise NotImplementedError('Subclasses must implement this method.')
+        raise NotImplementedError("Subclasses must implement this method.")
 
     def postprocess(self, preds):
-        raise NotImplementedError('Subclasses must implement this method.')
+        raise NotImplementedError("Subclasses must implement this method.")
 
     def filter_results(self, i, predictor):
         if predictor.tracker_outputs[i].size != 0:
@@ -59,17 +58,12 @@ class YoloInterface:
         return preds
 
     def preds_to_yolov8_results(self, path, preds, im, im0s, names):
-        return Results(
-            path=path,
-            boxes=preds,
-            orig_img=im0s[0],
-            names=names
-        )
+        return Results(path=path, boxes=preds, orig_img=im0s[0], names=names)
 
     def get_model_from_weigths(self, l, model):
         model_type = None
         for key in l:
             if Path(key).stem in str(model.name):
-                model_type = str(Path(key).with_suffix(''))
+                model_type = str(Path(key).with_suffix(""))
                 break
         return model_type

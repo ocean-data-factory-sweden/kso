@@ -4,7 +4,6 @@ from .yolo_interface import YoloInterface
 
 
 class Yolov8Strategy(YoloInterface):
-
     def __init__(self, model, device, args):
         self.model = model
 
