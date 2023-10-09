@@ -106,10 +106,9 @@ ENV USER=${NB_USER} \
 RUN adduser --disabled-password \
     --gecos "Default user" \
     --uid ${NB_UID} \
-    ${NB_USER} && \
+    ${NB_USER}
     # Ensure widget extensions are activated
     # jupyter contrib nbextension install --user && \
     # jupyter nbextension enable --user --py widgetsnbextension && \
     # jupyter nbextension enable --user --py jupyter_bbox_widget
-
 USER ${NB_USER}
