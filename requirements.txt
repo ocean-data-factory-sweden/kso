@@ -9,7 +9,7 @@ fiftyone==0.20.0
 fiftyone_db==0.4.0
 folium==0.12.1
 ftfy==6.1.1
-gdown==4.6.4
+gdown==4.7.1
 imagesize==1.4.1
 ipyfilechooser==0.4.4
 ipysheet==0.7.0
