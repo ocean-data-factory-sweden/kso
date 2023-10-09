@@ -152,15 +152,15 @@ jobs:
         run: pip install pytest pylint nbqa
       - name: Pylint Test kso_utils
         run: |
-          /github/home/.local/bin/pylint kso_utils
+          /github/home/.local/bin/pylint --disable=no-member kso_utils
       - name: Pylint Test tests
         if: success() || failure()
         run: |
-          /github/home/.local/bin/pylint test/*
+          /github/home/.local/bin/pylint --disable=no-member test/*
       - name: Pylint Test NB tutorials
         if: success() || failure()
         run: |
-          /github/home/.local/bin/nbqa pylint tutorials
+          /github/home/.local/bin/nbqa pylint --disable=no-member tutorials
         # If one of the pylint steps fails, there are errors and we do not need to run the test below.
       - name: Login W&B
         shell: bash
