@@ -88,6 +88,8 @@ RUN apt-get update && \
     # first to avoid the lap build error
     python3 -m pip --no-cache-dir install --upgrade pip && \
     python3 -m pip --no-cache-dir install numpy && \
+    python3 -m pip --no-cache-dir install \
+        -r /usr/src/app/kso/requirements.txt && \
     apt-get remove --autoremove -y python3-dev build-essential
 
 # Set environment variables
