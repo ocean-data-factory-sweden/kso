@@ -1352,12 +1352,12 @@ def create_clips(
     # Add the length of the clips to df (to keep track of the length of each uploaded clip)
     potential_start_df["clip_length"] = clip_length
 
-    # Specify the temp folder to host the clips
-    movie_path_folder = Path(movie_path).parent
-    # Test output file fix for template project
-    if "http" in str(movie_path_folder):
-        movie_path_folder = "."
-    clips_folder = str(Path(movie_path_folder, "tmp_dir", movie_i + "_zooniverseclips"))
+    # Specify output path for zooniverse clip extraction
+    if project.server == "SNIC":
+        temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/"
+    else:
+        temp_path = "."
+    clips_folder = str(Path(temp_path, "tmp_dir", movie_i + "_zooniverseclips"))
 
     # Set the filename of the clips
     potential_start_df["clip_filename"] = (
@@ -1427,9 +1427,12 @@ def create_modified_clips(
     # Specify the folder to host the modified clips
     mod_clip_folder = "modified_" + movie_i + "_clips"
 
-    # Specify the temp folder to host the clips
-    movie_path_folder = Path(movie_i).parent
-    mod_clips_folder = str(Path(movie_path_folder, "tmp_dir", mod_clip_folder))
+    # Specify output path for modified clip extraction
+    if project.server == "SNIC":
+        temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/"
+    else:
+        temp_path = "."
+    mod_clips_folder = str(Path(temp_path, "tmp_dir", mod_clip_folder))
 
     # Remove existing modified clips
     if os.path.exists(mod_clips_folder):

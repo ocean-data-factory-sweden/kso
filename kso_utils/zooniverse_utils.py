@@ -1386,7 +1386,7 @@ def set_zoo_clip_metadata(
         # Select only relevant columns
         sitesdf = sitesdf[
             [
-                "siteName",
+                "#siteName",
                 "#decimalLatitude",
                 "#decimalLongitude",
                 "#geodeticDatum",
@@ -1396,7 +1396,7 @@ def set_zoo_clip_metadata(
 
         # Include site info to the df
         upload_to_zoo = upload_to_zoo.merge(
-            sitesdf, left_on="#siteName", right_on="siteName"
+            sitesdf, left_on="#siteName", right_on="#siteName"
         )
 
     # Prevent NANs on any column
