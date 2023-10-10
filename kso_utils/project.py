@@ -1057,8 +1057,6 @@ class MLProjectProcessor(ProjectProcessor):
         self.modules.update(
             g_utils.import_model_modules(
                 ["yolov5.train", "yolov5.val", "yolov5.detect"],
-                utils=False,
-                models=True,
             )
         )
 
