@@ -923,7 +923,7 @@ def choose_baseline_model(download_path: str, test: bool = False):
                 for af in model_dict[change["new"].name].versions():
                     artifact_dir = af.download(download_path)
                     artifact_file = [
-                        str(Path(artifact_dir, i))
+                        str(i)
                         for i in Path(artifact_dir).iterdir()
                         if str(i).endswith(".pt")
                     ][-1]
@@ -954,7 +954,7 @@ def setup_paths(output_folder: str, model_type: str):
     if model_type == 1:
         try:
             data_path = [
-                str(Path(output_folder, f))
+                str(f)
                 for f in Path(output_folder).iterdir()
                 if str(f).endswith(".yaml") and "hyp" not in str(f)
             ][-1]
@@ -1045,7 +1045,7 @@ def generate_csv_report(
         f = str(f)
         frame_no = int(f.split("_")[-1].replace(".txt", ""))
         data_dict[f] = []
-        with open(Path(evaluation_path, "labels", f), "r") as infile:
+        with open(Path(f), "r") as infile:
             lines = infile.readlines()
             for line in lines:
                 class_id, x, y, w, h, conf = line.split(" ")
@@ -1128,7 +1128,7 @@ def generate_counts(
     model = torch.load(
         Path(
             [
-                f
+                str(f)
                 for f in Path(artifact_dir).iterdir()
                 if f.is_file() and "best.pt" in str(f)
             ][-1]
@@ -1194,7 +1194,7 @@ def track_objects(
         return None
 
     model_path = [
-        f
+        str(f)
         for f in Path(artifact_dir).iterdir()
         if f.is_file()
         and ".pt" in str(f)
