@@ -171,7 +171,7 @@ jobs:
         id: nb-tests
         run: >-
           export "WANDB_DIR=$(mktemp -d)" && export WANDB_CACHE_DIR="$WANDB_DIR" &&
-          mkdir -p yolov5_tracker/trackers && src/multi_tracker_zoo.py $_ &&
+          mkdir -p yolov5_tracker/trackers && cp src/multi_tracker_zoo.py $_ &&
           python3 -m pytest --disable-warnings test/widget-tests.py &&
           python3 -m pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }} --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py
 
