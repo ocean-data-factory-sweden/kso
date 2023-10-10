@@ -1030,9 +1030,11 @@ class MLProjectProcessor(ProjectProcessor):
         self.best_model_path = None
         self.model_type = 1  # set as 1 for testing
         self.train, self.run, self.test = (None,) * 3
-        self.registry = (
-            "mlflow" if os.environ["MLFLOW_TRACKING_URI"] is not None else "wandb"
-        )
+        
+        self.registry = "wandb"
+        if "MLFLOW_TRACKING_URI" in os.environ:
+            if os.environ["MLFLOW_TRACKING_URI"] is not None:
+                self.registry = "mlflow"
 
         # Before t6_utils gets loaded in, the val.py file in yolov5_tracker repository needs to be removed
         # to prevent the batch_size error, see issue kso-object-detection #187
