@@ -1030,7 +1030,7 @@ class MLProjectProcessor(ProjectProcessor):
         self.best_model_path = None
         self.model_type = 1  # set as 1 for testing
         self.train, self.run, self.test = (None,) * 3
-        
+
         self.registry = "wandb"
         if "MLFLOW_TRACKING_URI" in os.environ:
             if os.environ["MLFLOW_TRACKING_URI"] is not None:
@@ -1051,6 +1051,14 @@ class MLProjectProcessor(ProjectProcessor):
             g_utils.import_modules(
                 ["torch", "wandb", "yaml", "ultralytics"],
                 utils=False,
+            )
+        )
+        # Import model models for backwards compatibility
+        self.modules.update(
+            g_utils.import_model_modules(
+                ["yolov5.train", "yolov5.val", "yolov5.detect"],
+                utils=False,
+                models=True,
             )
         )
 
