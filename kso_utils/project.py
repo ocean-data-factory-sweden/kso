@@ -1491,7 +1491,7 @@ class MLProjectProcessor(ProjectProcessor):
                 eval_dir, "detection_output", self.registry, self.run
             )
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-                eval_dir, self.run, wandb_log=True, registry=self.registry
+                eval_dir, self.run, log=True, registry=self.registry
             )
         elif self.registry == "mlflow":
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
@@ -1508,7 +1508,7 @@ class MLProjectProcessor(ProjectProcessor):
         self.modules["yolo_utils"].set_config(conf_thres, model, eval_dir)
         self.modules["yolo_utils"].add_data(eval_dir, "detection_output", self.run)
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-            eval_dir, self.run, wandb_log=True
+            eval_dir, self.run, log=True
         )
 
     def segment_footage(self, source: str):
