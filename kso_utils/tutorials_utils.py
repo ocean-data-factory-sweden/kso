@@ -257,7 +257,7 @@ def modify_clips(
 
         if len(mod_prompt) > 0:
             full_prompt += mod_prompt
-        if out_prompt:
+        if 'output_prompt' in vars():
             full_prompt += out_prompt
         else:
             full_prompt += default_output_prompt
@@ -290,7 +290,7 @@ def modify_clips(
 
         if len(mod_prompt) > 0:
             full_prompt += mod_prompt
-        if out_prompt:
+        if 'output_prompt' in vars():
             full_prompt += out_prompt
         else:
             full_prompt += default_output_prompt
