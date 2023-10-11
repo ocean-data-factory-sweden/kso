@@ -12,7 +12,6 @@ import datetime
 import random
 import imagesize
 import requests
-import multiprocessing
 import ffmpeg as ffmpeg_python
 from base64 import b64encode
 from io import BytesIO
@@ -1445,9 +1444,6 @@ def create_modified_clips(
             # Recursively add permissions to folders created
             [os.chmod(root, 0o777) for root, dirs, files in os.walk(mod_clips_folder)]
 
-        # Specify the number of parallel items
-        pool = multiprocessing.Pool(pool_size)
-
         # Create empty list to keep track of new clips
         modified_clips = []
         results = []
@@ -1461,20 +1457,13 @@ def create_modified_clips(
             modified_clips = modified_clips + [output_clip_path]
 
             # Modify the clips and store them in the folder
-            results.append(
-                pool.apply_async(
-                    modify_clips,
-                    (
-                        clip_i,
-                        modification_details,
-                        output_clip_path,
-                        gpu_available,
-                    ),
-                )
+            modify_clips(
+                clip_i,
+                modification_details,
+                output_clip_path,
+                gpu_available,
             )
 
-        pool.close()
-        pool.join()
         return modified_clips
     else:
         logging.info("No modification selected")
