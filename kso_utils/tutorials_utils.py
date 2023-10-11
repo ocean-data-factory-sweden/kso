@@ -244,24 +244,31 @@ def modify_clips(
         # Commenting out b_v as it causes gpu runs to fail
         # b_v = df.filter(regex="bv$", axis=1).values[0][0] + "M"
 
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-hwaccel",
-                "cuda",
-                "-hwaccel_output_format",
-                "cuda",
-                "-i",
-                clip_i,
-                "-c:a",
-                "copy",
-                "-c:v",
-                "h264_nvenc",
-                # "-b:v",
-                # b_v,
-                output_clip_path,
-            ]
-        )
+        cmd = [
+            "ffmpeg",
+            "-hwaccel",
+            "cuda",
+            "-hwaccel_output_format",
+            "cuda",
+            "-i",
+            clip_i,
+            # "-c:a",
+            # "copy",
+            "-c:v",
+            "h264_nvenc",
+            # "-b:v",
+            # b_v,
+            output_clip_path,
+        ]
+
+        for key, value in modification_details.items():
+            if key not in ["b_v"]:
+                if value is not None:
+                    cmd.extend([key, value])
+                else:
+                    cmd.append(key)
+
+        subprocess.call(cmd)
 
     else:
         # Set up input prompt
