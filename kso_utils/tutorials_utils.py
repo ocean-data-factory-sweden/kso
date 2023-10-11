@@ -240,8 +240,8 @@ def modify_clips(
     """
     if gpu_available:
         # Set up input prompt
-        init_prompt = f"ffmpeg_python.input('{clip_i}')"
-        default_output_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='h264_nvenc', hwaccel='cuda', hwaccel_output_format='cuda')"
+        init_prompt = f"ffmpeg_python.input('{clip_i}', hwaccel='cuda', hwaccel_output_format='cuda')"
+        default_output_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='h264_nvenc',)"
         full_prompt = init_prompt
         mod_prompt = ""
 
@@ -253,7 +253,7 @@ def modify_clips(
                 # Unnest the modification detail dict
                 df = pd.json_normalize(modification_details, sep="_")
                 crf = df.filter(regex="crf$", axis=1).values[0][0]
-                out_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='libx264', hwaccel='cuda', hwaccel_output_format='cuda')"
+                out_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='h264_nvenc')"
 
         if len(mod_prompt) > 0:
             full_prompt += mod_prompt
