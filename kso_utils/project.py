@@ -1056,7 +1056,6 @@ class MLProjectProcessor(ProjectProcessor):
         )
         # Import model models for backwards compatibility
         if self.registry == "wandb":
-            subprocess.run(["pip", "install", "ultralytics==8.0.100"])
             self.modules.update(
                 g_utils.import_model_modules(
                     ["yolov5.train", "yolov5.detect", "yolov5.val"],
