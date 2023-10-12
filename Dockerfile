@@ -111,7 +111,6 @@ RUN adduser --disabled-password \
     # jupyter contrib nbextension install --user && \
     # jupyter nbextension enable --user --py widgetsnbextension && \
     # jupyter nbextension enable --user --py jupyter_bbox_widget
-RUN chown -R ${NB_USER}:${NB_USER} /usr/local/lib/python3.8/dist-packages
-RUN chmod -R 755 /usr/local/lib/python3.8/dist-packages
+RUN chown -R ${NB_USER}:${NB_USER} /usr/local/lib/python3.8/dist-packages/yolov5
+RUN chmod -R 755 /usr/local/lib/python3.8/dist-packages/yolov5
 USER ${NB_USER}
-
