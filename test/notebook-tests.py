@@ -231,6 +231,7 @@ def test_t6():
 
     # Generate current timestamp
     import shutil
+    import subprocess
     from datetime import datetime
 
     dt = datetime.now()
@@ -266,7 +267,7 @@ def test_t6():
         f"tracker_test_{dt}".replace(" ", "_").replace(".", "_").replace(":", "-")
     )
 
-    if self.registry == "wandb":
+    if mlp.registry == "wandb":
         subprocess.run(['pip', 'install', 'ultralytics', '==8.0.100'])
 
     # Tracking individuals
