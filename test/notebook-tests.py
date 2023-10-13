@@ -266,6 +266,9 @@ def test_t6():
         f"tracker_test_{dt}".replace(" ", "_").replace(".", "_").replace(":", "-")
     )
 
+    if self.registry == "wandb":
+        subprocess.run(['pip', 'install', 'ultralytics', '==8.0.100']
+
     # Tracking individuals
     mlp.track_individuals(
         name=track_exp_name,
