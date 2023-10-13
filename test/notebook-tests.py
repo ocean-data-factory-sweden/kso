@@ -268,7 +268,7 @@ def test_t6():
     )
 
     if mlp.registry == "wandb":
-        subprocess.run(['pip', 'install', 'ultralytics==8.0.100'])
+        subprocess.run(['pip', 'install', 'ultralytics==8.0.18'])
 
     # Tracking individuals
     mlp.track_individuals(
