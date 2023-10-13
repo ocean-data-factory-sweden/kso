@@ -18,6 +18,7 @@ To run these tests manually, use pytest --disable-warnings test/notebook-tests.p
 ## Import Python packages
 import os
 import sys
+import subprocess
 
 if "kso_utils" not in sys.modules:
     # for when we are running it on git, the yaml file will install the docker image. then we do need to go to the correct directory
@@ -234,7 +235,6 @@ def test_t6():
 
     # Generate current timestamp
     import shutil
-    import subprocess
     from datetime import datetime
 
     dt = datetime.now()
