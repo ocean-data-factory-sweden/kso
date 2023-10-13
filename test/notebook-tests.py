@@ -39,6 +39,9 @@ mlp = MLProjectProcessor(pp, test=True)
 # Create a folder for temporary test output
 os.makedirs("../test/test_output", exist_ok=True)
 
+if mlp.registry == "wandb":
+    subprocess.run(['pip', 'install', 'ultralytics==8.0.18'])
+
 # ----------------Tutorial 1----------------------------------------------------
 
 
@@ -266,9 +269,6 @@ def test_t6():
     track_exp_name = (
         f"tracker_test_{dt}".replace(" ", "_").replace(".", "_").replace(":", "-")
     )
-
-    if mlp.registry == "wandb":
-        subprocess.run(['pip', 'install', 'ultralytics==8.0.18'])
 
     # Tracking individuals
     mlp.track_individuals(
