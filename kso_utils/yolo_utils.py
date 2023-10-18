@@ -1096,7 +1096,12 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
                     lines = infile.readlines()
                     for line in lines:
                         vals = line.split(" ")
-                        class_id, frame_no, tracker_id = vals[-2], vals[0], vals[1]
+                        print(vals)
+                        class_id, frame_no, tracker_id = (
+                            vals[-3],
+                            vals[0],
+                            vals[1],
+                        )  # vals[-2], vals[0], vals[1] (track_yolo)
                         data_dict[track_file].append([class_id, frame_no, tracker_id])
         dlist = [
             [str(Path(key).parent / Path(key).stem) + f"_{i[1]}.txt", i[0], i[1], i[2]]
@@ -1135,6 +1140,7 @@ def generate_counts(
         )
     )
     names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
+    print(names)
     tracker_df = generate_tracking_report(tracker_dir, eval_dir)
     if tracker_df is None:
         logging.error("No tracks to count.")
@@ -1170,6 +1176,7 @@ def track_objects(
     conf_thres: float = 0.5,
     img_size: tuple = (720, 540),
     gpu: bool = False,
+    test: bool = False,
 ):
     """
     This function takes in the source directory of the video, the artifact directory, the tracker
@@ -1193,7 +1200,7 @@ def track_objects(
         logging.error("The tracker folder does not exist. Please try again")
         return None
 
-    model_path = [
+    models = [
         str(f)
         for f in Path(artifact_dir).iterdir()
         if f.is_file()
@@ -1202,7 +1209,13 @@ def track_objects(
         and "best" in str(f)
     ][0]
 
-    best_model = Path(model_path)
+    if len(models) > 0 and not test:
+        best_model = models[0]
+    else:
+        logging.info("No trained model found, using yolov8 base model...")
+        best_model = "yolov8s.pt"
+
+    best_model = Path(best_model)
 
     if not gpu:
         track_dict = {
@@ -1261,7 +1274,7 @@ def track_objects(
     args = SimpleNamespace(**track_dict)
     track.run(args)
     tracker_root = Path(tracker_folder, "runs", "track")
-    latest_tracker = Path(tracker_root, sorted(Path(tracker_root).iterdir())[-1], "mot")
+    latest_tracker = Path(sorted(Path(tracker_root).iterdir())[-1], "mot")
     logging.info(f"Tracking saved succesfully to {latest_tracker}")
     return latest_tracker
 

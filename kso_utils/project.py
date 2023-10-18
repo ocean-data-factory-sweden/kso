@@ -1223,7 +1223,10 @@ class MLProjectProcessor(ProjectProcessor):
 
             runs = api.runs(full_path)
 
-            for run in runs[:10]:
+            if len(runs) > 10:
+                runs = list(runs)[:10]
+
+            for run in runs:
                 model_artifacts = [
                     artifact
                     for artifact in chain(run.logged_artifacts(), run.used_artifacts())
@@ -1409,11 +1412,14 @@ class MLProjectProcessor(ProjectProcessor):
 
     def detect_yolo(
         self,
+        project: str,
+        name: str,
         source: str,
         conf_thres: float,
         artifact_dir: str,
         img_size: int = 640,
         save_output: bool = True,
+        test: bool = True,
     ):
         if self.registry == "mlflow":
             active_run = mlflow.active_run()
@@ -1431,17 +1437,23 @@ class MLProjectProcessor(ProjectProcessor):
                 project="model-evaluations",
                 settings=self.modules["wandb"].Settings(start_method="thread"),
             )
-        model = self.modules["ultralytics"].YOLO(
-            [
-                f
-                for f in Path(artifact_dir).iterdir()
-                if f.is_file()
-                and str(f).endswith((".pt", ".model"))
-                and "osnet" not in str(f)
-                and "best" in str(f)
-            ][0]
-        )
+        models = [
+            f
+            for f in Path(artifact_dir).iterdir()
+            if f.is_file()
+            and str(f).endswith((".pt", ".model"))
+            and "osnet" not in str(f)
+            and "best" in str(f)
+        ]
+        if len(models) > 0 and not test:
+            best_model = models[-1]
+        else:
+            logging.info("No trained model found, using yolov8 base model...")
+            best_model = "yolov8s.pt"
+        model = self.modules["ultralytics"].YOLO(best_model)
         model.predict(
+            project=project,
+            name=name,
             source=source,
             conf=conf_thres,
             save_txt=True,
@@ -1558,7 +1570,9 @@ class MLProjectProcessor(ProjectProcessor):
         eval_dir: str,
         conf_thres: float,
         img_size: tuple = (540, 540),
+        test: bool = False,
     ):
+
         latest_tracker = self.modules["yolo_utils"].track_objects(
             name=name,
             source_dir=source,
@@ -1567,6 +1581,7 @@ class MLProjectProcessor(ProjectProcessor):
             conf_thres=conf_thres,
             img_size=img_size,
             gpu=True if self.modules["torch"].cuda.is_available() else False,
+            test=test,
         )
 
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(

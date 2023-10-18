@@ -40,9 +40,6 @@ mlp = MLProjectProcessor(pp, test=True)
 # Create a folder for temporary test output
 os.makedirs("../test/test_output", exist_ok=True)
 
-if mlp.registry == "wandb":
-    subprocess.run(['pip', 'install', 'ultralytics==8.0.18'])
-
 # ----------------Tutorial 1----------------------------------------------------
 
 
@@ -193,13 +190,13 @@ def test_t5():
     weights = y_utils.choose_baseline_model(mlp.output_path, test=True)
     batch_size, epochs, img_h, img_w = mlp.choose_train_params()
     mlp.modules["wandb"].finish()
-    mlp.train_yolov5(
+    mlp.train_yolo(
         exp_name=exp_name,
-        weights=weights.artifact_path,
+        weights="yolov8s.pt",  # weights.artifact_path,
         project=project_path,
         epochs=epochs.value,
         batch_size=batch_size.value,
-        img_size=img_h.value,
+        img_size=img_h.value,  # this requires an int
     )
     # Test whether last.pt and best.pt are present in the weights folder (i.e. model training
     # was successful)
@@ -208,7 +205,7 @@ def test_t5():
     # Model evaluation
     conf_thres = t_utils.choose_eval_params()
     # Evaluate YOLO Model on Unseen Test data
-    mlp.eval_yolov5(exp_name, conf_thres.value)
+    mlp.eval_yolo(exp_name=exp_name, conf_thres=conf_thres.value)
 
     # Enhancement tests (leave out for now)
     # eh_conf_thres = t_utils.choose_eval_params()
@@ -220,7 +217,7 @@ def test_t5():
     # assert len(os.listdir(f"{mlp.run_path}/labels")==0)
 
     # Clean up residual files
-    shutil.rmtree(exp_path)
+    # shutil.rmtree(exp_path)
 
 
 # -------------Tutorial 6-------------------------------------------------------
@@ -248,17 +245,20 @@ def test_t6():
     # Evaluation
     s_utils.get_ml_data(project, test=True)
     model = mlp.choose_model().options[-1][1]
+
     download_dir = mlp.output_path
     artifact_dir = mlp.get_model(model, download_dir)
     source = os.path.join("../test/test_output", mlp.project.ml_folder, "images")
     save_dir = project_path
     conf_thres = t_utils.choose_conf()
-    mlp.detect_yolov5(
-        exp_name=exp_name,
+    mlp.detect_yolo(
+        project=project_path,
+        name=exp_name,
         source=source,
-        save_dir=save_dir,
         conf_thres=conf_thres.value,
         artifact_dir=artifact_dir,
+        save_output=True,
+        test=True,
     )
     eval_dir = exp_path
     mlp.save_detections(conf_thres.value, model, eval_dir)
@@ -278,9 +278,10 @@ def test_t6():
         eval_dir=eval_dir,
         conf_thres=conf_thres.value,
         img_size=(640, 640),
+        test=True,
     )
     # Remove any residual files
-    shutil.rmtree(exp_path)
+    # shutil.rmtree(exp_path)
 
 
 # #-------------Tutorial 7-------------------------------------------------------
