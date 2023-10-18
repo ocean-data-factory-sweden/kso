@@ -12,7 +12,6 @@ import datetime
 import random
 import imagesize
 import requests
-import multiprocessing
 import ffmpeg as ffmpeg_python
 from base64 import b64encode
 from io import BytesIO
@@ -240,29 +239,39 @@ def modify_clips(
     :param gpu_available: If you have a GPU, set this to True. If you don't, set it to False
     """
     if gpu_available:
-        # Unnest the modification detail dict
-        df = pd.json_normalize(modification_details, sep="_")
-        # Commenting out b_v as it causes gpu runs to fail
-        # b_v = df.filter(regex="bv$", axis=1).values[0][0] + "M"
-
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-hwaccel",
-                "cuda",
-                "-hwaccel_output_format",
-                "cuda",
-                "-i",
-                clip_i,
-                "-c:a",
-                "copy",
-                "-c:v",
-                "h264_nvenc",
-                # "-b:v",
-                # b_v,
-                output_clip_path,
-            ]
+        # Set up input prompt
+        init_prompt = f"ffmpeg_python.input('{clip_i}', hwaccel='cuda', hwaccel_output_format='cuda')"
+        default_output_prompt = (
+            f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='h264_nvenc',)"
         )
+        full_prompt = init_prompt
+        mod_prompt = ""
+
+        # Set up modification
+        for transform in modification_details.values():
+            if "filter" in transform:
+                mod_prompt += transform["filter"]
+            else:
+                # Unnest the modification detail dict
+                df = pd.json_normalize(modification_details, sep="_")
+                crf = df.filter(regex="crf$", axis=1).values[0][0]
+                out_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='h264_nvenc')"
+
+        if len(mod_prompt) > 0:
+            full_prompt += mod_prompt
+        if "output_prompt" in vars():
+            full_prompt += out_prompt
+        else:
+            full_prompt += default_output_prompt
+
+        # Run the modification
+        try:
+            eval(full_prompt).run(capture_stdout=True, capture_stderr=True)
+            os.chmod(output_clip_path, 0o777)
+        except ffmpeg_python.Error as e:
+            logging.info("stdout: {}", e.stdout.decode("utf8"))
+            logging.info("stderr: {}", e.stderr.decode("utf8"))
+            raise e
 
     else:
         # Set up input prompt
@@ -283,7 +292,7 @@ def modify_clips(
 
         if len(mod_prompt) > 0:
             full_prompt += mod_prompt
-        if out_prompt:
+        if "output_prompt" in vars():
             full_prompt += out_prompt
         else:
             full_prompt += default_output_prompt
@@ -1445,9 +1454,6 @@ def create_modified_clips(
             # Recursively add permissions to folders created
             [os.chmod(root, 0o777) for root, dirs, files in os.walk(mod_clips_folder)]
 
-        # Specify the number of parallel items
-        pool = multiprocessing.Pool(pool_size)
-
         # Create empty list to keep track of new clips
         modified_clips = []
         results = []
@@ -1461,20 +1467,13 @@ def create_modified_clips(
             modified_clips = modified_clips + [output_clip_path]
 
             # Modify the clips and store them in the folder
-            results.append(
-                pool.apply_async(
-                    modify_clips,
-                    (
-                        clip_i,
-                        modification_details,
-                        output_clip_path,
-                        gpu_available,
-                    ),
-                )
+            modify_clips(
+                clip_i,
+                modification_details,
+                output_clip_path,
+                gpu_available,
             )
 
-        pool.close()
-        pool.join()
         return modified_clips
     else:
         logging.info("No modification selected")

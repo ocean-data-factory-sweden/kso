@@ -439,18 +439,34 @@ def frame_aggregation(
         yaml.dump(hyp_data, outfile, default_flow_style=None)
 
     # Clean species names
-    species_df = pd.read_sql_query("SELECT id, commonName FROM species", conn)
-    species_df["clean_label"] = species_df.commonName.apply(clean_species_name)
-    species_df["zoo_label"] = species_df.commonName.apply(clean_label)
+    species_df = pd.read_sql_query(
+        "SELECT id, commonName, scientificName FROM species", conn
+    )
 
     # Add species_id to train_rows
     if "species_id" not in train_rows.columns:
-        train_rows["species_id"] = train_rows["label"].apply(
-            lambda x: species_df[species_df.commonName == x].id.values[0]
-            if x != "empty"
-            else "empty",
-            1,
-        )
+        # Allow for both cases where commonName or scientificName was used for annotation
+        try:
+            train_rows["species_id"] = train_rows["label"].apply(
+                lambda x: species_df[species_df.commonName == x].id.values[0]
+                if x != "empty"
+                else "empty",
+                1,
+            )
+            species_df["clean_label"] = species_df.commonName.apply(clean_species_name)
+            species_df["zoo_label"] = species_df.commonName.apply(clean_label)
+        except IndexError:
+            train_rows["species_id"] = train_rows["label"].apply(
+                lambda x: species_df[species_df.scientificName == x].id.values[0]
+                if x != "empty"
+                else "empty",
+                1,
+            )
+            species_df["clean_label"] = species_df.scientificName.apply(
+                clean_species_name
+            )
+            species_df["zoo_label"] = species_df.scientificName.apply(clean_label)
+
         train_rows.drop(columns=["label"], axis=1, inplace=True)
 
     sp_id2mod_id = {
