@@ -39,4 +39,5 @@ SQLAlchemy==2.0.20
 tqdm==4.64.1
 ultralytics==8.0.199
 wandb==0.15.11
+yolov5==7.0.13
 
