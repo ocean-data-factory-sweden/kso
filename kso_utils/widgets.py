@@ -1235,7 +1235,7 @@ def extract_custom_frames(
 
     # Determine which frames to extract based on the input parameters
     if num_frames is not None:
-        # Note: current workaround uses every 500 frames to avoid frame seeking error
+        # Note: if frame-seeking fails, use every 500th frame instead
         frames_to_extract = random.sample(range(frame_start, frame_end, 1), num_frames)
     elif frame_skip is not None:
         frames_to_extract = range(frame_start, frame_end, frame_skip)

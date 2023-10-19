@@ -19,6 +19,7 @@ To run these tests manually, use pytest --disable-warnings test/notebook-tests.p
 import os
 import sys
 import subprocess
+from pathlib import Path
 
 if "kso_utils" not in sys.modules:
     # for when we are running it on git, the yaml file will install the docker image. then we do need to go to the correct directory
@@ -38,7 +39,9 @@ project = p_utils.find_project(project_name="Template project")
 pp = ProjectProcessor(project)
 mlp = MLProjectProcessor(pp, test=True)
 # Create a folder for temporary test output
-os.makedirs("../test/test_output", exist_ok=True)
+output_path = Path("../test/test_output")
+output_path.mkdir(parents=True, exist_ok=True)
+mlp.output_path = str(Path("../test/test_output").resolve())
 
 # ----------------Tutorial 1----------------------------------------------------
 
@@ -161,10 +164,10 @@ def test_t4(zoo_user, zoo_pass):
     assert len(pp.modified_frames) == 9
 
 
-# # #-------------Tutorial 5-------------------------------------------------------
-# # """
-# # ...
-# # """
+# #-------------Tutorial 5-------------------------------------------------------
+# """
+# ...
+# """
 def test_t5():
     import kso_utils.tutorials_utils as t_utils
     import kso_utils.yolo_utils as y_utils
@@ -180,16 +183,15 @@ def test_t5():
     s_utils.get_ml_data(project, test=True)
 
     # Setup paths
-    mlp.output_path = "../test/test_output"
     mlp.setup_paths(test=True)
     exp_name = f"notebook_test_train_{dt}"
-    project_path = os.path.join(mlp.output_path, mlp.project_name)
-    exp_path = os.path.join(project_path, exp_name)
+    project_path = Path(mlp.output_path, mlp.project_name)
+    exp_path = Path(project_path, exp_name)
 
     # Model training
-    weights = y_utils.choose_baseline_model(mlp.output_path, test=True)
+    # weights = y_utils.choose_baseline_model(mlp.output_path, test=True)
     batch_size, epochs, img_h, img_w = mlp.choose_train_params()
-    mlp.modules["wandb"].finish()
+
     mlp.train_yolo(
         exp_name=exp_name,
         weights="yolov8s.pt",  # weights.artifact_path,
@@ -198,9 +200,10 @@ def test_t5():
         batch_size=batch_size.value,
         img_size=img_h.value,  # this requires an int
     )
+
     # Test whether last.pt and best.pt are present in the weights folder (i.e. model training
     # was successful)
-    assert len(os.listdir(os.path.join(exp_path, "weights"))) == 2
+    assert len(list(Path(exp_path, "weights").glob("*"))) == 2
 
     # Model evaluation
     conf_thres = t_utils.choose_eval_params()
@@ -238,17 +241,15 @@ def test_t6():
 
     # Create a unique experiment name
     exp_name = f"custom_{dt}".replace(" ", "_").replace(".", "_").replace(":", "-")
-    mlp.output_path = "../test/test_output"
-    project_path = os.path.join(mlp.output_path, mlp.project_name)
-    exp_path = os.path.join(project_path, exp_name)
+    project_path = str(Path(mlp.output_path, mlp.project_name))
+    exp_path = str(Path(project_path, exp_name))
 
     # Evaluation
     s_utils.get_ml_data(project, test=True)
     model = mlp.choose_model().options[-1][1]
 
-    download_dir = mlp.output_path
-    artifact_dir = mlp.get_model(model, download_dir)
-    source = os.path.join("../test/test_output", mlp.project.ml_folder, "images")
+    artifact_dir = mlp.get_model(model, mlp.output_path)
+    source = str(Path("../test/test_output", mlp.project.ml_folder, "images"))
     save_dir = project_path
     conf_thres = t_utils.choose_conf()
     mlp.detect_yolo(
@@ -354,7 +355,6 @@ def test_t8(zoo_user, zoo_pass):
     assert len(pp.aggregated_zoo_classifications) == 3
 
     # Run the preparation script
-    mlp.output_path = "../test/test_output"
     # This test does not work yet as the Template Project has no frame classifications
     # TODO: Add frame classifications and adjust workflow name and subject type above
     # mlp.prepare_dataset(

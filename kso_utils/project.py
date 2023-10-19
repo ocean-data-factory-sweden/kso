@@ -1301,11 +1301,9 @@ class MLProjectProcessor(ProjectProcessor):
         img_size: int = 128,
     ):
         # Disable wandb (not necessary yet)
-        # self.modules["ultralytics"].settings.update({"wandb": False})
-        try:
-            if "yolov5" in weights:
-                weights = Path(weights).name
-            model = self.modules["ultralytics"].YOLO(weights)
+        self.modules["ultralytics"].settings.update({"wandb": True})
+
+        if self.registry == "mlflow":
             active_run = mlflow.active_run()
 
             from mlflow.data.pandas_dataset import PandasDataset
@@ -1328,6 +1326,11 @@ class MLProjectProcessor(ProjectProcessor):
             mlflow.log_artifacts(
                 Path(self.data_path).parent, artifact_path="input_datasets"
             )
+        try:
+            if "yolov5" in weights:
+                weights = Path(weights).name
+
+            model = self.modules["ultralytics"].YOLO(weights)
             model.train(
                 data=self.data_path,
                 project=project,
@@ -1336,11 +1339,11 @@ class MLProjectProcessor(ProjectProcessor):
                 batch=int(batch_size),
                 imgsz=img_size,
             )
-
         except Exception as e:
             logging.info(f"Training failed due to: {e}")
         # Close down run
-        self.modules["wandb"].finish()
+        if self.registry == "wandb":
+            self.modules["wandb"].finish()
 
     def train_yolov5(
         self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
@@ -1446,7 +1449,7 @@ class MLProjectProcessor(ProjectProcessor):
             and "best" in str(f)
         ]
         if len(models) > 0 and not test:
-            best_model = models[-1]
+            best_model = models[0]
         else:
             logging.info("No trained model found, using yolov8 base model...")
             best_model = "yolov8s.pt"
@@ -1572,7 +1575,6 @@ class MLProjectProcessor(ProjectProcessor):
         img_size: tuple = (540, 540),
         test: bool = False,
     ):
-
         latest_tracker = self.modules["yolo_utils"].track_objects(
             name=name,
             source_dir=source,
