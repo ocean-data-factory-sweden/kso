@@ -1,5 +1,6 @@
 av==8.1.0
 boto3==1.26.64
+csv-diff==1.1
 dataclass-csv==1.4.0
 ffmpeg==1.4
 ffmpeg-python==0.2.0
