@@ -19,7 +19,7 @@ jupyter_contrib_nbextensions==0.7.0
 jupyter==1.0.0
 more-itertools==9.1.0
 natsort==8.1.0
-notebook==6.5.5
+notebook==6.5.4
 numpy>=1.22.0,<1.24.1
 opencv-contrib-python==4.6.0.66
 opencv-python==4.6.0.66
@@ -35,6 +35,4 @@ split-folders==0.5.1
 SQLAlchemy==2.0.20
 tqdm==4.64.1
 traitlets==5.9.0
-ultralytics==8.0.200
-wandb==0.15.11
-yolov5==7.0.13
+wandb==0.13.2
