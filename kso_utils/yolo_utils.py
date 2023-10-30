@@ -624,8 +624,8 @@ def frame_aggregation(
             named_tuple = tuple([grouped_fields[1], filename])
         else:
             # Get movie_path and frame_number
-            grouped_fields.reverse()
-            named_tuple = tuple([grouped_fields])
+            rev_fields = grouped_fields.reverse()
+            named_tuple = tuple([rev_fields])
 
         if movie_bool:
             from kso_utils.movie_utils import unswedify
