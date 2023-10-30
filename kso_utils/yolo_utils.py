@@ -1059,7 +1059,7 @@ def generate_csv_report(
     labels = os.listdir(Path(evaluation_path, "labels"))
     data_dict = {}
     for f in labels:
-        frame_no = int(f.split("_")[-1].replace(".txt", ""))
+        frame_no = int(float(f.split("_")[-1].replace(".txt", "")))
         data_dict[f] = []
         with open(Path(evaluation_path, "labels", f), "r") as infile:
             lines = infile.readlines()
