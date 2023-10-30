@@ -1043,7 +1043,9 @@ def add_data_wandb(path: str, name: str, run):
     run.log_artifact(my_data)
 
 
-def generate_csv_report(evaluation_path: str, run, wandb_log: bool = False):
+def generate_csv_report(
+    entity: str, project: str, evaluation_path: str, run, wandb_log: bool = False
+):
     """
     > We read the labels from the `labels` folder, and create a dictionary with the filename as the key,
     and the list of labels as the value. We then convert this dictionary to a dataframe, and write it to
@@ -1074,7 +1076,7 @@ def generate_csv_report(evaluation_path: str, run, wandb_log: bool = False):
     ).to_csv(csv_out, index=False)
     logging.info("Report created at {}".format(csv_out))
     if wandb_log:
-        wandb.init(resume="must", id=run.id)
+        wandb.init(resume="must", entity=entity, project=project, id=run.id)
         wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
     return detect_df
 
@@ -1125,7 +1127,13 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
 
 
 def generate_counts(
-    eval_dir: str, tracker_dir: str, artifact_dir: str, run, wandb_log: bool = False
+    entity: str,
+    project: str,
+    eval_dir: str,
+    tracker_dir: str,
+    artifact_dir: str,
+    run,
+    wandb_log: bool = False,
 ):
     import torch
 
@@ -1157,7 +1165,7 @@ def generate_counts(
             .reset_index()
         )
         if wandb_log:
-            wandb.init(resume="must", id=run.id)
+            wandb.init(resume="must", entity=entity, project=project, id=run.id)
             wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
         return final_df
 

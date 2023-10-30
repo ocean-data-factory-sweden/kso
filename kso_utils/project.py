@@ -1339,7 +1339,7 @@ class MLProjectProcessor(ProjectProcessor):
             eval_dir, "detection_output", self.run
         )
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-            eval_dir, self.run, wandb_log=True
+            self.team_name, self.project_name, eval_dir, self.run, wandb_log=True
         )
 
     def track_individuals(
@@ -1364,10 +1364,16 @@ class MLProjectProcessor(ProjectProcessor):
             Path(latest_tracker).parent.absolute(), "tracker_output", self.run
         )
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-            eval_dir, self.run, wandb_log=True
+            self.team_name, self.project_name, eval_dir, self.run, wandb_log=True
         )
         self.tracking_report = self.modules["yolo_utils"].generate_counts(
-            eval_dir, latest_tracker, artifact_dir, self.run, wandb_log=True
+            self.team_name,
+            self.project_name,
+            eval_dir,
+            latest_tracker,
+            artifact_dir,
+            self.run,
+            wandb_log=True,
         )
         # self.modules["wandb"].finish()
 
