@@ -1076,7 +1076,7 @@ def generate_csv_report(
     ).to_csv(csv_out, index=False)
     logging.info("Report created at {}".format(csv_out))
     if wandb_log:
-        wandb.init(resume="must", entity=entity, project=project, id=run.id)
+        wandb.init(resume="must", entity=entity, project="model-evaluations", id=run.id)
         wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
     return detect_df
 
@@ -1165,7 +1165,9 @@ def generate_counts(
             .reset_index()
         )
         if wandb_log:
-            wandb.init(resume="must", entity=entity, project=project, id=run.id)
+            wandb.init(
+                resume="must", entity=entity, project="model-evaluations", id=run.id
+            )
             wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
         return final_df
 
@@ -1194,6 +1196,9 @@ def track_objects(
     """
     import torch
     import yolov5_tracker.track as track
+    from yolov5.utils import torch_utils
+
+    os.chdir("../yolov5_tracker/")
 
     # Check that tracker folder specified exists
     if not os.path.exists(tracker_folder):
