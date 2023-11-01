@@ -1251,6 +1251,10 @@ class MLProjectProcessor(ProjectProcessor):
     def train_yolov5(
         self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
     ):
+
+        if self.project.server == "SNIC":
+            project = f"/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/{project}"
+
         if self.model_type == 1:
             self.modules["train"].run(
                 entity=self.team_name,
