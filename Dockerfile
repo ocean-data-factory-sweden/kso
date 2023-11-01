@@ -87,6 +87,12 @@ RUN apt-get update && \
     cp \
         /usr/src/app/kso/src/multi_tracker_zoo.py \
         /usr/src/app/kso/yolov5_tracker/trackers/multi_tracker_zoo.py && \
+    cp \
+        /usr/src/app/kso/src/detect.py \
+        /usr/src/app/kso/yolov5/detect.py && \
+    cp \
+        /usr/src/app/kso/src/track.py \
+        /usr/src/app/kso/yolov5_tracker/track.py && \
     # Install all python packages, numpy needs to be installed
     # first to avoid the lap build error
     python3 -m pip --no-cache-dir install --upgrade pip && \
