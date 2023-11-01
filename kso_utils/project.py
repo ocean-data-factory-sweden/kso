@@ -1315,6 +1315,7 @@ class MLProjectProcessor(ProjectProcessor):
         self.run = self.modules["wandb"].init(
             entity=self.team_name,
             project="model-evaluations",
+            name="predict",
             settings=self.modules["wandb"].Settings(start_method="thread"),
         )
         eval_dir = increment_path(Path(save_dir) / exp_name, exist_ok=False)
@@ -1372,8 +1373,10 @@ class MLProjectProcessor(ProjectProcessor):
         self.run = self.modules["wandb"].init(
             entity=self.team_name,
             project="model-evaluations",
+            name="track",
             settings=self.modules["wandb"].Settings(start_method="thread"),
         )
+        self.modules["yolo_utils"].set_config(conf_thres, artifact_dir, eval_dir)
         self.modules["yolo_utils"].add_data_wandb(
             Path(latest_tracker).parent.absolute(), "tracker_output", self.run
         )
