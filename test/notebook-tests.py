@@ -256,6 +256,7 @@ def test_t6():
         conf_thres=conf_thres.value,
         artifact_dir=artifact_dir,
     )
+    eval_dir = exp_path
 
     # Note: investigating training and validation datasets is not currently tested.
 
