@@ -84,6 +84,7 @@ RUN apt-get update && \
         git \
         vim && \
     apt-get clean && \
+    # Copy over custom scripts to submodules
     cp \
         /usr/src/app/kso/src/multi_tracker_zoo.py \
         /usr/src/app/kso/yolov5_tracker/trackers/multi_tracker_zoo.py && \
