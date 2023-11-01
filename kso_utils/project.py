@@ -1369,12 +1369,11 @@ class MLProjectProcessor(ProjectProcessor):
             gpu=True if self.modules["torch"].cuda.is_available() else False,
         )
         # Create a new run for tracking only if necessary
-        if not hasattr(self, "run"):
-            self.run = self.modules["wandb"].init(
-                entity=self.team_name,
-                project="model-evaluations",
-                settings=self.modules["wandb"].Settings(start_method="thread"),
-            )
+        self.run = self.modules["wandb"].init(
+            entity=self.team_name,
+            project="model-evaluations",
+            settings=self.modules["wandb"].Settings(start_method="thread"),
+        )
         self.modules["yolo_utils"].add_data_wandb(
             Path(latest_tracker).parent.absolute(), "tracker_output", self.run
         )
