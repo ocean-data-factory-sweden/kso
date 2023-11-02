@@ -1608,9 +1608,7 @@ class MLProjectProcessor(ProjectProcessor):
                 settings=self.modules["wandb"].Settings(start_method="thread"),
             )
             self.modules["yolo_utils"].set_config(conf_thres, artifact_dir, eval_dir)
-            self.modules["yolo_utils"].add_data_wandb(
-                Path(latest_tracker).parent.absolute(), "tracker_output", self.run
-            )
+
         # self.csv_report = self.modules["yolo_utils"].generate_csv_report(
         #    self.team_name, self.project_name, eval_dir, self.run, log=True
         # )
