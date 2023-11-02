@@ -1220,10 +1220,6 @@ def track_objects(
     import torch
     import src.track_yolo as track
     from types import SimpleNamespace
-    import yolov5_tracker.track as track
-    from yolov5.utils import torch_utils
-
-    os.chdir("../yolov5_tracker/")
 
     # Check that tracker folder specified exists
     if not Path(tracker_folder).exists():
