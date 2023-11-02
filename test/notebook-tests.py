@@ -262,7 +262,6 @@ def test_t6():
         test=True,
     )
     eval_dir = exp_path
-    mlp.save_detections(conf_thres.value, model, eval_dir)
 
     # Note: investigating training and validation datasets is not currently tested.
 

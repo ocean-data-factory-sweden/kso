@@ -629,8 +629,8 @@ def frame_aggregation(
             named_tuple = tuple([grouped_fields[1], filename])
         else:
             # Get movie_path and frame_number
-            grouped_fields.reverse()
-            named_tuple = tuple([grouped_fields])
+            rev_fields = grouped_fields.reverse()
+            named_tuple = tuple([rev_fields])
 
         if movie_bool:
             from kso_utils.movie_utils import unswedify
@@ -1168,12 +1168,10 @@ def generate_counts(
         )
     )
     names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
-    print(names)
     tracker_df = generate_tracking_report(tracker_dir, eval_dir)
     if tracker_df is None:
         logging.error("No tracks to count.")
     else:
-        print(tracker_df)
         tracker_df["frame_no"] = tracker_df["frame_no"].astype(int)
         tracker_df["species_name"] = tracker_df["class_id"].apply(
             lambda x: names[int(x)]
@@ -1189,7 +1187,7 @@ def generate_counts(
         )
         if log:
             if registry == "wandb":
-                wandb.init(resume="must", id=run.id)
+                # wandb.init(resume="must", id=run.id)
                 wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
             elif registry == "mlflow":
                 pass
@@ -1222,6 +1220,10 @@ def track_objects(
     import torch
     import src.track_yolo as track
     from types import SimpleNamespace
+    import yolov5_tracker.track as track
+    from yolov5.utils import torch_utils
+
+    os.chdir("../yolov5_tracker/")
 
     # Check that tracker folder specified exists
     if not Path(tracker_folder).exists():

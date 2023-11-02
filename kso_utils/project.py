@@ -1348,6 +1348,10 @@ class MLProjectProcessor(ProjectProcessor):
     def train_yolov5(
         self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
     ):
+
+        if self.project.server == "SNIC":
+            project = f"/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/{project}"
+
         if self.model_type == 1:
             self.modules["train"].run(
                 entity=self.team_name,
@@ -1475,20 +1479,25 @@ class MLProjectProcessor(ProjectProcessor):
         img_size: int = 640,
         save_output: bool = True,
     ):
+        from yolov5.utils.general import increment_path
+
         self.run = self.modules["wandb"].init(
             entity=self.team_name,
             project="model-evaluations",
+            name="predict",
             settings=self.modules["wandb"].Settings(start_method="thread"),
         )
+        eval_dir = increment_path(Path(save_dir) / exp_name, exist_ok=False)
+        weights_path = [
+            f
+            for f in Path(artifact_dir).iterdir()
+            if f.is_file()
+            and str(f).endswith((".pt", ".model"))
+            and "osnet" not in str(f)
+            and "best" in str(f)
+        ][0]
         self.modules["detect"].run(
-            weights=[
-                f
-                for f in Path(artifact_dir).iterdir()
-                if f.is_file()
-                and str(f).endswith((".pt", ".model"))
-                and "osnet" not in str(f)
-                and "best" in str(f)
-            ][0],
+            weights=weights_path,
             source=source,
             conf_thres=conf_thres,
             save_txt=True,
@@ -1497,6 +1506,10 @@ class MLProjectProcessor(ProjectProcessor):
             name=exp_name,
             nosave=not save_output,
         )
+        self.save_detections_wandb(conf_thres, weights_path, eval_dir)
+        if wandb.run is not None:
+            self.modules["wandb"].finish()
+        return str(eval_dir)
 
     def save_detections(self, conf_thres: float, model: str, eval_dir: str):
         if self.registry == "wandb":
@@ -1586,10 +1599,24 @@ class MLProjectProcessor(ProjectProcessor):
             test=test,
         )
 
-        self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-            eval_dir, self.run, log=True, registry=self.registry
-        )
+        # Create a new run for tracking only if necessary
+        if self.registry == "wandb":
+            self.run = self.modules["wandb"].init(
+                entity=self.team_name,
+                project="model-evaluations",
+                name="track",
+                settings=self.modules["wandb"].Settings(start_method="thread"),
+            )
+            self.modules["yolo_utils"].set_config(conf_thres, artifact_dir, eval_dir)
+            self.modules["yolo_utils"].add_data_wandb(
+                Path(latest_tracker).parent.absolute(), "tracker_output", self.run
+            )
+        # self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+        #    self.team_name, self.project_name, eval_dir, self.run, log=True
+        # )
         self.tracking_report = self.modules["yolo_utils"].generate_counts(
+            self.team_name,
+            self.project_name,
             eval_dir,
             latest_tracker,
             artifact_dir,
@@ -1625,7 +1652,9 @@ class MLProjectProcessor(ProjectProcessor):
             save=True,
             imgsz=img_size,
         )
-        self.modules["wandb"].finish()
+
+        if wandb.run is not None:
+            self.modules["wandb"].finish()
 
     def enhance_yolov5(
         self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
