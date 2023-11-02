@@ -1613,8 +1613,6 @@ class MLProjectProcessor(ProjectProcessor):
         #    self.team_name, self.project_name, eval_dir, self.run, log=True
         # )
         self.tracking_report = self.modules["yolo_utils"].generate_counts(
-            self.team_name,
-            self.project_name,
             eval_dir,
             latest_tracker,
             artifact_dir,
