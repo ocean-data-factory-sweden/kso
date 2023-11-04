@@ -89,7 +89,7 @@ def get_movie_path(f_path: str, project: Project, server_connection: dict = None
         return movie_url
 
     else:
-        logging.error(f"Returning the fpath {f_path}")
+        logging.info(f"Returning the fpath {f_path}")
         return f_path
 
 
@@ -719,9 +719,10 @@ def check_movies_meta(
         )
 
     # Add information about whether the movies are available in the movie_folder
-    df_toreview = df.merge(
-        available_movies_df[["fpath", "exists"]],
-        on=["fpath"],
+    df_temp = df.copy().drop(columns=["fpath"])
+    df_toreview = df_temp.merge(
+        available_movies_df[["filename", "fpath", "exists"]],
+        on=["filename"],
         how="left",
     )
 

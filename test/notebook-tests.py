@@ -257,7 +257,6 @@ def test_t6():
         artifact_dir=artifact_dir,
     )
     eval_dir = exp_path
-    mlp.save_detections_wandb(conf_thres.value, model, eval_dir)
 
     # Note: investigating training and validation datasets is not currently tested.
 

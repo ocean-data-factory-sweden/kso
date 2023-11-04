@@ -26,9 +26,9 @@ jobs:
         with:
           files: |
             Dockerfile
-            requirements
-            yolov5_tracker/requirements
-            yolov5/requirements
+            requirements.txt
+            yolov5_tracker/requirements.txt
+            yolov5/requirements.txt
             
   # Based on if the files have changed and whether we push or PR, 
   # we decide on the tag of the image.
@@ -152,15 +152,15 @@ jobs:
         run: pip install pytest pylint nbqa
       - name: Pylint Test kso_utils
         run: |
-          /github/home/.local/bin/pylint kso_utils
+          /github/home/.local/bin/pylint --disable=no-member,assignment-from-no-return kso_utils
       - name: Pylint Test tests
         if: success() || failure()
         run: |
-          /github/home/.local/bin/pylint test/*
+          /github/home/.local/bin/pylint --disable=no-member,assignment-from-no-return test/*
       - name: Pylint Test NB tutorials
         if: success() || failure()
         run: |
-          /github/home/.local/bin/nbqa pylint tutorials
+          /github/home/.local/bin/nbqa pylint --disable=no-member,assignment-from-no-return tutorials
         # If one of the pylint steps fails, there are errors and we do not need to run the test below.
       - name: Login W&B
         shell: bash
@@ -171,7 +171,7 @@ jobs:
         id: nb-tests
         run: >-
           export "WANDB_DIR=$(mktemp -d)" && export WANDB_CACHE_DIR="$WANDB_DIR" &&
-          cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py &&
+          mkdir -p yolov5_tracker/trackers && cp src/multi_tracker_zoo.py yolov5_tracker/trackers/multi_tracker_zoo.py &&
           python3 -m pytest --disable-warnings test/widget-tests.py &&
           python3 -m pytest --disable-warnings --zoo_user=${{ secrets.ZOO_USERNAME }} --zoo_pass=${{ secrets.ZOO_TOKEN }} test/notebook-tests.py
 

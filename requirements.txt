@@ -1,5 +1,6 @@
 av==8.1.0
 boto3==1.26.64
+csv-diff==1.1
 dataclass-csv==1.4.0
 ffmpeg==1.4
 ffmpeg-python==0.2.0
@@ -17,6 +18,7 @@ jupyter-bbox-widget==0.5.0
 jupyter_contrib_nbextensions==0.7.0 
 jupyter==1.0.0
 more-itertools==9.1.0
+moviepy==1.0.3
 natsort==8.1.0
 notebook==6.5.4
 numpy>=1.22.0,<1.24.1
@@ -33,5 +35,5 @@ setuptools==67.6.1
 split-folders==0.5.1
 SQLAlchemy==2.0.20
 tqdm==4.64.1
+traitlets==5.9.0
 wandb==0.13.2
-csv-diff==1.1

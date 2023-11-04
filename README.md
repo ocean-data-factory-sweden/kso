@@ -24,7 +24,7 @@ The system processes underwater footage and its associated metadata into biologi
 This repository contains scripts and resources to:
 * move and process underwater footage and its associated data (e.g. location, date, sampling device).
 * make this data available for citizen science to help you with annotating the data.
-* train and evaluate machine learning models. (customise [Yolov5][YoloV5] models using Ultralytics.)
+* train and evaluate machine learning models. (customise [Yolov5][YoloV5] or [Yolov8][YoloV8] models using Ultralytics.)
 
 ![high-level][high-level-overview]
 
@@ -49,9 +49,16 @@ Users can run these tutorials via Google Colab (by clicking on the Colab links i
 \* Project-specific tutorial
 
 ## Local Installation
-If you want to fully use our system (Binder has computing limitations), you will need to download this repository on your local computer or server. (Or use SNIC, see instructions below)
+If you want to fully use our system (Binder has computing limitations), you will need to download this repository on your local computer or server. (Or use SNIC or Cloudina, see instructions below)
+Note that depending on your choice of infrastructure, you will be limited to either [Yolov5][YoloV5] or [Yolov8][YoloV8]:
+* Locally it is possible to either use Yolov5 or Yolov8.
+* SNIC: only possible to use Yolov5.
+* Cloudina: Only possible to use Yolov8.
 
-### Requirements
+The latest developments are only available in the combination with Yolov8. However, there is a stable tagged [yolov5] (https://github.com/ocean-data-factory-sweden/kso/yolov5) version if you prefer Yolov5. 
+
+### Local installation with Yolov5
+Requirements
 * [Python 3.8](https://www.python.org/)
 * [Anaconda](https://docs.anaconda.com/anaconda/install/index.html)
 * [GIT](https://git-scm.com/downloads)
@@ -60,8 +67,9 @@ If you want to fully use our system (Binder has computing limitations), you will
 #### Download this repository
 Clone this repository using
 ```python
-git clone --recurse-submodules https://github.com/ocean-data-factory-sweden/kso.git
+git clone --recurse-submodules --depth 1 --branch yolov5 https://github.com/ocean-data-factory-sweden/kso.git
 ``` 
+
 #### Prepare your system
 Depending on which system you are using (Windows/Linux/MacOS), you might need to install some extra tools. If this is the case, you will get a message about what you need to install in the next steps. 
 For example, on a Windows system, it will request you to install the Microsoft Build Tools C++ with a version higher than 14.0. You can install it from https://visualstudio.microsoft.com/visual-cpp-build-tools/. You only need to select the "Windows <your version> SDK" in the install menu.
@@ -101,6 +109,9 @@ After installing all the requirements, run the following command in your environ
 
 Now open the Jupyter notebook and select/change kernel to run the notebooks from your environment.
 
+### Local installation with Yolov8
+These instuctions will be provided once a stable version with Yolov8 is achieved. 
+
 ## SNIC Users (VPN required)
 
 **Before using the VPN to connect to SNIC, users should have login credentials and set up the Chalmers VPN on their local computers**
@@ -123,6 +134,10 @@ This will directly queue a server session using the correct container image, fir
 ![screenshot_start][screenshot_started]
 
 Important note: The remaining time for the server is shown in green window as well. If you have finished using the notebook server before the allocated time runs out, please select **"Delete"** so that the resources can be released for use by others within the project. 
+
+## Cloudina 
+Instructions will come...
+
 
 ## Starting a new project
 If you will work on a new project you will need to:
@@ -194,6 +209,7 @@ pip install python-magic-bin
 [colab_tut_9]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/10_Run_ML_Models_on_footage.ipynb
 [objdecmodule]: https://github.com/ocean-data-factory-sweden/kso
 [YoloV5]: https://github.com/ultralytics/yolov5
+[YoloV8]: https://github.com/ultralytics/ultralytics
 [OBIS-site]: https://www.gbif.org/network/2b7c7b4f-4d4f-40d3-94de-c28b6fa054a6
 [Koster_info_diagram]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/Koster_information_flow.png?raw=true "Information architecture of the Koster Seafloor Observatory"
 [screenshot_loading]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/screenshot_loading.png?raw=true

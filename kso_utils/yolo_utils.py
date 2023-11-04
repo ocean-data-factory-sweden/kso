@@ -363,15 +363,23 @@ def frame_aggregation(
     train_rows = agg_df[agg_df.label.isin(class_list)]
 
     # Rename columns if in different format
-    train_rows = train_rows.rename(
-        columns={"x": "x_position", "y": "y_position", "w": "width", "h": "height"}
-    ).copy()
+    train_rows = (
+        train_rows.rename(
+            columns={"x": "x_position", "y": "y_position", "w": "width", "h": "height"}
+        )
+        .copy()
+        .reset_index()
+    )
 
     # Remove null annotations
     if remove_nulls:
-        train_rows = train_rows.dropna(
-            subset=["x_position", "y_position", "width", "height"],
-        ).copy()
+        train_rows = (
+            train_rows.dropna(
+                subset=["x_position", "y_position", "width", "height"],
+            )
+            .copy()
+            .reset_index()
+        )
 
     # Check if any frames are left after removing null values
     if len(train_rows) == 0:
@@ -449,18 +457,34 @@ def frame_aggregation(
         yaml.dump(hyp_data, outfile, default_flow_style=None)
 
     # Clean species names
-    species_df = pd.read_sql_query("SELECT id, commonName FROM species", conn)
-    species_df["clean_label"] = species_df.commonName.apply(clean_species_name)
-    species_df["zoo_label"] = species_df.commonName.apply(clean_label)
+    species_df = pd.read_sql_query(
+        "SELECT id, commonName, scientificName FROM species", conn
+    )
 
     # Add species_id to train_rows
     if "species_id" not in train_rows.columns:
-        train_rows["species_id"] = train_rows["label"].apply(
-            lambda x: species_df[species_df.commonName == x].id.values[0]
-            if x != "empty"
-            else "empty",
-            1,
-        )
+        # Allow for both cases where commonName or scientificName was used for annotation
+        try:
+            train_rows["species_id"] = train_rows["label"].apply(
+                lambda x: species_df[species_df.commonName == x].id.values[0]
+                if x != "empty"
+                else "empty",
+                1,
+            )
+            species_df["clean_label"] = species_df.commonName.apply(clean_species_name)
+            species_df["zoo_label"] = species_df.commonName.apply(clean_label)
+        except IndexError:
+            train_rows["species_id"] = train_rows["label"].apply(
+                lambda x: species_df[species_df.scientificName == x].id.values[0]
+                if x != "empty"
+                else "empty",
+                1,
+            )
+            species_df["clean_label"] = species_df.scientificName.apply(
+                clean_species_name
+            )
+            species_df["zoo_label"] = species_df.scientificName.apply(clean_label)
+
         train_rows.drop(columns=["label"], axis=1, inplace=True)
 
     sp_id2mod_id = {
@@ -471,7 +495,7 @@ def frame_aggregation(
     # Get movie info from server
     from kso_utils.movie_utils import retrieve_movie_info_from_server
 
-    movie_df = retrieve_movie_info_from_server(
+    movie_df, _, _ = retrieve_movie_info_from_server(
         project=project,
         server_connection=server_connection,
         db_connection=db_connection,
@@ -507,14 +531,15 @@ def frame_aggregation(
 
     if movie_bool:
         # Get movie path on the server
+
         train_rows["movie_path"] = train_rows.merge(
-            movie_df, left_on="movie_id", right_on="id", how="left"
+            movie_df, on="movie_id", how="left"
         )["fpath"]
 
         from kso_utils.movie_utils import get_movie_path
 
         train_rows["movie_path"] = train_rows["movie_path"].apply(
-            lambda x: get_movie_path(project, x)
+            lambda x: get_movie_path(x, project, server_connection)
         )
 
         # Read each movie for efficient frame access
@@ -569,11 +594,13 @@ def frame_aggregation(
     # Get relevant fields from dataframe (before groupby)
     train_rows = train_rows[key_fields]
 
+    link_bool = "subject_ids" in key_fields
+
     group_fields = (
         ["subject_ids", "species_id"]
         if link_bool
         else (
-            ["movie_path", "frame_number", "species_id"]
+            ["species_id", "frame_number", "movie_path"]
             if movie_bool
             else ["filename", "species_id"]
         )
@@ -584,7 +611,7 @@ def frame_aggregation(
     tboxes = {}
 
     for name, group in tqdm(train_rows.groupby(group_fields)):
-        grouped_fields = name[: len(group_fields)]
+        grouped_fields = list(name[: len(group_fields)])
         if not movie_bool:
             # Get the filenames of the images
             filename = (
@@ -603,7 +630,7 @@ def frame_aggregation(
         if movie_bool:
             from kso_utils.movie_utils import unswedify
 
-            final_name = name[0] if name[0] in video_dict else unswedify(name[0])
+            final_name = name[2] if name[2] in video_dict else unswedify(name[2])
 
             if grouped_fields[1] > len(video_dict[final_name]):
                 logging.warning(
@@ -615,7 +642,8 @@ def frame_aggregation(
                 bboxes[named_tuple].extend(
                     tuple(i[len(grouped_fields) :]) for i in group.values
                 )
-                movie_w, movie_h = video_dict[final_name][0].shape
+
+                movie_w, movie_h = video_dict[final_name][0].shape[:2]
 
                 for box in bboxes[named_tuple]:
                     new_rows.append(
@@ -1015,7 +1043,9 @@ def add_data_wandb(path: str, name: str, run):
     run.log_artifact(my_data)
 
 
-def generate_csv_report(evaluation_path: str, run, wandb_log: bool = False):
+def generate_csv_report(
+    entity: str, project: str, evaluation_path: str, run, wandb_log: bool = False
+):
     """
     > We read the labels from the `labels` folder, and create a dictionary with the filename as the key,
     and the list of labels as the value. We then convert this dictionary to a dataframe, and write it to
@@ -1029,7 +1059,7 @@ def generate_csv_report(evaluation_path: str, run, wandb_log: bool = False):
     labels = os.listdir(Path(evaluation_path, "labels"))
     data_dict = {}
     for f in labels:
-        frame_no = int(f.split("_")[-1].replace(".txt", ""))
+        frame_no = int(float(f.split("_")[-1].replace(".txt", "")))
         data_dict[f] = []
         with open(Path(evaluation_path, "labels", f), "r") as infile:
             lines = infile.readlines()
@@ -1046,7 +1076,7 @@ def generate_csv_report(evaluation_path: str, run, wandb_log: bool = False):
     ).to_csv(csv_out, index=False)
     logging.info("Report created at {}".format(csv_out))
     if wandb_log:
-        wandb.init(resume="must", id=run.id)
+        # wandb.init(resume="must", entity=entity, project="model-evaluations", id=run.id)
         wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
     return detect_df
 
@@ -1097,7 +1127,13 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
 
 
 def generate_counts(
-    eval_dir: str, tracker_dir: str, artifact_dir: str, run, wandb_log: bool = False
+    entity: str,
+    project: str,
+    eval_dir: str,
+    tracker_dir: str,
+    artifact_dir: str,
+    run,
+    wandb_log: bool = False,
 ):
     import torch
 
@@ -1129,7 +1165,9 @@ def generate_counts(
             .reset_index()
         )
         if wandb_log:
-            wandb.init(resume="must", id=run.id)
+            # wandb.init(
+            #    resume="must", entity=entity, project="model-evaluations", id=run.id
+            # )
             wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
         return final_df
 
@@ -1158,6 +1196,9 @@ def track_objects(
     """
     import torch
     import yolov5_tracker.track as track
+    from yolov5.utils import torch_utils
+
+    os.chdir("../yolov5_tracker/")
 
     # Check that tracker folder specified exists
     if not os.path.exists(tracker_folder):

@@ -84,9 +84,16 @@ RUN apt-get update && \
         git \
         vim && \
     apt-get clean && \
+    # Copy over custom scripts to submodules
     cp \
         /usr/src/app/kso/src/multi_tracker_zoo.py \
         /usr/src/app/kso/yolov5_tracker/trackers/multi_tracker_zoo.py && \
+    cp \
+        /usr/src/app/kso/src/detect.py \
+        /usr/src/app/kso/yolov5/detect.py && \
+    cp \
+        /usr/src/app/kso/src/track.py \
+        /usr/src/app/kso/yolov5_tracker/track.py && \
     # Install all python packages, numpy needs to be installed
     # first to avoid the lap build error
     python3 -m pip --no-cache-dir install --upgrade pip && \
@@ -94,7 +101,7 @@ RUN apt-get update && \
     python3 -m pip --no-cache-dir install \
         -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
         -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
-        -r /usr/src/app/kso/kso_utils/requirements.txt && \
+        -r /usr/src/app/kso/requirements.txt && \
     apt-get remove --autoremove -y python3-dev build-essential
 
 # Set environment variables
