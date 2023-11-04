@@ -1629,32 +1629,72 @@ def choose_statistics():
     return statistics
 
 
-""" 
-def get_species_list(annotations.csv):
-    Obtain the list of unique numbers from the argument and associate them with the species names in the 
-    conf.yaml file (need to know how to access this file)
+# Auxiliary function to obtain a dictionary with the mapping between the class ids used by the detection model and the species names
+def get_species_mapping(model, project_name, team_name="koster"):
+    import wandb
 
-def choose_species(path of annotations.csv):
+    api = wandb.Api()
 
-    species_list = get_species_list(annotations.csv)
-    species=widgets.SelectMultiple(
+    full_path = f"{team_name}/{project_name}"
+    runs = api.runs(full_path)  # Get all runs in the project
+    for r in runs:
+        # Choose the run corresponding to the model given as parameter
+        if r.id == model.split("_")[1]:
+            run = api.run(project_name + "/" + r.id)
+
+    data_dict = run.rawconfig["data_dict"]
+    species_mapping = data_dict["names"]
+
+    return species_mapping
+
+
+def choose_species(labels_path, model, project_name, team_name="koster"):
+    """
+    > This function creates a widget that allows the user to choose the species of interest.
+
+    :param labels_path: the path to the folder containing the annotations.csv file
+    :param model: the name of the model in wandb used to obtain the detections
+    :param project_name: name of the project in wandb
+    :param team_name: name of the team. By default, it is set to the "koster" team.
+
+    """
+    # Read the annotations.csv file
+    annotations = pd.read_csv(os.path.join(labels_path, "annotations.csv"))
+
+    # Obtain the list of unique class ids from the annotations.csv file
+    species_ids = annotations["class_id"].unique()
+
+    # Obtain a dictionary with the mapping between the class ids and the species names and create a dataframe from it
+    species_mapping = get_species_mapping(model, project_name, team_name)
+    species_df = pd.DataFrame.from_dict(species_mapping, orient="index")
+    species_df.reset_index(inplace=True)
+    species_df.columns = ["id", "species"]
+    species_df["id"] = species_df["id"].astype(int)
+
+    # Filter the dataframe to consider only the species available in the annotations.csv file
+    species_df = species_df[species_df["id"].isin(species_ids)]
+    species_list = species_df["species"].tolist()
+
+    # Create the widget with the list of available species
+    species = widgets.SelectMultiple(
         options=species_list,
-        description='Species',
+        description="Species",
         disabled=False,
-        layout=widgets.Layout(width='max-content'),
-        style={'description_width': 'initial'}
+        layout=widgets.Layout(width="25%"),
+        style={"description_width": "initial"},
     )
-
     main_out = widgets.Output()
     display(species, main_out)
 
     return species
-"""
 
 
 def detection_statistics(
     csv_path: str,
     metrics: list,
+    model: str,
+    project_name: str,
+    team_name: str = "koster",
     species: list = None,
     save: bool = True,
     save_folder: str = None,
@@ -1666,10 +1706,14 @@ def detection_statistics(
 
     :param csv_path: the path to the folder containing the annotations.csv file
     :param metrics: a list of the statistics to compute
-    :param species: a list of the species of interest
+    :param model: the name of the model in wandb used to obtain the detections
+    :param project_name: name of the project in wandb
+    :param team_name: name of the team. By default, it is set to the "koster" team.
+    :param species: a list of the species of interest. If None, all the species are considered (it is the default option)
     :param save: True if you want to save the results in csv files, False otherwise
-    :param save_folder: the path to the folder where you want to save the csv files
+    :param save_folder: the path to the folder where you want to save the csv files. If None, the results are saved in the same folder as the annotations.csv file
     :param print_results: True if you want to print the results (in a tabular format), False otherwise
+
     """
 
     if save:
@@ -1683,11 +1727,18 @@ def detection_statistics(
     # Read the annotations.csv file
     df = pd.read_csv(os.path.join(csv_path, "annotations.csv"))
 
+    # Obtain a dictionary with the mapping between the class ids and the species names
+    species_mapping = get_species_mapping(model, project_name, team_name)
+
+    # Add a column with the species name corresponding to each class id
+    df["species_name"] = df.apply(
+        lambda row: species_mapping[str(row["class_id"])], axis=1
+    )
+
     if species is not None:
         # Filter the dataframe to consider only the species of interest
-        # TODO:  Convert species to list of class_id
-        # df_filtered=df[df['class_id'].isin(species)]
-        logging.info("This sections is currently under development")
+        df_filtered = df[df["species_name"].isin(species)]
+
     else:
         # Consider all the available species
         df_filtered = df
@@ -1705,7 +1756,7 @@ def detection_statistics(
         df_grouped["class_count"] = df_grouped["class_id"]
         # Count the number of detections of the same species in each frame
         df_grouped = df_grouped.groupby(
-            ["footage", "filename", "class_id", "class_count"],
+            ["footage", "filename", "species_name", "class_count"],
             as_index=False,
             sort=True,
         )["class_count"].aggregate("count")
@@ -1714,15 +1765,17 @@ def detection_statistics(
 
         # Compute the mean, min and max number of detections of each species over the frames of each footage
         df_grouped = (
-            df_grouped.groupby(["footage", "class_id"])["class_count"]
+            df_grouped.groupby(["footage", "species_name"])["class_count"]
             .agg(["mean", "min", "max"])
             .reset_index()
         )
         # print(df_grouped)
         statistics_same = pd.DataFrame()
-        # TODO:  Convert class_id to species name
+
         # Save the results in a dataframe
-        statistics_same[["footage", "species"]] = df_grouped[["footage", "class_id"]]
+        statistics_same[["footage", "species"]] = df_grouped[
+            ["footage", "species_name"]
+        ]
         if "Mean same species per frame" in metrics:
             statistics_same["Mean same species per frame"] = df_grouped["mean"]
         if "Max same species per frame" in metrics:
@@ -1737,7 +1790,8 @@ def detection_statistics(
                 )
             )
             statistics_same.to_csv(
-                os.path.join(save_folder, "statistics_same_species.csv"), index=False
+                os.path.join(save_folder, "statistics_same_species_prueba.csv"),
+                index=False,
             )
         if print_results:
             print(
