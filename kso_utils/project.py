@@ -1320,7 +1320,17 @@ class MLProjectProcessor(ProjectProcessor):
             if active_run:
                 mlflow.end_run()
 
-            mlflow.start_run(run_name=exp_name)
+            try:
+                experiment_id = mlflow.create_experiment(
+                    self.project_name,
+                )
+            except:
+                current_experiment = dict(
+                    mlflow.get_experiment_by_name(self.project_name)
+                )
+                experiment_id = current_experiment["experiment_id"]
+
+            mlflow.start_run(experiment_id=experiment_id, run_name=exp_name)
             mlflow.log_input(train_dataset, context="training")
             mlflow.log_input(val_dataset, context="validation")
             mlflow.log_artifacts(
