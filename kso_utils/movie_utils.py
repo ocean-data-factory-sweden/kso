@@ -939,3 +939,20 @@ def concatenate_local_movies(csv_paths):
 #         # Delete the go_pro_videos
 #         for f in video_list:
 #             os.remove(f)
+
+
+def select_project_movies(
+    project: Project,
+    movies_df: pd.DataFrame,
+):
+    """
+    > This function filters a df of movies to select only those movies that are relevant to the project (e.g. good visibity)
+
+    :param project: the project object
+    :param movies_df: a df with the information about the filepaths and "existance" of the movies
+    """
+    # Select only movies that are a good deployment
+    if project.Project_name in ["Spyfish_Aotearoa", "Spyfish_BOPRC"]:
+        movies_df = movies_df.loc[~movies_df.IsBadDeployment]
+
+    return movies_df

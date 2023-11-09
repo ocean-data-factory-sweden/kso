@@ -1,6 +1,4 @@
 # base imports
-import glob
-import os
 import argparse
 import time
 import cv2 as cv2
@@ -19,6 +17,7 @@ import wandb
 import imagesize
 import base64
 import ffmpeg
+import mlflow
 import ipywidgets as widgets
 from jupyter_bbox_widget import BBoxWidget
 from IPython.display import display, clear_output, HTML
@@ -32,14 +31,6 @@ from natsort import index_natsorted
 
 # util imports
 from kso_utils.project_utils import Project
-
-try:
-    from yolov5.utils import torch_utils
-    import yolov5.detect as detect
-except ModuleNotFoundError:
-    logging.error(
-        "Modules yolov5 and yolov5_tracker are required for ML functionality."
-    )
 
 # Logging
 logging.basicConfig()
@@ -132,10 +123,10 @@ def ProcFrames(proc_frame_func: Callable, frames_path: str):
     :return: The time it took to process all the frames in the folder, and the number of frames processed.
     """
     start = time.time()
-    files = os.listdir(frames_path)
+    files = Path(frames_path).iterdir()
     for f in files:
-        if f.endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
-            if os.path.exists(str(Path(frames_path, f))):
+        if str(f).endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
+            if Path(frames_path, f).exists():
                 new_frame = proc_frame_func(cv2.imread(str(Path(frames_path, f))))
                 cv2.imwrite(str(Path(frames_path, f)), new_frame)
             else:
@@ -218,21 +209,22 @@ def prepare(data_path, percentage_test, out_path):
 
     # Populate train.txt and test.txt
     counter = 1
-    index_test = int((1 - percentage_test) / 100 * len(os.listdir(dataset_path)))
+    index_test = int((1 - percentage_test) / 100 * len(Path(dataset_path).iterdir()))
     latest_movie = ""
-    for pathAndFilename in glob.iglob(os.path.join(dataset_path, "*.jpg")):
-        title, ext = os.path.splitext(os.path.basename(pathAndFilename))
+    for pathAndFilename in Path(dataset_path).rglob("*.jpg"):
+        file_path = Path(pathAndFilename)
+        title, ext = file_path.name, file_path.suffix
         movie_name = title.replace("_frame_*", "", regex=True)
 
         if counter == index_test + 1:
             if movie_name != latest_movie:
-                file_test.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+                file_test.write(out_path + Path(title).name + ".jpg" + "\n")
             else:
-                file_train.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+                file_train.write(out_path + Path(title).name + ".jpg" + "\n")
             counter += 1
         else:
             latest_movie = movie_name
-            file_train.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+            file_train.write(out_path + Path(title).name + ".jpg" + "\n")
             counter += 1
 
 
@@ -255,7 +247,7 @@ def process_path(path: str):
     """
     Process a single path
     """
-    return os.path.basename(re.split("_[0-9]+", path)[0]).replace("_frame", "")
+    return Path(re.split("_[0-9]+", path)[0]).name.replace("_frame", "")
 
 
 def clean_species_name(species_name: str):
@@ -279,13 +271,11 @@ def split_frames(data_path: str, perc_test: float):
 
     # Populate train.txt and test.txt
     counter = 1
-    index_test = int(
-        (1 - perc_test)
-        * len([s for s in os.listdir(images_path) if s.endswith(".jpg")])
-    )
+    index_test = int((1 - perc_test) * len(list(images_path.glob("*.jpg"))))
     latest_movie = ""
-    for pathAndFilename in glob.iglob(os.path.join(images_path, "*.jpg")):
-        title, ext = os.path.splitext(os.path.basename(pathAndFilename))
+    for pathAndFilename in list(images_path.rglob("*.jpg")):
+        file_path = Path(pathAndFilename)
+        title, ext = file_path.name, file_path.suffix
         movie_name = title.replace("_frame_*", "")
 
         if counter >= index_test + 1:
@@ -387,17 +377,17 @@ def frame_aggregation(
         return
 
     # Create output folder
-    if os.path.isdir(out_path):
+    if Path(out_path).is_dir():
         shutil.rmtree(out_path)
-    os.mkdir(out_path)
+    Path(out_path).mkdir()
 
     # Set up directory structure
     img_dir = Path(out_path, "images")
     label_dir = Path(out_path, "labels")
 
     # Create image and label directories
-    os.mkdir(img_dir)
-    os.mkdir(label_dir)
+    Path(img_dir).mkdir()
+    Path(label_dir).mkdir()
 
     # Create timestamped koster yaml file with model configuration
     species_list = [clean_species_name(sp) for sp in class_list]
@@ -499,7 +489,7 @@ def frame_aggregation(
         project=project,
         server_connection=server_connection,
         db_connection=db_connection,
-    )
+    )[0]
 
     # If at least one movie is linked to the project
     logging.info(f"There are {len(movie_df)} movies")
@@ -529,8 +519,17 @@ def frame_aggregation(
         )
         return None
 
+    if link_bool and movie_bool:
+        # If both movies and subject urls exist, use subject urls to speed up extraction
+        movie_bool = False
+
     if movie_bool:
         # Get movie path on the server
+        movie_df.rename(columns={"movie_id": "id"}, inplace=True)
+        # TODO: Remove weird workaround for datatype conversions (should not be done manually here)
+        movie_df["id"] = movie_df["id"].astype(float).astype(int)
+        train_rows["movie_id"] = train_rows["movie_id"].astype(float).astype(int)
+        train_rows = train_rows.reset_index(drop=True)
 
         train_rows["movie_path"] = train_rows.merge(
             movie_df, on="movie_id", how="left"
@@ -539,7 +538,9 @@ def frame_aggregation(
         from kso_utils.movie_utils import get_movie_path
 
         train_rows["movie_path"] = train_rows["movie_path"].apply(
-            lambda x: get_movie_path(x, project, server_connection)
+            lambda x: get_movie_path(
+                f_path=x, project=project, server_connection=server_connection
+            )
         )
 
         # Read each movie for efficient frame access
@@ -547,8 +548,11 @@ def frame_aggregation(
         for i in tqdm(train_rows["movie_path"].unique()):
             try:
                 video_dict[i] = pims.MoviePyReader(i)
-            except FileNotFoundError:
+            except Exception as e:
                 try:
+                    logging.info(
+                        f"Could not use moviepy, switching to regular pims... {e}"
+                    )
                     from kso_utils.movie_utils import unswedify
 
                     video_dict[unswedify(str(i))] = pims.Video(unswedify(str(i)))
@@ -562,6 +566,7 @@ def frame_aggregation(
 
         # Ensure key fields wrt movies are available
         key_fields = [
+            "subject_ids",
             "species_id",
             "frame_number",
             "movie_path",
@@ -753,15 +758,17 @@ def frame_aggregation(
         colour="green",
     ):
         if movie_bool:
-            file, ext = os.path.splitext(name[1])
-            file_base = os.path.basename(file)
-            file_out = f"{out_path}/labels/{file_base}_frame_{name[0]}.txt"
-            img_out = f"{out_path}/images/{file_base}_frame_{name[0]}.jpg"
+            file_path = Path(name[1])
+            file, ext = file_path.name, file_path.suffix
+            file_base = Path(file).name
+            file_out = Path(out_path, "labels", f"{file_base}_frame_{name[0]}.txt")
+            img_out = Path(out_path, "images", f"{file_base}_frame_{name[0]}.jpg")
         else:
-            file, ext = os.path.splitext(name)
-            file_base = os.path.basename(file)
-            file_out = f"{out_path}/labels/{file_base}.txt"
-            img_out = f"{out_path}/images/{file_base}.jpg"
+            file_path = Path(name[1])
+            file, ext = file_path.name, file_path.suffix
+            file_base = Path(file).name
+            file_out = Path(out_path, "labels", f"{file_base}.txt")
+            img_out = Path(out_path, "images", f"{file_base}.jpg")
 
         # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
         if out_format == "yolo":
@@ -944,9 +951,9 @@ def choose_baseline_model(download_path: str, test: bool = False):
                 for af in model_dict[change["new"].name].versions():
                     artifact_dir = af.download(download_path)
                     artifact_file = [
-                        str(Path(artifact_dir, i))
-                        for i in os.listdir(artifact_dir)
-                        if i.endswith(".pt")
+                        str(i)
+                        for i in Path(artifact_dir).iterdir()
+                        if str(i).endswith(".pt")
                     ][-1]
                     logging.info(
                         f"Baseline {af.name} successfully downloaded from WANDB"
@@ -975,9 +982,9 @@ def setup_paths(output_folder: str, model_type: str):
     if model_type == 1:
         try:
             data_path = [
-                str(Path(output_folder, _))
-                for _ in os.listdir(output_folder)
-                if _.endswith(".yaml") and "hyp" not in _
+                str(f)
+                for f in Path(output_folder).iterdir()
+                if str(f).endswith(".yaml") and "hyp" not in str(f)
             ][-1]
             hyps_path = str(Path(output_folder, "hyp.yaml"))
 
@@ -1027,9 +1034,9 @@ def set_config(conf_thres: float, model: str, eval_dir: str):
     return config
 
 
-def add_data_wandb(path: str, name: str, run):
+def add_data(path: str, name: str, registry: str, run):
     """
-    > The function `add_data_wandb` takes a path to a directory, a name for the directory, and a run
+    > The function `add_data` takes a path to a directory, a name for the directory, and a run
     object, and adds the directory to the run as an artifact
 
     :param path: the path to the directory you want to upload
@@ -1038,13 +1045,16 @@ def add_data_wandb(path: str, name: str, run):
     :type name: str
     :param run: The run object that you get from calling wandb.init()
     """
-    my_data = wandb.Artifact(name, type="raw_data")
-    my_data.add_dir(path)
-    run.log_artifact(my_data)
+    if registry == "wandb":
+        my_data = wandb.Artifact(name, type="raw_data")
+        my_data.add_dir(path)
+        run.log_artifact(my_data)
+    elif registry == "mlflow":
+        mlflow.log_artifact(path, artifact_path=name)
 
 
 def generate_csv_report(
-    entity: str, project: str, evaluation_path: str, run, wandb_log: bool = False
+    evaluation_path: str, run, log: bool = False, registry: str = "wandb"
 ):
     """
     > We read the labels from the `labels` folder, and create a dictionary with the filename as the key,
@@ -1056,12 +1066,14 @@ def generate_csv_report(
     :return: A dataframe with the following columns:
         filename, class_id, frame_no, x, y, w, h, conf
     """
-    labels = os.listdir(Path(evaluation_path, "labels"))
+    labels = Path(evaluation_path, "labels").iterdir()
     data_dict = {}
     for f in labels:
-        frame_no = int(float(f.split("_")[-1].replace(".txt", "")))
+        # Convert PosixPath to string
+        f = str(f)
+        frame_no = int(f.split("_")[-1].replace(".txt", ""))
         data_dict[f] = []
-        with open(Path(evaluation_path, "labels", f), "r") as infile:
+        with open(Path(f), "r") as infile:
             lines = infile.readlines()
             for line in lines:
                 class_id, x, y, w, h, conf = line.split(" ")
@@ -1075,9 +1087,14 @@ def generate_csv_report(
         by="frame_no", key=lambda x: np.argsort(index_natsorted(detect_df["filename"]))
     ).to_csv(csv_out, index=False)
     logging.info("Report created at {}".format(csv_out))
-    if wandb_log:
-        # wandb.init(resume="must", entity=entity, project="model-evaluations", id=run.id)
-        wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
+    if log:
+        if registry == "wandb":
+            wandb.init(resume="must", id=run.id)
+            wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
+        elif registry == "mlflow":
+            pass
+            # seems like csv file gets logged anyway
+            # mlflow.log_table(data=detect_df.to_dict(orient='dict'), artifact_file=str(Path("detection_output", "annotations.json")))
     return detect_df
 
 
@@ -1093,31 +1110,36 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
     :return: A dataframe with the following columns: filename, class_id, frame_no, tracker_id
     """
     data_dict = {}
-    if os.path.exists(tracker_dir):
-        track_files = os.listdir(tracker_dir)
+    if Path(tracker_dir).exists():
+        track_files = [str(f.name) for f in Path(tracker_dir).iterdir()]
     else:
         track_files = []
     if len(track_files) == 0:
         logging.error("No tracks found.")
     else:
         for track_file in track_files:
-            if track_file.endswith(".txt"):
+            if str(track_file).endswith(".txt"):
                 data_dict[track_file] = []
                 with open(Path(tracker_dir, track_file), "r") as infile:
                     lines = infile.readlines()
                     for line in lines:
                         vals = line.split(" ")
-                        class_id, frame_no, tracker_id = vals[0], vals[1], vals[2]
+                        print(vals)
+                        class_id, frame_no, tracker_id = (
+                            vals[-3],
+                            vals[0],
+                            vals[1],
+                        )  # vals[-2], vals[0], vals[1] (track_yolo)
                         data_dict[track_file].append([class_id, frame_no, tracker_id])
         dlist = [
-            [os.path.splitext(key)[0] + f"_{i[1]}.txt", i[0], i[1], i[2]]
+            [str(Path(key).parent / Path(key).stem) + f"_{i[1]}.txt", i[0], i[1], i[2]]
             for key, value in data_dict.items()
             for i in value
         ]
         detect_df = pd.DataFrame.from_records(
             dlist, columns=["filename", "class_id", "frame_no", "tracker_id"]
         )
-        csv_out = Path(eval_dir, "tracking.csv")
+        csv_out = Path(tracker_dir, "tracking.csv")
         detect_df.sort_values(
             by="frame_no",
             key=lambda x: np.argsort(index_natsorted(detect_df["filename"])),
@@ -1127,22 +1149,21 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
 
 
 def generate_counts(
-    entity: str,
-    project: str,
     eval_dir: str,
     tracker_dir: str,
     artifact_dir: str,
     run,
-    wandb_log: bool = False,
+    log: bool = False,
+    registry: str = "wandb",
 ):
     import torch
 
     model = torch.load(
         Path(
             [
-                f
+                str(f)
                 for f in Path(artifact_dir).iterdir()
-                if f.is_file() and ".pt" in str(f)
+                if f.is_file() and "best.pt" in str(f)
             ][-1]
         )
     )
@@ -1164,11 +1185,12 @@ def generate_counts(
             .to_frame()
             .reset_index()
         )
-        if wandb_log:
-            # wandb.init(
-            #    resume="must", entity=entity, project="model-evaluations", id=run.id
-            # )
-            wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
+        if log:
+            if registry == "wandb":
+                # wandb.init(resume="must", id=run.id)
+                wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
+            elif registry == "mlflow":
+                pass
         return final_df
 
 
@@ -1180,6 +1202,7 @@ def track_objects(
     conf_thres: float = 0.5,
     img_size: tuple = (720, 540),
     gpu: bool = False,
+    test: bool = False,
 ):
     """
     This function takes in the source directory of the video, the artifact directory, the tracker
@@ -1195,18 +1218,16 @@ def track_objects(
     :return: The latest tracker folder
     """
     import torch
-    import yolov5_tracker.track as track
-    from yolov5.utils import torch_utils
-
-    os.chdir("../yolov5_tracker/")
+    import src.track_yolo as track
+    from types import SimpleNamespace
 
     # Check that tracker folder specified exists
-    if not os.path.exists(tracker_folder):
+    if not Path(tracker_folder).exists():
         logging.error("The tracker folder does not exist. Please try again")
         return None
 
-    model_path = [
-        f
+    models = [
+        str(f)
         for f in Path(artifact_dir).iterdir()
         if f.is_file()
         and ".pt" in str(f)
@@ -1214,41 +1235,72 @@ def track_objects(
         and "best" in str(f)
     ][0]
 
-    best_model = Path(model_path)
+    if len(models) > 0 and not test:
+        best_model = models[0]
+    else:
+        logging.info("No trained model found, using yolov8 base model...")
+        best_model = "yolov8s.pt"
+
+    best_model = Path(best_model)
 
     if not gpu:
-        track.run(
-            name=name,
-            source=source_dir,
-            conf_thres=conf_thres,
-            yolo_weights=best_model,
-            reid_weights=Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
-            imgsz=img_size,
-            project=Path(f"{tracker_folder}/runs/track/"),
-            save_vid=True,
-            save_conf=True,
-            save_txt=True,
-        )
+        track_dict = {
+            "name": name,
+            "source": source_dir,
+            "conf": conf_thres,
+            "yolo_model": best_model,
+            "reid_model": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
+            "imgsz": img_size,
+            "device": "0" if torch.cuda.is_available() else "cpu",
+            "project": Path(f"{tracker_folder}/runs/track/"),
+            "save": True,
+            "save_mot": True,
+            "save_txt": True,
+            "iou": 0.7,
+            "show": False,
+            "show_conf": True,
+            "show_labels": True,
+            "verbose": True,
+            "exist_ok": True,
+            "classes": None,
+            "vid_stride": 1,
+            "line_width": None,
+            "tracking_method": "deepocsort",
+            "half": True,
+            "per_class": False,
+            "save_id_crops": False,
+        }
     else:
-        track.run(
-            name=name,
-            source=source_dir,
-            conf_thres=conf_thres,
-            yolo_weights=best_model,
-            reid_weights=Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
-            imgsz=img_size,
-            project=Path(f"{tracker_folder}/runs/track/"),
-            device=torch_utils.select_device(""),
-            save_vid=True,
-            save_conf=True,
-            save_txt=True,
-            half=True,
-        )
+        track_dict = {
+            "name": name,
+            "source": source_dir,
+            "conf": conf_thres,
+            "yolo_weights": best_model,
+            "reid_weights": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
+            "imgsz": img_size,
+            "project": Path(f"{tracker_folder}/runs/track/"),
+            "device": "0" if torch.cuda.is_available() else "cpu",
+            "save": True,
+            "save_mot": True,
+            "save_txt": True,
+            "half": True,
+            "iou": 0.7,
+            "show": False,
+            "show_conf": True,
+            "show_labels": True,
+            "verbose": True,
+            "exist_ok": True,
+            "classes": None,
+            "vid_stride": 1,
+            "line_width": None,
+            "tracking_method": "deepocsort",
+            "save_id_crops": False,
+        }
 
-    tracker_root = os.path.join(tracker_folder, "runs", "track")
-    latest_tracker = os.path.join(
-        tracker_root, sorted(os.listdir(tracker_root))[-1], "tracks"
-    )
+    args = SimpleNamespace(**track_dict)
+    track.run(args)
+    tracker_root = Path(tracker_folder, "runs", "track")
+    latest_tracker = Path(sorted(Path(tracker_root).iterdir())[-1], "mot")
     logging.info(f"Tracking saved succesfully to {latest_tracker}")
     return latest_tracker
 
@@ -1267,188 +1319,188 @@ def encode_image(filepath):
     return "data:image/jpg;base64," + encoded
 
 
-def get_annotator(image_path: str, species_list: list, autolabel_model: str = None):
-    """
-    It takes a path to a folder containing images and annotations, and a list of species names, and
-    returns a widget that allows you to view the images and their annotations, and to edit the
-    annotations
+# def get_annotator(image_path: str, species_list: list, autolabel_model: str = None):
+#     """
+#     It takes a path to a folder containing images and annotations, and a list of species names, and
+#     returns a widget that allows you to view the images and their annotations, and to edit the
+#     annotations
 
-    :param data_path: the path to the image folder
-    :type data_path: str
-    :param species_list: a list of species names
-    :type species_list: list
-    :return: A VBox widget containing a progress bar and a BBoxWidget.
-    """
-    images = sorted(
-        [
-            f
-            for f in os.listdir(image_path)
-            if os.path.isfile(os.path.join(image_path, f)) and f.endswith(".jpg")
-        ]
-    )
+#     :param data_path: the path to the image folder
+#     :type data_path: str
+#     :param species_list: a list of species names
+#     :type species_list: list
+#     :return: A VBox widget containing a progress bar and a BBoxWidget.
+#     """
+#     images = sorted(
+#         [
+#             f
+#             for f in Path(image_path).iterdir()
+#             if Path(image_path, f).is_file() and f.suffix == ".jpg"
+#         ]
+#     )
 
-    annot_path = os.path.join(Path(image_path).parent, "labels")
+#     annot_path = Path(Path(image_path).parent, "labels")
 
-    # a progress bar to show how far we got
-    w_progress = widgets.IntProgress(value=0, max=len(images), description="Progress")
-    w_status = widgets.Label(value="")
+#     # a progress bar to show how far we got
+#     w_progress = widgets.IntProgress(value=0, max=len(images), description="Progress")
+#     w_status = widgets.Label(value="")
 
-    def get_bboxes(image, bboxes, labels, predict: bool = False):
-        logging.getLogger("yolov5").setLevel(logging.WARNING)
-        if predict:
-            detect.run(
-                weights=autolabel_model,
-                source=image,
-                conf_thres=0.5,
-                nosave=True,
-                name="labels",
-            )
-        label_file = [
-            f
-            for f in os.listdir(annot_path)
-            if os.path.isfile(os.path.join(annot_path, f))
-            and f.endswith(".txt")
-            and Path(f).stem == Path(image).stem
-        ]
-        if len(label_file) == 1:
-            label_file = label_file[0]
-            with open(os.path.join(annot_path, label_file), "r") as f:
-                for line in f:
-                    s = line.split(" ")
-                    labels.append(s[0])
+#     def get_bboxes(image, bboxes, labels, predict: bool = False):
+#         logging.getLogger("yolov5").setLevel(logging.WARNING)
+#         if predict:
+#             detect.run(
+#                 weights=autolabel_model,
+#                 source=image,
+#                 conf_thres=0.5,
+#                 nosave=True,
+#                 name="labels",
+#             )
+#         label_file = [
+#             f
+#             for f in Path(annot_path).iterdir()
+#             if Path(annot_path, f).is_file()
+#             and f.suffix == ".txt"
+#             and Path(f).stem == Path(image).stem
+#         ]
+#         if len(label_file) == 1:
+#             label_file = label_file[0]
+#             with open(Path(annot_path, label_file), "r") as f:
+#                 for line in f:
+#                     s = line.split(" ")
+#                     labels.append(s[0])
 
-                    left = (float(s[1]) - (float(s[3]) / 2)) * width
-                    top = (float(s[2]) - (float(s[4]) / 2)) * height
+#                     left = (float(s[1]) - (float(s[3]) / 2)) * width
+#                     top = (float(s[2]) - (float(s[4]) / 2)) * height
 
-                    bboxes.append(
-                        {
-                            "x": left,
-                            "y": top,
-                            "width": float(s[3]) * width,
-                            "height": float(s[4]) * height,
-                            "label": species_list[int(s[0])],
-                        }
-                    )
-            w_status.value = "Annotations loaded"
-        else:
-            w_status.value = "No annotations found"
-        return bboxes, labels
+#                     bboxes.append(
+#                         {
+#                             "x": left,
+#                             "y": top,
+#                             "width": float(s[3]) * width,
+#                             "height": float(s[4]) * height,
+#                             "label": species_list[int(s[0])],
+#                         }
+#                     )
+#             w_status.value = "Annotations loaded"
+#         else:
+#             w_status.value = "No annotations found"
+#         return bboxes, labels
 
-    # the bbox widget
-    image = os.path.join(image_path, images[0])
-    width, height = imagesize.get(image)
-    bboxes, labels = [], []
-    if autolabel_model is not None:
-        w_status.value = "Loading annotations..."
-        bboxes, labels = get_bboxes(image, bboxes, labels, predict=True)
-    else:
-        w_status.value = "No predictions, using existing labels if available"
-        bboxes, labels = get_bboxes(image, bboxes, labels)
-    w_bbox = BBoxWidget(image=encode_image(image), classes=species_list)
+#     # the bbox widget
+#     image = Path(image_path, images[0])
+#     width, height = imagesize.get(image)
+#     bboxes, labels = [], []
+#     if autolabel_model is not None:
+#         w_status.value = "Loading annotations..."
+#         bboxes, labels = get_bboxes(image, bboxes, labels, predict=True)
+#     else:
+#         w_status.value = "No predictions, using existing labels if available"
+#         bboxes, labels = get_bboxes(image, bboxes, labels)
+#     w_bbox = BBoxWidget(image=encode_image(image), classes=species_list)
 
-    # here we assign an empty list to bboxes but
-    # we could also run a detection model on the file
-    # and use its output for creating initial bboxes
-    w_bbox.bboxes = bboxes
+#     # here we assign an empty list to bboxes but
+#     # we could also run a detection model on the file
+#     # and use its output for creating initial bboxes
+#     w_bbox.bboxes = bboxes
 
-    # combine widgets into a container
-    w_container = widgets.VBox(
-        [
-            w_status,
-            w_progress,
-            w_bbox,
-        ]
-    )
+#     # combine widgets into a container
+#     w_container = widgets.VBox(
+#         [
+#             w_status,
+#             w_progress,
+#             w_bbox,
+#         ]
+#     )
 
-    def on_button_clicked(b):
-        w_progress.value = 0
-        image = os.path.join(image_path, images[0])
-        width, height = imagesize.get(image)
-        bboxes, labels = [], []
-        if autolabel_model is not None:
-            w_status.value = "Loading annotations..."
-            bboxes, labels = get_bboxes(image, bboxes, labels, predict=True)
-        else:
-            w_status.value = "No annotations found"
-            bboxes, labels = get_bboxes(image, bboxes, labels)
-        w_bbox.image = encode_image(image)
+#     def on_button_clicked(b):
+#         w_progress.value = 0
+#         image = Path(image_path, images[0])
+#         width, height = imagesize.get(image)
+#         bboxes, labels = [], []
+#         if autolabel_model is not None:
+#             w_status.value = "Loading annotations..."
+#             bboxes, labels = get_bboxes(image, bboxes, labels, predict=True)
+#         else:
+#             w_status.value = "No annotations found"
+#             bboxes, labels = get_bboxes(image, bboxes, labels)
+#         w_bbox.image = encode_image(image)
 
-        # here we assign an empty list to bboxes but
-        # we could also run a detection model on the file
-        # and use its output for creating inital bboxes
-        w_bbox.bboxes = bboxes
-        w_container.children = tuple(list(w_container.children[1:]))
-        b.close()
+#         # here we assign an empty list to bboxes but
+#         # we could also run a detection model on the file
+#         # and use its output for creating inital bboxes
+#         w_bbox.bboxes = bboxes
+#         w_container.children = tuple(list(w_container.children[1:]))
+#         b.close()
 
-    # when Skip button is pressed we move on to the next file
-    def on_skip():
-        w_progress.value += 1
-        if w_progress.value == len(images):
-            button = widgets.Button(
-                description="Click to restart.",
-                disabled=False,
-                display="flex",
-                flex_flow="column",
-                align_items="stretch",
-            )
-            if isinstance(w_container.children[0], widgets.Button):
-                w_container.children = tuple(list(w_container.children[1:]))
-            w_container.children = tuple([button] + list(w_container.children))
-            button.on_click(on_button_clicked)
+#     # when Skip button is pressed we move on to the next file
+#     def on_skip():
+#         w_progress.value += 1
+#         if w_progress.value == len(images):
+#             button = widgets.Button(
+#                 description="Click to restart.",
+#                 disabled=False,
+#                 display="flex",
+#                 flex_flow="column",
+#                 align_items="stretch",
+#             )
+#             if isinstance(w_container.children[0], widgets.Button):
+#                 w_container.children = tuple(list(w_container.children[1:]))
+#             w_container.children = tuple([button] + list(w_container.children))
+#             button.on_click(on_button_clicked)
 
-        # open new image in the widget
-        else:
-            image_file = images[w_progress.value]
-            image_p = os.path.join(image_path, image_file)
-            width, height = imagesize.get(image_p)
-            w_bbox.image = encode_image(image_p)
-            bboxes, labels = [], []
-            if autolabel_model is not None:
-                w_status.value = "Loading annotations..."
-                bboxes, labels = get_bboxes(image_p, bboxes, labels, predict=True)
-            else:
-                w_status.value = "No annotations found"
-                bboxes, labels = get_bboxes(image_p, bboxes, labels)
+#         # open new image in the widget
+#         else:
+#             image_file = images[w_progress.value]
+#             image_p = Path(image_path, image_file)
+#             width, height = imagesize.get(image_p)
+#             w_bbox.image = encode_image(image_p)
+#             bboxes, labels = [], []
+#             if autolabel_model is not None:
+#                 w_status.value = "Loading annotations..."
+#                 bboxes, labels = get_bboxes(image_p, bboxes, labels, predict=True)
+#             else:
+#                 w_status.value = "No annotations found"
+#                 bboxes, labels = get_bboxes(image_p, bboxes, labels)
 
-            # here we assign an empty list to bboxes but
-            # we could also run a detection model on the file
-            # and use its output for creating initial bboxes
-            w_bbox.bboxes = bboxes
+#             # here we assign an empty list to bboxes but
+#             # we could also run a detection model on the file
+#             # and use its output for creating initial bboxes
+#             w_bbox.bboxes = bboxes
 
-    w_bbox.on_skip(on_skip)
+#     w_bbox.on_skip(on_skip)
 
-    # when Submit button is pressed we save current annotations
-    # and then move on to the next file
-    def on_submit():
-        image_file = images[w_progress.value]
-        width, height = imagesize.get(os.path.join(image_path, image_file))
-        # save annotations for current image
-        label_file = Path(image_file).name.replace(".jpg", ".txt")
-        # if the label_file needs to be created
-        if not os.path.exists(annot_path):
-            Path(annot_path).mkdir(parents=True, exist_ok=True)
-        open(os.path.join(annot_path, label_file), "w").write(
-            "\n".join(
-                [
-                    "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
-                        species_list.index(
-                            i["label"]
-                        ),  # single class vs multiple classes
-                        min((i["x"] + i["width"] / 2) / width, 1.0),
-                        min((i["y"] + i["height"] / 2) / height, 1.0),
-                        min(i["width"] / width, 1.0),
-                        min(i["height"] / height, 1.0),
-                    )
-                    for i in w_bbox.bboxes
-                ]
-            )
-        )
-        # move on to the next file
-        on_skip()
+#     # when Submit button is pressed we save current annotations
+#     # and then move on to the next file
+#     def on_submit():
+#         image_file = images[w_progress.value]
+#         width, height = imagesize.get(Path(image_path, image_file))
+#         # save annotations for current image
+#         label_file = Path(image_file).name.replace(".jpg", ".txt")
+#         # if the label_file needs to be created
+#         if not Path(annot_path).exists():
+#             Path(annot_path).mkdir(parents=True, exist_ok=True)
+#         open(Path(annot_path, label_file), "w").write(
+#             "\n".join(
+#                 [
+#                     "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
+#                         species_list.index(
+#                             i["label"]
+#                         ),  # single class vs multiple classes
+#                         min((i["x"] + i["width"] / 2) / width, 1.0),
+#                         min((i["y"] + i["height"] / 2) / height, 1.0),
+#                         min(i["width"] / width, 1.0),
+#                         min(i["height"] / height, 1.0),
+#                     )
+#                     for i in w_bbox.bboxes
+#                 ]
+#             )
+#         )
+#         # move on to the next file
+#         on_skip()
 
-    w_bbox.on_submit(on_submit)
+#     w_bbox.on_submit(on_submit)
 
-    return w_container
+#     return w_container
 
 
 def get_annotations_viewer(data_path: str, species_list: list):
@@ -1463,33 +1515,25 @@ def get_annotations_viewer(data_path: str, species_list: list):
     :type species_list: list
     :return: A VBox widget containing a progress bar and a BBoxWidget.
     """
-    image_path = os.path.join(data_path, "images")
-    annot_path = os.path.join(data_path, "labels")
+    image_path = Path(data_path, "images")
+    annot_path = Path(data_path, "labels")
 
     images = sorted(
-        [
-            f
-            for f in os.listdir(image_path)
-            if os.path.isfile(os.path.join(image_path, f))
-        ]
+        [f for f in Path(image_path).iterdir() if Path(image_path, f).is_file()]
     )
     annotations = sorted(
-        [
-            f
-            for f in os.listdir(annot_path)
-            if os.path.isfile(os.path.join(annot_path, f))
-        ]
+        [f for f in Path(annot_path).iterdir() if Path(annot_path, f).is_file()]
     )
 
     # a progress bar to show how far we got
     w_progress = widgets.IntProgress(value=0, max=len(images), description="Progress")
     # the bbox widget
-    image = os.path.join(image_path, images[0])
+    image = Path(image_path, images[0])
     width, height = imagesize.get(image)
     label_file = annotations[w_progress.value]
     bboxes = []
     labels = []
-    with open(os.path.join(annot_path, label_file), "r") as f:
+    with open(Path(annot_path, label_file), "r") as f:
         for line in f:
             s = line.split(" ")
             labels.append(s[0])
@@ -1523,12 +1567,12 @@ def get_annotations_viewer(data_path: str, species_list: list):
 
     def on_button_clicked(b):
         w_progress.value = 0
-        image = os.path.join(image_path, images[0])
+        image = Path(image_path, images[0])
         width, height = imagesize.get(image)
         label_file = annotations[w_progress.value]
         bboxes = []
         labels = []
-        with open(os.path.join(annot_path, label_file), "r") as f:
+        with open(Path(annot_path, label_file), "r") as f:
             for line in f:
                 s = line.split(" ")
                 labels.append(s[0])
@@ -1573,12 +1617,12 @@ def get_annotations_viewer(data_path: str, species_list: list):
         # open new image in the widget
         else:
             image_file = images[w_progress.value]
-            image_p = os.path.join(image_path, image_file)
+            image_p = Path(image_path, image_file)
             width, height = imagesize.get(image_p)
             w_bbox.image = encode_image(image_p)
             label_file = annotations[w_progress.value]
             bboxes = []
-            with open(os.path.join(annot_path, label_file), "r") as f:
+            with open(Path(annot_path, label_file), "r") as f:
                 for line in f:
                     s = line.split(" ")
                     left = (float(s[1]) - (float(s[3]) / 2)) * width
@@ -1604,9 +1648,9 @@ def get_annotations_viewer(data_path: str, species_list: list):
     # and then move on to the next file
     def on_submit():
         image_file = images[w_progress.value]
-        width, height = imagesize.get(os.path.join(image_path, image_file))
+        width, height = imagesize.get(Path(image_path, image_file))
         # save annotations for current image
-        open(os.path.join(annot_path, label_file), "w").write(
+        open(Path(annot_path, label_file), "w").write(
             "\n".join(
                 [
                     "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
@@ -1642,10 +1686,14 @@ def get_data_viewer(data_path: str):
     if "empty_string" in data_path:
         logging.info("No files.")
         return None
-    imgs = list(filter(lambda fn: fn.lower().endswith(".jpg"), os.listdir(data_path)))
+    imgs = [
+        file
+        for file in Path(data_path).iterdir()
+        if file.is_file() and file.name.lower().endswith(".jpg")
+    ]
 
     def loadimg(k, scale=0.4):
-        display(draw_box(os.path.join(data_path, imgs[k]), scale))
+        display(draw_box(Path(data_path, imgs[k]), scale))
 
     return widgets.interact(loadimg, k=(0, len(imgs) - 1), scale=(0.1, 1.0))
 
@@ -1699,7 +1747,7 @@ def choose_files(path: str):
     if path is None:
         logging.error("No path selected.")
         return
-    files = np.append([path + i for i in os.listdir(path)], "No file")
+    files = np.append([str(i) for i in Path(path).iterdir()], "No file")
 
     clip_path_widget = widgets.Dropdown(
         options=tuple(np.sort(files)),
@@ -1736,23 +1784,23 @@ def view_file(path: str):
     :return: A widget that displays the image or video.
     """
     # Get path of the modified clip selected
-    extension = os.path.splitext(path)[1]
+    extension = Path(path).suffix
     file = open(path, "rb").read()
     if extension.lower() in [".jpeg", ".png", ".jpg"]:
         widget = widgets.Image(value=file, format=extension)
     elif extension.lower() in [".mp4", ".mov", ".avi"]:
-        if os.path.exists("linked_content"):
+        if Path("linked_content").exists():
             shutil.rmtree("linked_content")
         try:
-            os.mkdir("linked_content")
+            Path("linked_content").mkdir()
             logging.info("Opening viewer...")
             stream = ffmpeg.input(path)
-            stream = ffmpeg.output(stream, f"linked_content/{os.path.basename(path)}")
+            stream = ffmpeg.output(stream, f"linked_content/{Path(path).name}")
             ffmpeg.run(stream)
             widget = HTML(
                 f"""
                         <video width=800 height=400 alt="test" controls>
-                            <source src="linked_content/{os.path.basename(path)}" type="video/{extension.lower().replace(".", "")}">
+                            <source src="linked_content/{Path(path).name}" type="video/{extension.lower().replace(".", "")}">
                         </video>
                     """
             )
