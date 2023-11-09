@@ -361,6 +361,11 @@ def process_test_csv(
 
     elif init_key == "movies":
         table_id = "movie_id"
+        
+        from kso_utils.movie_utils import select_project_movies
+        # Select only the movies that are relevant to the project
+        local_df = select_project_movies(project, local_df)
+        
         # Reference movies with their respective sites
         sites_df = get_df_from_db_table(conn, "sites")[["id", "siteName"]].rename(
             columns={"id": "site_id"}
