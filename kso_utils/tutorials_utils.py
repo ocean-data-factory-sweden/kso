@@ -1747,7 +1747,6 @@ def detection_statistics(
     df_filtered["footage"] = df_filtered.apply(
         lambda row: "_".join(row.filename.split("_")[:-1]), axis=1
     )
-    # print(df_filtered.head())
 
     # If the user wants to compute statistics over the detections of the same species
     if any("same" in sub for sub in metrics):
@@ -1760,16 +1759,13 @@ def detection_statistics(
             as_index=False,
             sort=True,
         )["class_count"].aggregate("count")
-        # df_grouped.to_csv(os.path.join(save_folder, 'group_same.csv'),index=False)
-        # print("count", df_grouped.head())
-
+        
         # Compute the mean, min and max number of detections of each species over the frames of each footage
         df_grouped = (
             df_grouped.groupby(["footage", "species_name"])["class_count"]
             .agg(["mean", "min", "max"])
             .reset_index()
         )
-        # print(df_grouped)
         statistics_same = pd.DataFrame()
 
         # Save the results in a dataframe
@@ -1813,8 +1809,6 @@ def detection_statistics(
         df_grouped = df_filtered.groupby(
             ["footage", "filename"], as_index=False, sort=True
         )["class_id"].aggregate(lambda x: len(np.unique(x)))
-        # print(df_grouped)
-        # df_grouped.to_csv(os.path.join(save_folder, 'group_different.csv'),index=False)
 
         # Compute the mean, min and max number of different species over the frames of each footage
         df_grouped = (
@@ -1822,7 +1816,6 @@ def detection_statistics(
             .agg(["mean", "min", "max"])
             .reset_index()
         )
-        # print(df_grouped)
 
         # Save the results in a dataframe
         statistics_different = pd.DataFrame()
