@@ -83,27 +83,6 @@ def log_meta_changes(
         return
 
 
-def process_source(source):
-    """
-    If the source is a string, write the string to a file and return the file name. If the source is a
-    list, return the list. If the source is neither, return None
-
-    :param source: The source of the data. This can be a URL, a file, or a list of URLs or files
-    :return: the value of the source variable.
-    """
-    try:
-        source.value
-        if source.value is None:
-            raise AttributeError("Value is None")
-        return write_urls_to_file(source.value)
-    except AttributeError:
-        try:
-            source.selected
-            return source.selected
-        except AttributeError:
-            return None
-
-
 def write_urls_to_file(movie_list: list, filepath: str = "/tmp/temp.txt"):
     """
     > This function takes a list of movie urls and writes them to a file
@@ -310,12 +289,12 @@ def modify_clips(
     logging.info(f"Clip {clip_i} modified successfully")
 
 
-def review_clip_selection(clip_selection, movie_i: str, clip_modification):
+def review_clip_selection(clip_selection, movies_selected: str, clip_modification):
     """
     > This function reviews the clips that will be created from the movie selected
 
     :param clip_selection: the object that contains the results of the clip selection
-    :param movie_i: the movie you want to create clips from
+    :param movies_selected: the movie(s) you want to create clips from
     :param clip_modification: The modification that will be applied to the clips
     """
     start_trim = clip_selection.kwargs["clips_range"][0]
@@ -323,7 +302,7 @@ def review_clip_selection(clip_selection, movie_i: str, clip_modification):
 
     # Review the clips that will be created
     logging.info(
-        f"You are about to create {round(clip_selection.result)} clips from {movie_i}"
+        f"You are about to create {round(clip_selection.result)} clips from {movies_selected}"
     )
     logging.info(
         f"starting at {datetime.timedelta(seconds=start_trim)} and ending at {datetime.timedelta(seconds=end_trim)}"
@@ -1286,8 +1265,8 @@ class WidgetMaker(widgets.VBox):
 
 def create_clips(
     available_movies_df: pd.DataFrame,
-    movie_i: str,
-    movie_path: str,
+    movies_selected: str,
+    movies_paths: str,
     clip_selection,
     project: Project,
     modification_details: dict,
@@ -1298,8 +1277,8 @@ def create_clips(
     This function takes a movie and extracts clips from it
 
     :param available_movies_df: the dataframe with the movies that are available for the project
-    :param movie_i: the name of the movie you want to extract clips from
-    :param movie_path: the path to the movie you want to extract clips from
+    :param movies_selected: the name(s) of the movie(s) you want to extract clips from
+    :param movies_paths: the path(s) to the movie(s) you want to extract clips from
     :param clip_selection: a ClipSelection object
     :param project: the project object
     :param modification_details: a dictionary with the following keys:
@@ -1349,15 +1328,17 @@ def create_clips(
         list_clip_start = [clip_selection.result["clip_start_time"]]
 
     # Filter the df for the movie of interest
-    movie_i_df = available_movies_df[
-        available_movies_df["filename"] == movie_i
+    movies_selected_df = available_movies_df[
+        available_movies_df["filename"] == movies_selected
     ].reset_index(drop=True)
 
     # Add the list of starting seconds to the df
-    movie_i_df["list_clip_start"] = list_clip_start
+    movies_selected_df["list_clip_start"] = list_clip_start
 
     # Reshape the dataframe with the starting seconds for the new clips
-    potential_start_df = expand_list(movie_i_df, "list_clip_start", "upl_seconds")
+    potential_start_df = expand_list(
+        movies_selected_df, "list_clip_start", "upl_seconds"
+    )
 
     # Add the length of the clips to df (to keep track of the length of each uploaded clip)
     potential_start_df["clip_length"] = clip_length
@@ -1367,11 +1348,11 @@ def create_clips(
         temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/"
     else:
         temp_path = "."
-    clips_folder = str(Path(temp_path, "tmp_dir", movie_i + "_zooniverseclips"))
+    clips_folder = str(Path(temp_path, "tmp_dir", movies_selected + "_zooniverseclips"))
 
     # Set the filename of the clips
     potential_start_df["clip_filename"] = (
-        movie_i
+        movies_selected
         + "_clip_"
         + potential_start_df["upl_seconds"].astype(str)
         + "_"
@@ -1399,7 +1380,7 @@ def create_clips(
     ):
         # Extract the videos and store them in the folder
         extract_clips(
-            movie_path,
+            movies_paths,
             clip_length,
             row["upl_seconds"],
             row["clip_path"],
@@ -1416,7 +1397,7 @@ def create_clips(
 def create_modified_clips(
     project: Project,
     clips_list: list,
-    movie_i: str,
+    movies_selected: str,
     modification_details: dict,
     gpu_available: bool,
     pool_size: int = 4,
@@ -1426,7 +1407,7 @@ def create_modified_clips(
     GPU availability flag, and returns a list of modified clips
 
     :param clips_list: a list of the paths to the clips you want to modify
-    :param movie_i: the path to the movie you want to extract clips from
+    :param movies_selected: the path(s) to the movie(s) you want to extract clips from
     :param modification_details: a dictionary with the modifications to be applied to the clips. The keys are the names of the modifications and the values are the parameters of the modifications
     :param project: the project object
     :param gpu_available: True if you have a GPU available, False if you don't
@@ -1435,7 +1416,7 @@ def create_modified_clips(
     """
 
     # Specify the folder to host the modified clips
-    mod_clip_folder = "modified_" + movie_i + "_clips"
+    mod_clip_folder = "modified_" + movies_selected + "_clips"
 
     # Specify output path for modified clip extraction
     if project.server == "SNIC":
