@@ -951,14 +951,16 @@ def select_project_movies(
     :param project: the project object
     :param movies_df: a df with the information about the filepaths and "existance" of the movies
     """
-    # Check for missing values in IsBadDeployment column
-    if movies_df["IsBadDeployment"].isnull().any():
-        raise ValueError(
-            "The 'IsBadDeployment' column contains missing values. Please handle missing values before proceeding."
-        )
-
+    
     # Select only movies that are a good deployment
     if project.Project_name in ["Spyfish_Aotearoa"]:
-        movies_df = movies_df.loc[~movies_df.IsBadDeployment]
+        # Check for missing values in IsBadDeployment column
+        if movies_df["IsBadDeployment"].isnull().any():
+            raise ValueError(
+                "The 'IsBadDeployment' column contains missing values. Please handle missing values before proceeding."
+            )
+
+        else:
+            movies_df = movies_df.loc[~movies_df.IsBadDeployment]
 
     return movies_df
