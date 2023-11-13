@@ -951,7 +951,7 @@ def select_project_movies(
     :param project: the project object
     :param movies_df: a df with the information about the filepaths and "existance" of the movies
     """
-    
+
     # Select only movies that are a good deployment
     if project.Project_name in ["Spyfish_Aotearoa"]:
         # Check for missing values in IsBadDeployment column
