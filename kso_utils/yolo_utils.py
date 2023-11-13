@@ -1212,7 +1212,7 @@ def track_objects(
         and ".pt" in str(f)
         and "osnet" not in str(f)
         and "best" in str(f)
-    ][0]
+    ]
 
     best_model = Path(model_path)
 

@@ -149,7 +149,9 @@ def retrieve_zoo_info(
 
             # Save the info as pandas data frame
             try:
-                export_df = pd.read_csv(io.StringIO(export.content.decode("utf-8")))
+                export_df = pd.read_csv(
+                    io.StringIO(export.content.decode("utf-8")), low_memory=False
+                )
             except pd.errors.ParserError:
                 logging.error(
                     "Export retrieval time out, please try again in 1 minute or so."
@@ -1709,7 +1711,7 @@ def modify_frames(
     if project.server == "SNIC":
         # Specify volume allocated by SNIC
         snic_path = "/mimer/NOBACKUP/groups/snic2021-6-9"
-        folder_name = f"{snic_path}/tmp_dir/frames/"
+        folder_name = Path(snic_path, "tmp_dir", "frames")
         mod_frames_folder = str(
             Path(folder_name, "modified_" + "_".join(species_i) + "_frames/")
         )
@@ -1719,10 +1721,8 @@ def modify_frames(
             mod_frames_folder = project.output_path + mod_frames_folder
 
     # Specify the path of the modified frames
-    frames_to_upload_df["modif_frame_path"] = (
-        mod_frames_folder
-        + "_modified_"
-        + frames_to_upload_df["frame_path"].apply(lambda x: os.path.basename(x))
+    frames_to_upload_df["modif_frame_path"] = frames_to_upload_df["frame_path"].apply(
+        lambda x: str(Path(mod_frames_folder, Path(x).name)), 1
     )
 
     # Remove existing modified clips
