@@ -1759,7 +1759,7 @@ def detection_statistics(
             as_index=False,
             sort=True,
         )["class_count"].aggregate("count")
-        
+
         # Compute the mean, min and max number of detections of each species over the frames of each footage
         df_grouped = (
             df_grouped.groupby(["footage", "species_name"])["class_count"]
