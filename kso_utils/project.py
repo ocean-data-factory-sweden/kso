@@ -272,58 +272,76 @@ class ProjectProcessor:
         """
         return movie_utils.get_movie_path(filepath, self)
 
-    def preview_media(self, test: bool = False):
+    def choose_footage(self, preview_media: bool = False, test: bool = False):
         """
-        > The function `preview_media` is a function that takes in a `self` argument and returns a
+        > The function `choose_footage` is a function that takes in a `self` argument and returns a
         function `f` that takes in three arguments: `project`, `csv_paths`, and `available_movies_df`. The
-        function `f` is an asynchronous function that takes in the value of the `movie_selected` widget
-        and displays the movie preview
+        function `f` is an asynchronous function that takes in the value of the `movies_selected` widget
+        and previews the movies if specified
         """
-        movie_selected = kso_widgets.select_movie(self.available_movies_df)
 
-        if not test:
+        # Check if the necessary attribute is available
+        if not hasattr(self, "available_movies_df") or self.available_movies_df is None:
+            self.get_movie_info()
 
-            async def f(project, server_connection, available_movies_df):
-                output = widgets.Output()
+        # Select the movie(s) of interest
+        select_movie_widg = kso_widgets.select_movie(self.available_movies_df)
 
-                def update_movie(change):
-                    with output:
-                        clear_output(wait=True)
-                        x = change.new
-                        html, movie_path = movie_utils.preview_movie(
+        # Create an async function to choose and display movies of interest
+        async def f(project, server_connection, available_movies_df):
+            output = widgets.Output()
+
+            def update_movie(change):
+                with output:
+                    clear_output(wait=True)
+                    selected_movies = change.new
+
+                    # Create a df with the selected movies
+                    selected_movies_df = available_movies_df[
+                        available_movies_df["filename"].isin(selected_movies)
+                    ].reset_index(drop=True)
+
+                    # Retrieve the paths of the movies selected
+                    movies_paths = [
+                        movie_utils.get_movie_path(
                             project=project,
-                            available_movies_df=available_movies_df,
-                            movie_i=x,
+                            f_path=f_path,
                             server_connection=server_connection,
                         )
-                        display(html)
-                        self.movie_selected = x
-                        self.movie_path = movie_path
+                        for f_path in selected_movies_df["fpath"]
+                    ]
 
-                movie_selected.observe(update_movie, "value")
-                display(movie_selected, output)
-                await asyncio.Event().wait()  # Wait indefinitely for user interaction
+                    # Display the movie
+                    if preview_media:
+                        # Display/preview each selected movie
+                        for index, movie_row in selected_movies_df.iterrows():
+                            movie_path = movies_paths[index]
+                            movie_metadata = pd.DataFrame(
+                                [movie_row.values], columns=movie_row.index
+                            )
 
-            loop = asyncio.get_event_loop()
-            loop.create_task(
-                f(self.project, self.server_connection, self.available_movies_df)
-            )
+                            html = movie_utils.preview_movie(
+                                movie_path=movie_path, movie_metadata=movie_metadata
+                            )
+                            display(html)
 
-        else:
+                    # Store the names and paths of the selected movies
+                    self.movies_selected = selected_movies
+                    self.movies_paths = movies_paths
 
-            def f(project, server_connection, available_movies_df):
-                x = movie_selected.options[0]
-                html, movie_path = movie_utils.preview_movie(
-                    project=project,
-                    available_movies_df=available_movies_df,
-                    movie_i=x,
-                    server_connection=server_connection,
-                )
-                display(html)
-                self.movie_selected = x
-                self.movie_path = movie_path
+            select_movie_widg.observe(update_movie, "value")
+            display(select_movie_widg, output)
+            await asyncio.Event().wait()  # Wait indefinitely for user interaction
 
+        loop = asyncio.get_event_loop()
+        loop.create_task(
             f(self.project, self.server_connection, self.available_movies_df)
+        )
+
+        if test:
+            # For the test case, directly call the update_movie logic
+            select_movie_widg.options = (select_movie_widg.options[0],)
+            update_movie({"new": select_movie_widg.options[0]})
 
     def check_meta_sync(self, meta_key: str):
         """
@@ -355,6 +373,11 @@ class ProjectProcessor:
         :param review_method: The method used to review the movies
         :param gpu_available: Boolean, whether or not a GPU is available
         """
+        # Check if the necessary attribute is available
+        if not hasattr(self, "available_movies_df") or self.available_movies_df is None:
+            raise AttributeError(
+                "Please run 'get_movie_info' before 'choose_footage' to set 'available_movies_df'."
+            )
 
         movie_utils.check_movies_meta(
             project=self.project,
@@ -551,21 +574,21 @@ class ProjectProcessor:
             generate_export=generate_export,
         )
 
-    def check_movies_uploaded(self, movie_name: str):
+    def check_movies_uploaded(self, movies_selected: list):
         """
         This function checks if a movie has been uploaded to Zooniverse
 
-        :param movie_name: The name of the movie you want to check if it's uploaded
-        :type movie_name: str
+        :param movies_selected: The name of the movie(s) you want to check if it's uploaded
+        :type movies_selected: list
         """
-        movie_utils.check_movie_uploaded(
-            project=self.project, db_connection=self.db_connection, movie_i=movie_name
+        movie_utils.check_movies_uploaded(
+            project=self.project, db_connection=self.db_connection, movies_selected=movies_selected
         )
 
     def generate_zoo_clips(
         self,
-        movie_name,
-        movie_path,
+        movies_selected: list,
+        movies_paths: list,
         use_gpu: bool = False,
         pool_size: int = 4,
         is_example: bool = False,
@@ -574,8 +597,8 @@ class ProjectProcessor:
         """
         > This function takes a movie name and path, and returns a list of clips from that movie
 
-        :param movie_name: The name of the movie you want to extract clips from
-        :param movie_path: The path to the movie you want to extract clips from
+        :param movies_selected: The name(s) of the movie(s) you want to extract clips from
+        :param movies_paths: The path(s) to the movie(s) you want to extract clips from
         :param use_gpu: If you have a GPU, set this to True, defaults to False
         :type use_gpu: bool (optional)
         :param pool_size: number of threads to use for clip extraction, defaults to 4
@@ -585,11 +608,23 @@ class ProjectProcessor:
         :type is_example: bool (optional)
         """
 
+        # Roadblock to ensure only one movie has been selected
+        # Option to generate clips from multiple movies is not available at this point
+        if len(movies_selected) > 1:
+            logging.info(
+                "The option to generate clips from multiple movies is not available at this point. Please select only one movie to gerenate clips from"
+            )
+            return
+
+        else:
+            movies_selected = str(movies_selected[0])
+            movies_paths = str(movies_paths[0])
+
         # Select the clips to be extracted
         clip_selection = kso_widgets.select_n_clips(
             project=self.project,
             db_connection=self.db_connection,
-            movie_i=movie_name,
+            movies_selected=movies_selected,
             is_example=is_example,
         )
         clip_modification = kso_widgets.clip_modification_widget()
@@ -606,8 +641,8 @@ class ProjectProcessor:
             def on_button_clicked(b):
                 self.generated_clips = t_utils.create_clips(
                     available_movies_df=self.available_movies_df,
-                    movie_i=movie_name,
-                    movie_path=movie_path,
+                    movies_selected=movies_selected,
+                    movies_paths=movies_paths,
                     clip_selection=clip_selection,
                     project=self.project,
                     modification_details={},
@@ -616,13 +651,14 @@ class ProjectProcessor:
                 )
 
                 mod_clips = t_utils.create_modified_clips(
-                    self.project,
-                    self.generated_clips.clip_path,
-                    movie_name,
-                    clip_modification.checks,
-                    use_gpu,
-                    pool_size,
+                    project=self.project,
+                    clips_list=self.generated_clips.clip_path,
+                    movies_selected=movies_selected,
+                    modification_details=clip_modification.checks,
+                    gpu_available=use_gpu,
+                    pool_size=pool_size,
                 )
+
                 # Temporary workaround to get both clip paths
                 self.generated_clips["modif_clip_path"] = mod_clips
                 # Temporary workaround to ensure site_id is an integer
@@ -639,8 +675,8 @@ class ProjectProcessor:
             clip_selection.result["clip_start_time"] = [0]
             self.generated_clips = t_utils.create_clips(
                 available_movies_df=self.available_movies_df,
-                movie_i=movie_name,
-                movie_path=movie_path,
+                movies_selected=movies_selected,
+                movies_paths=movies_paths,
                 clip_selection=clip_selection,
                 project=self.project,
                 modification_details={},
@@ -1358,7 +1394,6 @@ class MLProjectProcessor(ProjectProcessor):
     def train_yolov5(
         self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
     ):
-
         if self.project.server == "SNIC":
             project = f"/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/{project}"
 

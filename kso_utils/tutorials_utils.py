@@ -13,6 +13,7 @@ import random
 import imagesize
 import requests
 import ffmpeg as ffmpeg_python
+from tabulate import tabulate as tb
 from base64 import b64encode
 from io import BytesIO
 from urllib.parse import urlparse
@@ -80,27 +81,6 @@ def log_meta_changes(
             f"Changelog updated at: {Path(project.csv_folder, 'change_log.json')}"
         )
         return
-
-
-def process_source(source):
-    """
-    If the source is a string, write the string to a file and return the file name. If the source is a
-    list, return the list. If the source is neither, return None
-
-    :param source: The source of the data. This can be a URL, a file, or a list of URLs or files
-    :return: the value of the source variable.
-    """
-    try:
-        source.value
-        if source.value is None:
-            raise AttributeError("Value is None")
-        return write_urls_to_file(source.value)
-    except AttributeError:
-        try:
-            source.selected
-            return source.selected
-        except AttributeError:
-            return None
 
 
 def write_urls_to_file(movie_list: list, filepath: str = "/tmp/temp.txt"):
@@ -309,12 +289,12 @@ def modify_clips(
     logging.info(f"Clip {clip_i} modified successfully")
 
 
-def review_clip_selection(clip_selection, movie_i: str, clip_modification):
+def review_clip_selection(clip_selection, movies_selected: str, clip_modification):
     """
     > This function reviews the clips that will be created from the movie selected
 
     :param clip_selection: the object that contains the results of the clip selection
-    :param movie_i: the movie you want to create clips from
+    :param movies_selected: the movie(s) you want to create clips from
     :param clip_modification: The modification that will be applied to the clips
     """
     start_trim = clip_selection.kwargs["clips_range"][0]
@@ -322,7 +302,7 @@ def review_clip_selection(clip_selection, movie_i: str, clip_modification):
 
     # Review the clips that will be created
     logging.info(
-        f"You are about to create {round(clip_selection.result)} clips from {movie_i}"
+        f"You are about to create {round(clip_selection.result)} clips from {movies_selected}"
     )
     logging.info(
         f"starting at {datetime.timedelta(seconds=start_trim)} and ending at {datetime.timedelta(seconds=end_trim)}"
@@ -1285,8 +1265,8 @@ class WidgetMaker(widgets.VBox):
 
 def create_clips(
     available_movies_df: pd.DataFrame,
-    movie_i: str,
-    movie_path: str,
+    movies_selected: str,
+    movies_paths: str,
     clip_selection,
     project: Project,
     modification_details: dict,
@@ -1297,8 +1277,8 @@ def create_clips(
     This function takes a movie and extracts clips from it
 
     :param available_movies_df: the dataframe with the movies that are available for the project
-    :param movie_i: the name of the movie you want to extract clips from
-    :param movie_path: the path to the movie you want to extract clips from
+    :param movies_selected: the name(s) of the movie(s) you want to extract clips from
+    :param movies_paths: the path(s) to the movie(s) you want to extract clips from
     :param clip_selection: a ClipSelection object
     :param project: the project object
     :param modification_details: a dictionary with the following keys:
@@ -1348,15 +1328,17 @@ def create_clips(
         list_clip_start = [clip_selection.result["clip_start_time"]]
 
     # Filter the df for the movie of interest
-    movie_i_df = available_movies_df[
-        available_movies_df["filename"] == movie_i
+    movies_selected_df = available_movies_df[
+        available_movies_df["filename"] == movies_selected
     ].reset_index(drop=True)
 
     # Add the list of starting seconds to the df
-    movie_i_df["list_clip_start"] = list_clip_start
+    movies_selected_df["list_clip_start"] = list_clip_start
 
     # Reshape the dataframe with the starting seconds for the new clips
-    potential_start_df = expand_list(movie_i_df, "list_clip_start", "upl_seconds")
+    potential_start_df = expand_list(
+        movies_selected_df, "list_clip_start", "upl_seconds"
+    )
 
     # Add the length of the clips to df (to keep track of the length of each uploaded clip)
     potential_start_df["clip_length"] = clip_length
@@ -1366,11 +1348,11 @@ def create_clips(
         temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/"
     else:
         temp_path = "."
-    clips_folder = str(Path(temp_path, "tmp_dir", movie_i + "_zooniverseclips"))
+    clips_folder = str(Path(temp_path, "tmp_dir", movies_selected + "_zooniverseclips"))
 
     # Set the filename of the clips
     potential_start_df["clip_filename"] = (
-        movie_i
+        movies_selected
         + "_clip_"
         + potential_start_df["upl_seconds"].astype(str)
         + "_"
@@ -1398,7 +1380,7 @@ def create_clips(
     ):
         # Extract the videos and store them in the folder
         extract_clips(
-            movie_path,
+            movies_paths,
             clip_length,
             row["upl_seconds"],
             row["clip_path"],
@@ -1415,7 +1397,7 @@ def create_clips(
 def create_modified_clips(
     project: Project,
     clips_list: list,
-    movie_i: str,
+    movies_selected: str,
     modification_details: dict,
     gpu_available: bool,
     pool_size: int = 4,
@@ -1425,7 +1407,7 @@ def create_modified_clips(
     GPU availability flag, and returns a list of modified clips
 
     :param clips_list: a list of the paths to the clips you want to modify
-    :param movie_i: the path to the movie you want to extract clips from
+    :param movies_selected: the path(s) to the movie(s) you want to extract clips from
     :param modification_details: a dictionary with the modifications to be applied to the clips. The keys are the names of the modifications and the values are the parameters of the modifications
     :param project: the project object
     :param gpu_available: True if you have a GPU available, False if you don't
@@ -1434,7 +1416,7 @@ def create_modified_clips(
     """
 
     # Specify the folder to host the modified clips
-    mod_clip_folder = "modified_" + movie_i + "_clips"
+    mod_clip_folder = "modified_" + movies_selected + "_clips"
 
     # Specify output path for modified clip extraction
     if project.server == "SNIC":
@@ -1603,3 +1585,257 @@ def format_to_gbif(
         raise ValueError(
             "Specify who classified the species of interest (citizen_scientists, biologists or ml_algorithms)"
         )
+
+
+# Function to display a list of statistics to choose to compute for the detections over each footage
+def choose_statistics():
+    statistics = widgets.SelectMultiple(
+        options=[
+            "Mean same species per frame",
+            "Mean different species per frame",
+            "Max same species per frame",
+            "Max different species per frame",
+            "Min same species per frame",
+            "Min different species per frame",
+        ],
+        description="Statistics",
+        disabled=False,
+        layout=widgets.Layout(width="max-content"),
+        style={"description_width": "initial"},
+    )
+
+    main_out = widgets.Output()
+    display(statistics, main_out)
+
+    return statistics
+
+
+# Auxiliary function to obtain a dictionary with the mapping between the class ids used by the detection model and the species names
+def get_species_mapping(model, project_name, team_name="koster"):
+    import wandb
+
+    api = wandb.Api()
+
+    full_path = f"{team_name}/{project_name}"
+    runs = api.runs(full_path)  # Get all runs in the project
+    for r in runs:
+        # Choose the run corresponding to the model given as parameter
+        if r.id == model.split("_")[1]:
+            run = api.run(project_name + "/" + r.id)
+
+    data_dict = run.rawconfig["data_dict"]
+    species_mapping = data_dict["names"]
+
+    return species_mapping
+
+
+def choose_species(labels_path, model, project_name, team_name="koster"):
+    """
+    > This function creates a widget that allows the user to choose the species of interest.
+
+    :param labels_path: the path to the folder containing the annotations.csv file
+    :param model: the name of the model in wandb used to obtain the detections
+    :param project_name: name of the project in wandb
+    :param team_name: name of the team. By default, it is set to the "koster" team.
+
+    """
+    # Read the annotations.csv file
+    annotations = pd.read_csv(os.path.join(labels_path, "annotations.csv"))
+
+    # Obtain the list of unique class ids from the annotations.csv file
+    species_ids = annotations["class_id"].unique()
+
+    # Obtain a dictionary with the mapping between the class ids and the species names and create a dataframe from it
+    species_mapping = get_species_mapping(model, project_name, team_name)
+    species_df = pd.DataFrame.from_dict(species_mapping, orient="index")
+    species_df.reset_index(inplace=True)
+    species_df.columns = ["id", "species"]
+    species_df["id"] = species_df["id"].astype(int)
+
+    # Filter the dataframe to consider only the species available in the annotations.csv file
+    species_df = species_df[species_df["id"].isin(species_ids)]
+    species_list = species_df["species"].tolist()
+
+    # Create the widget with the list of available species
+    species = widgets.SelectMultiple(
+        options=species_list,
+        description="Species",
+        disabled=False,
+        layout=widgets.Layout(width="25%"),
+        style={"description_width": "initial"},
+    )
+    main_out = widgets.Output()
+    display(species, main_out)
+
+    return species
+
+
+def detection_statistics(
+    csv_path: str,
+    metrics: list,
+    model: str,
+    project_name: str,
+    team_name: str = "koster",
+    species: list = None,
+    save: bool = True,
+    save_folder: str = None,
+    print_results: bool = True,
+):
+    """
+    > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+    and saves the results in different csv files.
+
+    :param csv_path: the path to the folder containing the annotations.csv file
+    :param metrics: a list of the statistics to compute
+    :param model: the name of the model in wandb used to obtain the detections
+    :param project_name: name of the project in wandb
+    :param team_name: name of the team. By default, it is set to the "koster" team.
+    :param species: a list of the species of interest. If None, all the species are considered (it is the default option)
+    :param save: True if you want to save the results in csv files, False otherwise
+    :param save_folder: the path to the folder where you want to save the csv files. If None, the results are saved in the same folder as the annotations.csv file
+    :param print_results: True if you want to print the results (in a tabular format), False otherwise
+
+    """
+
+    if save:
+        if save_folder is None:
+            # By default, save the results in the same folder as the annotations.csv file
+            save_folder = csv_path
+        elif not os.path.exists(save_folder):
+            # Create the folder if it doesn't exist
+            os.makedirs(save_folder)
+
+    # Read the annotations.csv file
+    df = pd.read_csv(os.path.join(csv_path, "annotations.csv"))
+
+    # Obtain a dictionary with the mapping between the class ids and the species names
+    species_mapping = get_species_mapping(model, project_name, team_name)
+
+    # Add a column with the species name corresponding to each class id
+    df["species_name"] = df.apply(
+        lambda row: species_mapping[str(row["class_id"])], axis=1
+    )
+
+    if species is not None:
+        # Filter the dataframe to consider only the species of interest
+        df_filtered = df[df["species_name"].isin(species)]
+
+    else:
+        # Consider all the available species
+        df_filtered = df
+
+    # Add a column with the footage name
+    df_filtered["footage"] = df_filtered.apply(
+        lambda row: "_".join(row.filename.split("_")[:-1]), axis=1
+    )
+    # print(df_filtered.head())
+
+    # If the user wants to compute statistics over the detections of the same species
+    if any("same" in sub for sub in metrics):
+        df_grouped = df_filtered.copy()
+        # Create an additional column to compute the number of detections of the same species in each frame
+        df_grouped["class_count"] = df_grouped["class_id"]
+        # Count the number of detections of the same species in each frame
+        df_grouped = df_grouped.groupby(
+            ["footage", "filename", "species_name", "class_count"],
+            as_index=False,
+            sort=True,
+        )["class_count"].aggregate("count")
+        # df_grouped.to_csv(os.path.join(save_folder, 'group_same.csv'),index=False)
+        # print("count", df_grouped.head())
+
+        # Compute the mean, min and max number of detections of each species over the frames of each footage
+        df_grouped = (
+            df_grouped.groupby(["footage", "species_name"])["class_count"]
+            .agg(["mean", "min", "max"])
+            .reset_index()
+        )
+        # print(df_grouped)
+        statistics_same = pd.DataFrame()
+
+        # Save the results in a dataframe
+        statistics_same[["footage", "species"]] = df_grouped[
+            ["footage", "species_name"]
+        ]
+        if "Mean same species per frame" in metrics:
+            statistics_same["Mean same species per frame"] = df_grouped["mean"]
+        if "Max same species per frame" in metrics:
+            statistics_same["Max same species per frame"] = df_grouped["max"]
+        if "Min same species per frame" in metrics:
+            statistics_same["Min same species per frame"] = df_grouped["min"]
+
+        if save:
+            logging.info(
+                "Saving statistics of same species per frame into {}".format(
+                    os.path.join(save_folder, "statistics_same_species.csv")
+                )
+            )
+            statistics_same.to_csv(
+                os.path.join(save_folder, "statistics_same_species_prueba.csv"),
+                index=False,
+            )
+        if print_results:
+            print(
+                "-------------------- Statistics of same species per frame ---------------------"
+            )
+            print(
+                tb(
+                    statistics_same,
+                    headers="keys",
+                    tablefmt="psql",
+                    showindex=False,
+                    floatfmt=".3f",
+                )
+            )
+
+    # If the user wants to compute statistics over the detections of different species
+    if any("different" in sub for sub in metrics):
+        # Count the number of different species in each frame
+        df_grouped = df_filtered.groupby(
+            ["footage", "filename"], as_index=False, sort=True
+        )["class_id"].aggregate(lambda x: len(np.unique(x)))
+        # print(df_grouped)
+        # df_grouped.to_csv(os.path.join(save_folder, 'group_different.csv'),index=False)
+
+        # Compute the mean, min and max number of different species over the frames of each footage
+        df_grouped = (
+            df_grouped.groupby(["footage"])["class_id"]
+            .agg(["mean", "min", "max"])
+            .reset_index()
+        )
+        # print(df_grouped)
+
+        # Save the results in a dataframe
+        statistics_different = pd.DataFrame()
+        statistics_different["footage"] = df_grouped["footage"]
+        if "Mean different species per frame" in metrics:
+            statistics_different["Mean different species per frame"] = df_grouped[
+                "mean"
+            ]
+        if "Max different species per frame" in metrics:
+            statistics_different["Max different species per frame"] = df_grouped["max"]
+        if "Min different species per frame" in metrics:
+            statistics_different["Min different species per frame"] = df_grouped["min"]
+        if save:
+            logging.info(
+                "Saving statistics of different species per frame into {}".format(
+                    os.path.join(save_folder, "statistics_different_species.csv")
+                )
+            )
+            statistics_different.to_csv(
+                os.path.join(save_folder, "statistics_different_species.csv"),
+                index=False,
+            )
+        if print_results:
+            print(
+                "-------------------- Statistics of different species per frame ---------------------"
+            )
+            print(
+                tb(
+                    statistics_different,
+                    headers="keys",
+                    tablefmt="psql",
+                    showindex=False,
+                    floatfmt=".3f",
+                )
+            )
