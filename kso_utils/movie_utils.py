@@ -303,7 +303,11 @@ def check_movies_uploaded(project: Project, db_connection, movies_selected: list
     subjects_df = subjects_df[subjects_df["subject_type"] == "clip"]
 
     # Save the video filenames of the clips uploaded to Zooniverse
-    clips_uploaded = subjects_df[subjects_df["filename"].apply(lambda x: any(movie in x for movie in movies_selected))]
+    clips_uploaded = subjects_df[
+        subjects_df["filename"].apply(
+            lambda x: any(movie in x for movie in movies_selected)
+        )
+    ]
 
     if clips_uploaded.empty:
         logging.info(f"{movies_selected} has not been uploaded to Zooniverse yet")

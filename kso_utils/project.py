@@ -582,7 +582,9 @@ class ProjectProcessor:
         :type movies_selected: list
         """
         movie_utils.check_movies_uploaded(
-            project=self.project, db_connection=self.db_connection, movies_selected=movies_selected
+            project=self.project,
+            db_connection=self.db_connection,
+            movies_selected=movies_selected,
         )
 
     def generate_zoo_clips(

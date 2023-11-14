@@ -54,7 +54,7 @@ def test_t1():
     # Retrieve and display movies
     pp.get_movie_info()
     # Preview the media (pre-selected)
-    pp.choose_footage(preview_media=True,test=True)
+    pp.choose_footage(preview_media=True, test=True)
 
     # Check species dataframe
     pp.check_species_meta()
