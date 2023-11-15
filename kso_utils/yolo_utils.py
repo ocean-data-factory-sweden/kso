@@ -1174,7 +1174,7 @@ def track_objects(
         and ".pt" in str(f)
         and "osnet" not in str(f)
         and "best" in str(f)
-    ][0]
+    ]
 
     if len(models) > 0 and not test:
         best_model = models[0]
