@@ -1214,7 +1214,7 @@ def track_objects(
         and "best" in str(f)
     ]
 
-    best_model = Path(model_path)
+    best_model = Path(model_path[0])
 
     if not gpu:
         track.run(
