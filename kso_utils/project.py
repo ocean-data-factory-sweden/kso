@@ -1167,6 +1167,156 @@ class MLProjectProcessor(ProjectProcessor):
             button.on_click(on_button_clicked)
             display(button)
 
+    #############
+    # t5
+    #############
+    def choose_baseline_model(self, download_path: str, test: bool = False):
+        """
+        It downloads the latest version of the baseline model from WANDB
+        :return: The path to the baseline model.
+        """
+        if self.registry == "wandb":
+            api = wandb.Api()
+            # weird error fix (initialize api another time)
+            api.runs(path="koster/model-registry")
+            api = wandb.Api()
+            collections = [
+                coll
+                for coll in api.artifact_type(
+                    type_name="model", project="koster/model-registry"
+                ).collections()
+            ]
+
+            model_dict = {}
+            for artifact in collections:
+                model_dict[artifact.name] = artifact
+
+            model_widget = widgets.Dropdown(
+                options=[(name, model) for name, model in model_dict.items()],
+                value=None,
+                description="Select model:",
+                ensure_option=False,
+                disabled=False,
+                layout=widgets.Layout(width="50%"),
+                style={"description_width": "initial"},
+            )
+
+            main_out = widgets.Output()
+            display(model_widget, main_out)
+
+            def on_change(change):
+                with main_out:
+                    clear_output()
+                    try:
+                        for af in model_dict[change["new"].name].versions():
+                            artifact_dir = af.download(download_path)
+                            artifact_file = [
+                                str(i)
+                                for i in Path(artifact_dir).iterdir()
+                                if str(i).endswith(".pt")
+                            ][-1]
+                            logging.info(
+                                f"Baseline {af.name} successfully downloaded from WANDB"
+                            )
+                            model_widget.artifact_path = artifact_file
+                    except Exception as e:
+                        logging.error(
+                            f"Failed to download the baseline model. Please ensure you are logged in to WANDB. {e}"
+                        )
+
+            model_widget.observe(on_change, names="value")
+            if test:
+                model_widget.value = model_dict["baseline-yolov5"]
+            return model_widget
+
+        elif self.registry == "mlflow":
+            # Fetch model artifact list
+            from mlflow import MlflowClient
+
+            experiment = mlflow.get_experiment_by_name(self.project_name)
+            client = MlflowClient()
+
+            if experiment is not None:
+                experiment_id = experiment.experiment_id if experiment else None
+                runs = mlflow.search_runs(
+                    experiment_ids=experiment_id, output_format="list"
+                )
+                run_ids = [run.info.run_id for run in runs][-1:]
+                # Choose only the project directory
+                try:
+                    artifacts = [
+                        (
+                            list(
+                                filter(
+                                    lambda x: x.is_dir
+                                    and "input_datasets" not in x.path,
+                                    client.list_artifacts(i),
+                                )
+                            )[0],
+                            i,
+                        )
+                        for i in run_ids
+                    ]
+                    model_names = [
+                        str(
+                            Path(
+                                "runs:/",
+                                run_id,
+                                artifact.path,
+                                "best.pt",
+                            )
+                        )
+                        for artifact, run_id in artifacts
+                    ]
+                except IndexError:
+                    model_names = []
+            else:
+                model_names = []
+            model_names.append("No Model")
+
+            model_widget = widgets.Dropdown(
+                options=model_names,
+                value=None,
+                description="Select model:",
+                ensure_option=False,
+                disabled=False,
+                layout=widgets.Layout(width="50%"),
+                style={"description_width": "initial"},
+            )
+
+            main_out = widgets.Output()
+            display(model_widget, main_out)
+
+            def on_change(change):
+                with main_out:
+                    clear_output()
+                    try:
+                        for af in model_names:
+                            artifact_dir = mlflow.download_artifacts(
+                                artifact_uri=af, dst_path=download_path
+                            )
+                            artifact_file = [
+                                str(i)
+                                for i in Path(artifact_dir).iterdir()
+                                if str(i).endswith(".pt")
+                            ][-1]
+                            logging.info(
+                                f"Baseline {af.name} successfully downloaded from WANDB"
+                            )
+                            model_widget.artifact_path = artifact_file
+                    except Exception as e:
+                        logging.error(
+                            f"Failed to download the baseline model. Please ensure you are logged in to WANDB. {e}"
+                        )
+
+            model_widget.observe(on_change, names="value")
+
+            # Display the dropdown widget
+            display(model_widget)
+            return model_widget
+        else:
+            logging.error("Registry not supported.")
+
     def choose_entity(self, alt_name: bool = False):
         if self.team_name is None:
             return t_utils.choose_entity()
@@ -1220,11 +1370,9 @@ class MLProjectProcessor(ProjectProcessor):
                     model_names = [
                         str(
                             Path(
-                                experiment.artifact_location,
+                                "runs:/",
                                 run_id,
-                                "artifacts",
                                 artifact.path,
-                                "weights",
                                 "best.pt",
                             )
                         )

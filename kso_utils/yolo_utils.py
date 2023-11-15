@@ -911,65 +911,6 @@ def track_frames(
     return t_bbox
 
 
-def choose_baseline_model(download_path: str, test: bool = False):
-    """
-    It downloads the latest version of the baseline model from WANDB
-    :return: The path to the baseline model.
-    """
-    api = wandb.Api()
-    # weird error fix (initialize api another time)
-    api.runs(path="koster/model-registry")
-    api = wandb.Api()
-    collections = [
-        coll
-        for coll in api.artifact_type(
-            type_name="model", project="koster/model-registry"
-        ).collections()
-    ]
-
-    model_dict = {}
-    for artifact in collections:
-        model_dict[artifact.name] = artifact
-
-    model_widget = widgets.Dropdown(
-        options=[(name, model) for name, model in model_dict.items()],
-        value=None,
-        description="Select model:",
-        ensure_option=False,
-        disabled=False,
-        layout=widgets.Layout(width="50%"),
-        style={"description_width": "initial"},
-    )
-
-    main_out = widgets.Output()
-    display(model_widget, main_out)
-
-    def on_change(change):
-        with main_out:
-            clear_output()
-            try:
-                for af in model_dict[change["new"].name].versions():
-                    artifact_dir = af.download(download_path)
-                    artifact_file = [
-                        str(i)
-                        for i in Path(artifact_dir).iterdir()
-                        if str(i).endswith(".pt")
-                    ][-1]
-                    logging.info(
-                        f"Baseline {af.name} successfully downloaded from WANDB"
-                    )
-                    model_widget.artifact_path = artifact_file
-            except Exception as e:
-                logging.error(
-                    f"Failed to download the baseline model. Please ensure you are logged in to WANDB. {e}"
-                )
-
-    model_widget.observe(on_change, names="value")
-    if test:
-        model_widget.value = model_dict["baseline-yolov5"]
-    return model_widget
-
-
 def setup_paths(output_folder: str, model_type: str):
     """
     It takes the output folder and returns the path to the data file and the path to the hyperparameters
