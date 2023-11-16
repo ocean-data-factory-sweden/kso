@@ -1337,6 +1337,7 @@ class MLProjectProcessor(ProjectProcessor):
             conf_thres=conf_thres,
             save_txt=True,
             save_conf=True,
+            half=True,
             project=save_dir,
             name=exp_name,
             nosave=not save_output,
