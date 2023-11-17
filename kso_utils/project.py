@@ -1251,7 +1251,6 @@ class MLProjectProcessor(ProjectProcessor):
     def train_yolov5(
         self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
     ):
-
         if self.project.server == "SNIC":
             project = f"/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/{project}"
 
@@ -1269,6 +1268,7 @@ class MLProjectProcessor(ProjectProcessor):
                 single_cls=False,
                 cache_images=True,
                 upload_dataset=True,
+                rect=True,
             )
         elif self.model_type == 2:
             self.modules["train"].run(
@@ -1337,7 +1337,6 @@ class MLProjectProcessor(ProjectProcessor):
             conf_thres=conf_thres,
             save_txt=True,
             save_conf=True,
-            half=True,
             project=save_dir,
             name=exp_name,
             nosave=not save_output,

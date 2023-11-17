@@ -660,7 +660,7 @@ def frame_aggregation(
                 if track_frames:
                     # Track n frames after object is detected
                     tboxes[named_tuple].extend(
-                        track_frames(
+                        tracking_frames(
                             video_dict[final_name],
                             grouped_fields[-1],
                             bboxes[named_tuple],
@@ -673,7 +673,7 @@ def frame_aggregation(
                             (
                                 grouped_fields[-1],
                                 grouped_fields[1] + box[0],
-                                grouped_fields[-1],
+                                grouped_fields[0],
                                 video_dict[final_name][grouped_fields[1]].shape[1],
                                 video_dict[final_name][grouped_fields[1]].shape[0],
                             )
@@ -795,15 +795,17 @@ def frame_aggregation(
 
             save_name = name[1] if name[1] in video_dict else unswedify(name[1])
             if save_name in video_dict:
-                PIL.Image.fromarray(
-                    video_dict[save_name][name[0]][:, :, [2, 1, 0]]
-                ).save(img_out)
+                img_array = video_dict[save_name][name[0]][:, :, [2, 1, 0]]
+                img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+                PIL.Image.fromarray(img_array).save(img_out)
         else:
             if link_bool:
                 image_output = PIL.Image.open(requests.get(name, stream=True).raw)
             else:
                 image_output = np.asarray(PIL.Image.open(name))
-            PIL.Image.fromarray(np.asarray(image_output)).save(img_out)
+            img_array = np.asarray(image_output)
+            img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+            PIL.Image.fromarray(img_array).save(img_out)
 
     logging.info("Frames extracted successfully")
 
@@ -855,7 +857,7 @@ def createTrackerByName(trackerType: str):
     return tracker
 
 
-def track_frames(
+def tracking_frames(
     video, class_ids: list, bboxes: list, start_frame: int, last_frame: int
 ):
     """
@@ -889,7 +891,7 @@ def track_frames(
     t_bbox = []
     t = 0
     # Process video and track objects
-    for current_frame in range(start_frame + 1, last_frame + 1):
+    for current_frame in range(int(start_frame) + 1, int(last_frame) + 1):
         frame = video[current_frame]  # [0]
 
         # get updated location of objects in subsequent frames
