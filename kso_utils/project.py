@@ -1667,7 +1667,8 @@ class MLProjectProcessor(ProjectProcessor):
     def detect_yolov5(
         self,
         exp_name: str,
-        source: str,
+        movies_paths: list,
+        movies_selected: list,
         save_dir: str,
         conf_thres: float,
         artifact_dir: str,
@@ -1691,9 +1692,28 @@ class MLProjectProcessor(ProjectProcessor):
             and "osnet" not in str(f)
             and "best" in str(f)
         ][0]
+        # Save locally the movies to be processed by the ML detect
+        from urllib.request import urlopen
+        from urllib.parse import urlparse
+        # Check if movie_paths are urls
+        if all(urlparse(path).scheme in ['http', 'https'] for path in movies_paths):
+            # Specify the path where you want to save the downloaded videos
+            local_movies_paths = movies_selected
+
+            # Download each video separately
+            for i, video_url in enumerate(movies_paths):
+                # Open the URL and get the video content
+                video_content = urlopen(video_url).read()
+
+                # Save the video content to a local file
+                with open(local_movies_paths[i], 'wb') as video_file:
+                    video_file.write(video_content)
+        else:
+            local_movies_paths = movies_paths
+    
         self.modules["detect"].run(
             weights=weights_path,
-            source=source,
+            source=local_movies_paths,
             conf_thres=conf_thres,
             save_txt=True,
             save_conf=True,
