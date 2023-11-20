@@ -1774,7 +1774,7 @@ class MLProjectProcessor(ProjectProcessor):
         return latest_tracker
         # self.modules["wandb"].finish()
         
-    def increment_path(path, exist_ok=False, sep="", mkdir=False):
+    def increment_path(self, path, exist_ok=False, sep="", mkdir=False):
         # Increment file or directory path, i.e. runs/exp --> runs/exp{sep}2, runs/exp{sep}3, ... etc.
         path = Path(path)  # os-agnostic
         if path.exists() and not exist_ok:
@@ -1812,7 +1812,7 @@ class MLProjectProcessor(ProjectProcessor):
     ):
         if not hasattr(self, "eval_dir"):
             self.eval_dir = self.increment_path(
-                Path(self.save_dir) / "detect", exist_ok=False
+                path=Path(self.save_dir) / "detect", exist_ok=False
             )
 
         latest_tracker = self.modules["yolo_utils"].track_objects(
@@ -1836,11 +1836,22 @@ class MLProjectProcessor(ProjectProcessor):
             )
             self.modules["yolo_utils"].set_config(conf_thres, artifact_dir, eval_dir)
 
+        self.run = self.modules["wandb"].init(
+            entity=self.team_name,
+            project="model-evaluations",
+            name="track",
+            settings=self.modules["wandb"].Settings(start_method="thread"),
+        )
+        self.modules["yolo_utils"].set_config(conf_thres, artifact_dir, self.eval_dir)
+        self.modules["yolo_utils"].add_data_wandb(
+            Path(latest_tracker).parent.absolute(), "tracker_output", self.run
+        )
+
         # self.csv_report = self.modules["yolo_utils"].generate_csv_report(
         #    self.team_name, self.project_name, eval_dir, self.run, log=True
         # )
         self.tracking_report = self.modules["yolo_utils"].generate_counts(
-            eval_dir,
+            self.eval_dir,
             latest_tracker,
             artifact_dir,
             self.run,
