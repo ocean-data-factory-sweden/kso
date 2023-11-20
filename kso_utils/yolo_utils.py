@@ -20,6 +20,7 @@ import imagesize
 import base64
 import ffmpeg
 import ipywidgets as widgets
+import matplotlib.pyplot as plt
 from jupyter_bbox_widget import BBoxWidget
 from IPython.display import display, clear_output, HTML
 from PIL import Image as PILImage, ImageDraw
@@ -1771,6 +1772,61 @@ def view_file(path: str):
         widget.Image()
 
     return widget
+
+
+def adjust_tracking(
+    track_csv_path: str,
+    avg_diff_frames: int,
+    min_frames_length: int,
+    plot_result: bool = False,
+):
+    """Clean tracking output by removing noisy class changes and short-duration detections."""
+    tracking_df = pd.read_csv(track_csv_path)
+
+    if plot_result:
+        fig, ax = plt.subplots(figsize=(15, 5))
+
+        scatter = ax.scatter(
+            x=tracking_df["frame_no"],
+            y=tracking_df["tracker_id"],
+            c=tracking_df["class_id"],
+        )
+
+        # produce a legend with the unique colors from the scatter
+        legend1 = ax.legend(
+            *scatter.legend_elements(), loc="upper left", title="Classes"
+        )
+        ax.grid()
+        ax.add_artist(legend1)
+        plt.show()
+
+    def custom_tracking_diff(x):
+        """Compute the maximum difference between frame numbers"""
+        diff_series = np.diff(x)
+        if len(diff_series) > 0:
+            return diff_series.max()
+        else:
+            return 1
+
+    def custom_class(x):
+        """Choose class by rounding average of classifications"""
+        return np.round(x.mean())
+
+    diff_df = (
+        tracking_df.groupby(["tracker_id"])
+        .agg({"frame_no": custom_tracking_diff})
+        .sort_values(by="frame_no")
+    )
+    length_df = (
+        tracking_df.groupby("tracker_id")
+        .agg({"frame_no": "count", "class_id": custom_class})
+        .sort_values(by="frame_no", ascending=False)
+    )
+    total_df = pd.merge(diff_df, length_df, left_index=True, right_index=True)
+    return total_df[
+        (total_df.frame_no_x <= avg_diff_frames)
+        & (total_df.frame_no_y >= min_frames_length)
+    ].sort_index()
 
 
 def main():
