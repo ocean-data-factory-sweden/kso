@@ -110,7 +110,6 @@ class YoloXStrategy(YoloInterface):
     }
 
     def __init__(self, model, device, args):
-
         self.args = args
         self.pt = False
         self.stride = 32  # max stride in YOLOX
@@ -155,10 +154,8 @@ class YoloXStrategy(YoloInterface):
         pass
 
     def postprocess(self, path, preds, im, im0s):
-
         results = []
         for i, pred in enumerate(preds):
-
             pred = postprocess(
                 pred.unsqueeze(0),  # YOLOX postprocessor expects 3D arary
                 1,

@@ -1773,7 +1773,7 @@ class MLProjectProcessor(ProjectProcessor):
         )
         return latest_tracker
         # self.modules["wandb"].finish()
-        
+
     def increment_path(self, path, exist_ok=False, sep="", mkdir=False):
         # Increment file or directory path, i.e. runs/exp --> runs/exp{sep}2, runs/exp{sep}3, ... etc.
         path = Path(path)  # os-agnostic

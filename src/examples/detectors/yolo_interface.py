@@ -33,7 +33,6 @@ class YoloInterface:
             pass
 
     def get_scaling_factors(self, im, im0):
-
         # im to im0 factor for predictions
         im0_w = im0.shape[1]
         im0_h = im0.shape[0]
