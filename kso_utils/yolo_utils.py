@@ -1144,7 +1144,7 @@ def generate_counts(
             [
                 f
                 for f in Path(artifact_dir).iterdir()
-                if f.is_file() and ".pt" in str(f)
+                if f.is_file() and "best.pt" in str(f)
             ][-1]
         )
     )
