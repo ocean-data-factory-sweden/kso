@@ -436,7 +436,7 @@ def choose_w_version(workflows_df: pd.DataFrame, workflow_id: str):
         workflows_df[workflows_df.display_name == workflow_id].version.unique().tolist()
     )
 
-    if len(versions_available) > 1:
+    if len(versions_available) >= 1:
         # Display the versions of the workflow available
         w_version = widgets.Dropdown(
             options=list(map(float, versions_available)),

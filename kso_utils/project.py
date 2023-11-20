@@ -1561,6 +1561,7 @@ class MLProjectProcessor(ProjectProcessor):
                 single_cls=False,
                 cache_images=True,
                 upload_dataset=True,
+                rect=True,
             )
         elif self.model_type == 2:
             self.modules["train"].run(
@@ -1704,7 +1705,7 @@ class MLProjectProcessor(ProjectProcessor):
         self.save_detections_wandb(conf_thres, weights_path, eval_dir)
         if wandb.run is not None:
             self.modules["wandb"].finish()
-        return str(eval_dir)
+        self.eval_dir = str(eval_dir)
 
     def save_detections(self, conf_thres: float, model: str, eval_dir: str):
         if self.registry == "wandb":
@@ -1772,22 +1773,53 @@ class MLProjectProcessor(ProjectProcessor):
         )
         return latest_tracker
         # self.modules["wandb"].finish()
+        
+    def increment_path(path, exist_ok=False, sep="", mkdir=False):
+        # Increment file or directory path, i.e. runs/exp --> runs/exp{sep}2, runs/exp{sep}3, ... etc.
+        path = Path(path)  # os-agnostic
+        if path.exists() and not exist_ok:
+            path, suffix = (
+                (path.with_suffix(""), path.suffix) if path.is_file() else (path, "")
+            )
+
+            # Method 1
+            for n in range(2, 9999):
+                p = f"{path}{sep}{n}{suffix}"  # increment path
+                if not os.path.exists(p):  #
+                    break
+            path = Path(p)
+
+            # Method 2 (deprecated)
+            # dirs = glob.glob(f"{path}{sep}*")  # similar paths
+            # matches = [re.search(rf"{path.stem}{sep}(\d+)", d) for d in dirs]
+            # i = [int(m.groups()[0]) for m in matches if m]  # indices
+            # n = max(i) + 1 if i else 2  # increment number
+            # path = Path(f"{path}{sep}{n}{suffix}")  # increment path
+
+        if mkdir:
+            path.mkdir(parents=True, exist_ok=True)  # make directory
+
+        return path
 
     def track_individuals(
         self,
         name: str,
         source: str,
         artifact_dir: str,
-        eval_dir: str,
         conf_thres: float,
         img_size: tuple = (540, 540),
         test: bool = False,
     ):
+        if not hasattr(self, "eval_dir"):
+            self.eval_dir = self.increment_path(
+                Path(self.save_dir) / "detect", exist_ok=False
+            )
+
         latest_tracker = self.modules["yolo_utils"].track_objects(
             name=name,
             source_dir=source,
             artifact_dir=artifact_dir,
-            tracker_folder=eval_dir,
+            tracker_folder=self.eval_dir,
             conf_thres=conf_thres,
             img_size=img_size,
             gpu=True if self.modules["torch"].cuda.is_available() else False,
