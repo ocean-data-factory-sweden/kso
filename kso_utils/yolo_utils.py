@@ -1842,7 +1842,9 @@ def adjust_tracking(
     )
     total_df.rename({"class_id": "species_name"}, inplace=True)
     total_df = pd.merge(
-        total_df, tracking_df[["tracker_id", "frame_no"]], on="tracker_id"
+        total_df,
+        tracking_df[["tracker_id", "frame_no"]].groupby("tracker_id").first(),
+        on="tracker_id",
     )
     logging.info(
         f"Saving tracking file to {str(Path(tracking_folder, 'tracking_clean.csv'))}"
