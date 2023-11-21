@@ -1795,8 +1795,6 @@ def adjust_tracking(
         )
     )
     names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
-    # Add species name to tracking dataframe
-    tracking_df["species_name"] = tracking_df["class_id"].apply(lambda x: names[int(x)])
 
     if plot_result:
         fig, ax = plt.subplots(figsize=(15, 5))
@@ -1825,7 +1823,7 @@ def adjust_tracking(
 
     def custom_class(x):
         """Choose class by rounding average of classifications"""
-        return np.round(x.mean())
+        return names[int(np.round(x.mean()))]
 
     diff_df = (
         tracking_df.groupby(["tracker_id"])
