@@ -1840,6 +1840,7 @@ def adjust_tracking(
         columns={"frame_no_x": "max_frame_diff", "frame_no_y": "frame_length"},
         inplace=True,
     )
+    total_df.rename({"class_id": "species_name"}, inplace=True)
     logging.info(
         f"Saving tracking file to {str(Path(tracking_folder, 'tracking_clean.csv'))}"
     )
