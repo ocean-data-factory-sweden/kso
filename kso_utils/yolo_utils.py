@@ -1783,6 +1783,21 @@ def adjust_tracking(
     """Clean tracking output by removing noisy class changes and short-duration detections."""
     tracking_df = pd.read_csv(str(Path(tracking_folder, "tracking.csv")))
 
+    import torch
+
+    model = torch.load(
+        Path(
+            [
+                f
+                for f in Path(tracking_folder).parent.iterdir()
+                if f.is_file() and "best.pt" in str(f)
+            ][-1]
+        )
+    )
+    names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
+    # Add species name to tracking dataframe
+    tracking_df["species_name"] = tracking_df["class_id"].apply(lambda x: names[int(x)])
+
     if plot_result:
         fig, ax = plt.subplots(figsize=(15, 5))
 
@@ -1823,7 +1838,10 @@ def adjust_tracking(
         .sort_values(by="frame_no", ascending=False)
     )
     total_df = pd.merge(diff_df, length_df, left_index=True, right_index=True)
-    total_df.rename(columns={"frame_no_x": "max_frame_diff", "frame_no_y": "frame_length"}, inplace=True)
+    total_df.rename(
+        columns={"frame_no_x": "max_frame_diff", "frame_no_y": "frame_length"},
+        inplace=True,
+    )
     logging.info(
         f"Saving tracking file to {str(Path(tracking_folder, 'tracking_clean.csv'))}"
     )
