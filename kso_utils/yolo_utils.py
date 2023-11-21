@@ -1823,8 +1823,7 @@ def adjust_tracking(
         .sort_values(by="frame_no", ascending=False)
     )
     total_df = pd.merge(diff_df, length_df, left_index=True, right_index=True)
-    total_df["max_frame_diff"] = total_df["frame_no_x"]
-    total_df["frame_length"] = total_df["frame_no_y"]
+    total_df.rename(columns={"frame_no_x": "max_frame_diff", "frame_no_y": "frame_length"}, inplace=True)
     logging.info(
         f"Saving tracking file to {str(Path(tracking_folder, 'tracking_clean.csv'))}"
     )
