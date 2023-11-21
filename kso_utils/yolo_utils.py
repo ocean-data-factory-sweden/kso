@@ -1829,8 +1829,8 @@ def adjust_tracking(
     )
     return (
         total_df[
-            (total_df.frame_no_x <= avg_diff_frames)
-            & (total_df.frame_no_y >= min_frames_length)
+            (total_df.max_frame_diff <= avg_diff_frames)
+            & (total_df.frame_length >= min_frames_length)
         ]
         .sort_index()
         .to_csv(str(Path(tracking_folder, "tracking_clean.csv")))
