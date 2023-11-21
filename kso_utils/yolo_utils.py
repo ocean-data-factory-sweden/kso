@@ -1775,13 +1775,13 @@ def view_file(path: str):
 
 
 def adjust_tracking(
-    track_csv_path: str,
+    tracking_folder: str,
     avg_diff_frames: int,
     min_frames_length: int,
     plot_result: bool = False,
 ):
     """Clean tracking output by removing noisy class changes and short-duration detections."""
-    tracking_df = pd.read_csv(track_csv_path)
+    tracking_df = pd.read_csv(str(Path(tracking_folder, "tracking.csv")))
 
     if plot_result:
         fig, ax = plt.subplots(figsize=(15, 5))
@@ -1823,10 +1823,14 @@ def adjust_tracking(
         .sort_values(by="frame_no", ascending=False)
     )
     total_df = pd.merge(diff_df, length_df, left_index=True, right_index=True)
-    return total_df[
-        (total_df.frame_no_x <= avg_diff_frames)
-        & (total_df.frame_no_y >= min_frames_length)
-    ].sort_index()
+    return (
+        total_df[
+            (total_df.frame_no_x <= avg_diff_frames)
+            & (total_df.frame_no_y >= min_frames_length)
+        ]
+        .sort_index()
+        .to_csv(str(Path(tracking_folder, "tracking_clean.csv")))
+    )
 
 
 def main():
