@@ -1823,6 +1823,11 @@ def adjust_tracking(
         .sort_values(by="frame_no", ascending=False)
     )
     total_df = pd.merge(diff_df, length_df, left_index=True, right_index=True)
+    total_df["max_frame_diff"] = total_df["frame_no_x"]
+    total_df["frame_length"] = total_df["frame_no_y"]
+    logging.info(
+        f"Saving tracking file to {str(Path(tracking_folder, 'tracking_clean.csv'))}"
+    )
     return (
         total_df[
             (total_df.frame_no_x <= avg_diff_frames)
