@@ -1764,13 +1764,31 @@ def view_file(path: str):
 
 
 def adjust_tracking(
-    track_csv_path: str,
+    tracking_folder: str,
     avg_diff_frames: int,
     min_frames_length: int,
     plot_result: bool = False,
 ):
     """Clean tracking output by removing noisy class changes and short-duration detections."""
-    tracking_df = pd.read_csv(track_csv_path)
+    tracking_df = pd.read_csv(str(Path(tracking_folder, "tracking.csv")))
+
+    import torch
+
+    try:
+        model = torch.load(
+            Path(
+                [
+                    f
+                    for f in Path(tracking_folder).parent.iterdir()
+                    if f.is_file() and "best.pt" in str(f)
+                ][-1]
+            )
+        )
+        names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
+
+    except:
+        logging.error("Model not found, using class_id.")
+        names = {}
 
     if plot_result:
         fig, ax = plt.subplots(figsize=(15, 5))
@@ -1799,7 +1817,10 @@ def adjust_tracking(
 
     def custom_class(x):
         """Choose class by rounding average of classifications"""
-        return np.round(x.mean())
+        if len(names) > 0:
+            return names[int(np.round(x.mean()))]
+        else:
+            return int(np.round(x.mean()))
 
     diff_df = (
         tracking_df.groupby(["tracker_id"])
@@ -1812,10 +1833,28 @@ def adjust_tracking(
         .sort_values(by="frame_no", ascending=False)
     )
     total_df = pd.merge(diff_df, length_df, left_index=True, right_index=True)
-    return total_df[
-        (total_df.frame_no_x <= avg_diff_frames)
-        & (total_df.frame_no_y >= min_frames_length)
-    ].sort_index()
+    total_df.rename(
+        columns={"frame_no_x": "max_frame_diff", "frame_no_y": "frame_length"},
+        inplace=True,
+    )
+    if len(names) > 0:
+        total_df.rename({"class_id": "species_name"}, inplace=True)
+    total_df = pd.merge(
+        total_df,
+        tracking_df[["tracker_id", "frame_no"]].groupby("tracker_id").first(),
+        on="tracker_id",
+    )
+    logging.info(
+        f"Saving tracking file to {str(Path(tracking_folder, 'tracking_clean.csv'))}"
+    )
+    return (
+        total_df[
+            (total_df.max_frame_diff <= avg_diff_frames)
+            & (total_df.frame_length >= min_frames_length)
+        ]
+        .sort_index()
+        .to_csv(str(Path(tracking_folder, "tracking_clean.csv")))
+    )
 
 
 def main():
