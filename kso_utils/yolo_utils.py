@@ -1785,16 +1785,21 @@ def adjust_tracking(
 
     import torch
 
-    model = torch.load(
-        Path(
-            [
-                f
-                for f in Path(tracking_folder).parent.iterdir()
-                if f.is_file() and "best.pt" in str(f)
-            ][-1]
+    try:
+        model = torch.load(
+            Path(
+                [
+                    f
+                    for f in Path(tracking_folder).parent.iterdir()
+                    if f.is_file() and "best.pt" in str(f)
+                ][-1]
+            )
         )
-    )
-    names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
+        names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
+
+    except:
+        logging.error("Model not found, using class_id.")
+        names = {}
 
     if plot_result:
         fig, ax = plt.subplots(figsize=(15, 5))
@@ -1823,7 +1828,10 @@ def adjust_tracking(
 
     def custom_class(x):
         """Choose class by rounding average of classifications"""
-        return names[int(np.round(x.mean()))]
+        if len(names) > 0:
+            return names[int(np.round(x.mean()))]
+        else:
+            return int(np.round(x.mean()))
 
     diff_df = (
         tracking_df.groupby(["tracker_id"])
@@ -1840,7 +1848,8 @@ def adjust_tracking(
         columns={"frame_no_x": "max_frame_diff", "frame_no_y": "frame_length"},
         inplace=True,
     )
-    total_df.rename({"class_id": "species_name"}, inplace=True)
+    if len(names) > 0:
+        total_df.rename({"class_id": "species_name"}, inplace=True)
     total_df = pd.merge(
         total_df,
         tracking_df[["tracker_id", "frame_no"]].groupby("tracker_id").first(),
