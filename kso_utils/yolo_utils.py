@@ -1849,7 +1849,7 @@ def adjust_tracking(
         inplace=True,
     )
     if len(names) > 0:
-        total_df.rename({"class_id": "species_name"}, inplace=True)
+        total_df.rename(columns={"class_id": "species_name"}, inplace=True)
     total_df = pd.merge(
         total_df,
         tracking_df[["tracker_id", "frame_no"]].groupby("tracker_id").first(),
