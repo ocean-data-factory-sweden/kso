@@ -120,7 +120,6 @@ class YoloNASStrategy(YoloInterface):
 
     @torch.no_grad()
     def __call__(self, im, augment, visualize):
-
         im = im[0].permute(1, 2, 0).cpu().numpy() * 255
 
         with torch.no_grad():
@@ -145,16 +144,13 @@ class YoloNASStrategy(YoloInterface):
         pass
 
     def postprocess(self, path, preds, im, im0s):
-
         results = []
         for i, pred in enumerate(preds):
-
             if pred is None:
                 pred = torch.empty((0, 6))
                 r = Results(path=path, boxes=pred, orig_img=im0s[i], names=self.names)
                 results.append(r)
             else:
-
                 pred[:, :4] = ops.scale_boxes(im.shape[2:], pred[:, :4], im0s[i].shape)
 
                 r = Results(path=path, boxes=pred, orig_img=im0s[i], names=self.names)

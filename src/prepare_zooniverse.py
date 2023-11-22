@@ -29,6 +29,7 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+
 # utility functions
 def process_frames(frames_path: str, size: tuple = (416, 416)):
     """
@@ -263,7 +264,6 @@ def frame_aggregation(
     logging.info(f"There are {len(movie_df)} movies")
 
     if len(movie_df) > 0:
-
         train_rows["movie_path"] = train_rows.merge(
             movie_df, left_on="movie_id", right_on="id", how="left"
         )["spath"]
