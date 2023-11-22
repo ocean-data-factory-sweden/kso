@@ -1818,9 +1818,9 @@ def adjust_tracking(
     def custom_class(x):
         """Choose class by rounding average of classifications"""
         if len(names) > 0:
-            return names[int(np.round(x.mean()))]
+            return names[int(np.round(x.median()))]
         else:
-            return int(np.round(x.mean()))
+            return int(np.round(x.median()))
 
     diff_df = (
         tracking_df.groupby(["tracker_id"])
@@ -1838,7 +1838,7 @@ def adjust_tracking(
         inplace=True,
     )
     if len(names) > 0:
-        total_df.rename({"class_id": "species_name"}, inplace=True)
+        total_df.rename(columns={"class_id": "species_name"}, inplace=True)
     total_df = pd.merge(
         total_df,
         tracking_df[["tracker_id", "frame_no"]].groupby("tracker_id").first(),
@@ -1847,14 +1847,15 @@ def adjust_tracking(
     logging.info(
         f"Saving tracking file to {str(Path(tracking_folder, 'tracking_clean.csv'))}"
     )
-    return (
-        total_df[
-            (total_df.max_frame_diff <= avg_diff_frames)
-            & (total_df.frame_length >= min_frames_length)
-        ]
-        .sort_index()
-        .to_csv(str(Path(tracking_folder, "tracking_clean.csv")))
-    )
+    filtered_df = total_df[
+        (total_df.max_frame_diff <= avg_diff_frames)
+        & (total_df.frame_length >= min_frames_length)
+    ].sort_index()
+    if len(names) > 0:
+        logging.info(filtered_df["species_name"].value_counts())
+    else:
+        logging.info(filtered_df["class_id"].value_counts())
+    return filtered_df.to_csv(str(Path(tracking_folder, "tracking_clean.csv")))
 
 
 def main():
