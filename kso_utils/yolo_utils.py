@@ -285,7 +285,7 @@ def split_frames(data_path: str, perc_test: float):
         * len([s for s in os.listdir(images_path) if s.endswith(".jpg")])
     )
     latest_movie = ""
-    for pathAndFilename in glob.iglob(os.path.join(images_path, "*.jpg")):
+    for pathAndFilename in sorted(glob.iglob(os.path.join(images_path, "*.jpg"))):
         title, ext = os.path.splitext(os.path.basename(pathAndFilename))
         movie_name = title.replace("_frame_*", "")
 
