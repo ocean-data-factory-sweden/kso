@@ -1829,9 +1829,9 @@ def adjust_tracking(
     def custom_class(x):
         """Choose class by rounding average of classifications"""
         if len(names) > 0:
-            return names[int(np.round(x.mean()))]
+            return names[int(np.round(x.median()))]
         else:
-            return int(np.round(x.mean()))
+            return int(np.round(x.median()))
 
     diff_df = (
         tracking_df.groupby(["tracker_id"])
