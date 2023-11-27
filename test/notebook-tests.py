@@ -260,6 +260,7 @@ def test_t6():
         artifact_dir=artifact_dir,
         save_output=True,
         test=True,
+        model=model,
     )
 
     # Note: investigating training and validation datasets is not currently tested.
