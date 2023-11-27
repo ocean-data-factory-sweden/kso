@@ -285,63 +285,128 @@ class ProjectProcessor:
             self.get_movie_info()
 
         # Select the movie(s) of interest
-        select_movie_widg = kso_widgets.select_movie(self.available_movies_df)
+        import ipywidgets as widgets
+        from IPython.display import display
 
-        # Create an async function to choose and display movies of interest
-        async def f(project, server_connection, available_movies_df):
-            output = widgets.Output()
+        def on_radio_button_change(change):
+            if change["type"] == "change" and change["name"] == "value":
+                selected_option = change["new"]
 
-            def update_movie(change):
-                with output:
-                    clear_output(wait=True)
-                    selected_movies = change.new
+                # Perform actions based on the selected radio button
+                if selected_option == "Uploaded Footage":
+                    # Code for "Uploaded Footage" option
+                    print("Uploaded Footage selected")
+                    select_movie_widg = kso_widgets.select_movie(
+                        self.available_movies_df
+                    )
 
-                    # Create a df with the selected movies
-                    selected_movies_df = available_movies_df[
-                        available_movies_df["filename"].isin(selected_movies)
-                    ].reset_index(drop=True)
+                    # Create an async function to choose and display movies of interest
+                    async def f(project, server_connection, available_movies_df):
+                        output = widgets.Output()
 
-                    # Retrieve the paths of the movies selected
-                    movies_paths = [
-                        movie_utils.get_movie_path(
-                            project=project,
-                            f_path=f_path,
-                            server_connection=server_connection,
+                        def update_movie(change):
+                            with output:
+                                clear_output(wait=True)
+                                selected_movies = change.new
+
+                                # Create a df with the selected movies
+                                selected_movies_df = available_movies_df[
+                                    available_movies_df["filename"].isin(
+                                        selected_movies
+                                    )
+                                ].reset_index(drop=True)
+
+                                # Retrieve the paths of the movies selected
+                                movies_paths = [
+                                    movie_utils.get_movie_path(
+                                        project=project,
+                                        f_path=f_path,
+                                        server_connection=server_connection,
+                                    )
+                                    for f_path in selected_movies_df["fpath"]
+                                ]
+
+                                # Display the movie
+                                if preview_media:
+                                    # Display/preview each selected movie
+                                    for (
+                                        index,
+                                        movie_row,
+                                    ) in selected_movies_df.iterrows():
+                                        movie_path = movies_paths[index]
+                                        movie_metadata = pd.DataFrame(
+                                            [movie_row.values], columns=movie_row.index
+                                        )
+
+                                        html = movie_utils.preview_movie(
+                                            movie_path=movie_path,
+                                            movie_metadata=movie_metadata,
+                                        )
+                                        display(html)
+
+                                # Store the names and paths of the selected movies
+                                self.movies_selected = selected_movies
+                                self.movies_paths = movies_paths
+
+                        select_movie_widg.observe(update_movie, "value")
+                        display(select_movie_widg, output)
+                        await asyncio.Event().wait()  # Wait indefinitely for user interaction
+
+                    loop = asyncio.get_event_loop()
+                    loop.create_task(
+                        f(
+                            self.project,
+                            self.server_connection,
+                            self.available_movies_df,
                         )
-                        for f_path in selected_movies_df["fpath"]
-                    ]
+                    )
 
-                    # Display the movie
-                    if preview_media:
-                        # Display/preview each selected movie
-                        for index, movie_row in selected_movies_df.iterrows():
-                            movie_path = movies_paths[index]
-                            movie_metadata = pd.DataFrame(
-                                [movie_row.values], columns=movie_row.index
-                            )
+                    if test:
+                        # For the test case, directly call the update_movie logic
+                        select_movie_widg.options = (select_movie_widg.options[0],)
+                        update_movie({"new": select_movie_widg.options[0]})
+                elif selected_option == "Custom Footage":
+                    # Code for "Custom Footage" option
+                    print("Custom Footage selected")
 
-                            html = movie_utils.preview_movie(
-                                movie_path=movie_path, movie_metadata=movie_metadata
-                            )
-                            display(html)
+                    # Define a callback function for folder selection
+                    def on_folder_selected(change):
+                        selected_folder = select_movie_widg.selected
 
-                    # Store the names and paths of the selected movies
-                    self.movies_selected = selected_movies
-                    self.movies_paths = movies_paths
+                        # Check if a folder is selected
+                        if selected_folder is not None:
+                            self.movies_paths = selected_folder
+                            print(f"Selected folder: {selected_folder}")
+                            # Add your code here to use the selected folder
+                        else:
+                            print("No folder selected")
 
-            select_movie_widg.observe(update_movie, "value")
-            display(select_movie_widg, output)
-            await asyncio.Event().wait()  # Wait indefinitely for user interaction
+                    # Create a folder selection widget (replace this with your folder selection widget)
+                    select_movie_widg = kso_widgets.choose_footage(
+                        project=self.project,
+                        server_connection=self.server_connection,
+                        db_connection=self.db_connection,
+                        start_path=self.project.movie_folder
+                        if self.project.movie_folder not in [None, "None"]
+                        else ".",
+                        folder_type="custom footage",
+                    )
 
-        loop = asyncio.get_event_loop()
-        loop.create_task(
-            f(self.project, self.server_connection, self.available_movies_df)
+                    # Register the callback function
+                    select_movie_widg.register_callback(on_folder_selected)
+
+        # Create radio buttons
+        radio_buttons = widgets.RadioButtons(
+            options=["Uploaded Footage", "Custom Footage"],
+            value="Uploaded Footage",
+            description="Choose footage source:",
         )
 
-        if test:
-            # For the test case, directly call the update_movie logic
-            select_movie_widg.options = (select_movie_widg.options[0],)
-            update_movie({"new": select_movie_widg.options[0]})
+        # Register the callback function
+        radio_buttons.observe(on_radio_button_change)
+
+        # Display the radio buttons
+        display(radio_buttons)
 
     def check_meta_sync(self, meta_key: str):
         """
@@ -1620,10 +1685,13 @@ class MLProjectProcessor(ProjectProcessor):
         source: str,
         conf_thres: float,
         artifact_dir: str,
+        model: str,
         img_size: int = 640,
         save_output: bool = True,
-        test: bool = True,
+        test: bool = False,
     ):
+        from yolov5.utils.general import increment_path
+
         if self.registry == "mlflow":
             active_run = mlflow.active_run()
             if active_run:
@@ -1654,6 +1722,11 @@ class MLProjectProcessor(ProjectProcessor):
             logging.info("No trained model found, using yolov8 base model...")
             best_model = "yolov8s.pt"
         model = self.modules["ultralytics"].YOLO(best_model)
+        if self.output_path is None:
+            project = Path("..", project)
+        else:
+            project = Path(self.output_path, project)
+        self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
         model.predict(
             project=project,
             name=name,
@@ -1664,6 +1737,7 @@ class MLProjectProcessor(ProjectProcessor):
             save=save_output,
             imgsz=img_size,
         )
+        self.save_detections(conf_thres, model, self.eval_dir)
 
     def detect_yolov5(
         self,
@@ -1693,8 +1767,8 @@ class MLProjectProcessor(ProjectProcessor):
             and "osnet" not in str(f)
             and "best" in str(f)
         ][0]
-    
-        for movie_path in movies_paths:        
+
+        for movie_path in movies_paths:
             self.modules["detect"].run(
                 weights=weights_path,
                 source=movie_path,
@@ -1713,11 +1787,11 @@ class MLProjectProcessor(ProjectProcessor):
     def save_detections(self, conf_thres: float, model: str, eval_dir: str):
         if self.registry == "wandb":
             self.modules["yolo_utils"].set_config(conf_thres, model, eval_dir)
-            self.modules["yolo_utils"].add_data(
-                eval_dir, "detection_output", self.registry, self.run
-            )
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
                 eval_dir, self.run, log=True, registry=self.registry
+            )
+            self.modules["yolo_utils"].add_data(
+                eval_dir, "detection_output", self.registry, self.run
             )
         elif self.registry == "mlflow":
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
@@ -1727,14 +1801,17 @@ class MLProjectProcessor(ProjectProcessor):
                 registry=self.registry,
             )
             self.modules["yolo_utils"].add_data(
-                path=eval_dir, name="detection_output", registry=self.registry, run=self.run
+                path=eval_dir,
+                name="detection_output",
+                registry=self.registry,
+                run=self.run,
             )
 
     def save_detections_wandb(self, conf_thres: float, model: str, eval_dir: str):
         self.modules["yolo_utils"].set_config(conf_thres, model, eval_dir)
         self.modules["yolo_utils"].add_data(
-                path=eval_dir, name="detection_output", registry=self.registry, run=self.run
-            )
+            path=eval_dir, name="detection_output", registry=self.registry, run=self.run
+        )
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
             eval_dir, self.run, log=True
         )
@@ -1805,7 +1882,7 @@ class MLProjectProcessor(ProjectProcessor):
             path.mkdir(parents=True, exist_ok=True)  # make directory
 
         return path
-    
+
     def track_individuals(
         self,
         name: str,
@@ -1839,18 +1916,9 @@ class MLProjectProcessor(ProjectProcessor):
                 name="track",
                 settings=self.modules["wandb"].Settings(start_method="thread"),
             )
-            self.modules["yolo_utils"].set_config(conf_thres, artifact_dir, eval_dir)
-
-        self.run = self.modules["wandb"].init(
-            entity=self.team_name,
-            project="model-evaluations",
-            name="track",
-            settings=self.modules["wandb"].Settings(start_method="thread"),
-        )
-        self.modules["yolo_utils"].set_config(conf_thres, artifact_dir, self.eval_dir)
-        self.modules["yolo_utils"].add_data_wandb(
-            Path(latest_tracker).parent.absolute(), "tracker_output", self.run
-        )
+            self.modules["yolo_utils"].set_config(
+                conf_thres, artifact_dir, self.eval_dir
+            )
 
         # self.csv_report = self.modules["yolo_utils"].generate_csv_report(
         #    self.team_name, self.project_name, eval_dir, self.run, log=True

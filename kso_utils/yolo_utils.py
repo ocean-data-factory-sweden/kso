@@ -1033,7 +1033,7 @@ def generate_csv_report(
     logging.info("Report created at {}".format(csv_out))
     if log:
         if registry == "wandb":
-            wandb.init(resume="allow", id=run.id)
+            # wandb.init(resume="allow", id=run.id)
             wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
         elif registry == "mlflow":
             pass
@@ -1187,59 +1187,31 @@ def track_objects(
 
     best_model = Path(best_model)
 
-    if not gpu:
-        track_dict = {
-            "name": name,
-            "source": source_dir,
-            "conf": conf_thres,
-            "yolo_model": best_model,
-            "reid_model": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
-            "imgsz": img_size,
-            "device": "0" if torch.cuda.is_available() else "cpu",
-            "project": Path(f"{tracker_folder}/runs/track/"),
-            "save": True,
-            "save_mot": True,
-            "save_txt": True,
-            "iou": 0.7,
-            "show": False,
-            "show_conf": True,
-            "show_labels": True,
-            "verbose": True,
-            "exist_ok": True,
-            "classes": None,
-            "vid_stride": 1,
-            "line_width": None,
-            "tracking_method": "deepocsort",
-            "half": True,
-            "per_class": False,
-            "save_id_crops": False,
-        }
-    else:
-        track_dict = {
-            "name": name,
-            "source": source_dir,
-            "conf": conf_thres,
-            "yolo_weights": best_model,
-            "reid_weights": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
-            "imgsz": img_size,
-            "project": Path(f"{tracker_folder}/runs/track/"),
-            "device": "0" if torch.cuda.is_available() else "cpu",
-            "save": True,
-            "save_mot": True,
-            "save_txt": True,
-            "half": True,
-            "iou": 0.7,
-            "show": False,
-            "show_conf": True,
-            "show_labels": True,
-            "verbose": True,
-            "exist_ok": True,
-            "classes": None,
-            "vid_stride": 1,
-            "line_width": None,
-            "tracking_method": "deepocsort",
-            "save_id_crops": False,
-        }
+    track_dict = {
+        "name": name,
+        "source": source_dir,
+        "conf": conf_thres,
+        "yolo_model": best_model,
+        "reid_model": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
+        "imgsz": img_size,
+        "project": Path(f"{tracker_folder}/runs/track/"),
+        "device": "0" if torch.cuda.is_available() else "cpu",
+        "save": True,
+        "save_mot": True,
+        "save_txt": True,
+        "half": True,
+        "iou": 0.7,
+        "show": False,
+        "show_conf": True,
+        "show_labels": True,
+        "verbose": True,
+        "exist_ok": True,
+        "classes": None,
+        "vid_stride": 1,
+        "line_width": None,
+        "tracking_method": "deepocsort",
+        "save_id_crops": False,
+    }
 
     args = SimpleNamespace(**track_dict)
     track.run(args)

@@ -83,6 +83,27 @@ def log_meta_changes(
         return
 
 
+def process_source(source):
+    """
+    If the source is a string, write the string to a file and return the file name. If the source is a
+    list, return the list. If the source is neither, return None
+
+    :param source: The source of the data. This can be a URL, a file, or a list of URLs or files
+    :return: the value of the source variable.
+    """
+    try:
+        source.value
+        if source.value is None:
+            raise AttributeError("Value is None")
+        return write_urls_to_file(source.value)
+    except AttributeError:
+        try:
+            source.selected
+            return source.selected
+        except AttributeError:
+            return None
+
+
 def write_urls_to_file(movie_list: list, filepath: str = "/tmp/temp.txt"):
     """
     > This function takes a list of movie urls and writes them to a file
