@@ -1033,7 +1033,7 @@ def generate_csv_report(
     logging.info("Report created at {}".format(csv_out))
     if log:
         if registry == "wandb":
-            wandb.init(resume="must", id=run.id)
+            wandb.init(resume="allow", id=run.id)
             wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
         elif registry == "mlflow":
             pass

@@ -1693,39 +1693,22 @@ class MLProjectProcessor(ProjectProcessor):
             and "osnet" not in str(f)
             and "best" in str(f)
         ][0]
-        # Save locally the movies to be processed by the ML detect
-        from urllib.request import urlopen
-        from urllib.parse import urlparse
-        # Check if movie_paths are urls
-        if all(urlparse(path).scheme in ['http', 'https'] for path in movies_paths):
-            # Specify the path where you want to save the downloaded videos
-            local_movies_paths = movies_selected
-
-            # Download each video separately
-            for i, video_url in enumerate(movies_paths):
-                # Open the URL and get the video content
-                video_content = urlopen(video_url).read()
-
-                # Save the video content to a local file
-                with open(local_movies_paths[i], 'wb') as video_file:
-                    video_file.write(video_content)
-        else:
-            local_movies_paths = movies_paths
     
-        self.modules["detect"].run(
-            weights=weights_path,
-            source=local_movies_paths,
-            conf_thres=conf_thres,
-            save_txt=True,
-            save_conf=True,
-            project=save_dir,
-            name=exp_name,
-            nosave=not save_output,
-        )
-        self.save_detections_wandb(conf_thres, weights_path, eval_dir)
-        if wandb.run is not None:
-            self.modules["wandb"].finish()
-        self.eval_dir = str(eval_dir)
+        for movie_path in movies_paths:        
+            self.modules["detect"].run(
+                weights=weights_path,
+                source=movie_path,
+                conf_thres=conf_thres,
+                save_txt=True,
+                save_conf=True,
+                project=save_dir,
+                name=exp_name,
+                nosave=not save_output,
+            )
+            self.save_detections_wandb(conf_thres, weights_path, eval_dir)
+            if wandb.run is not None:
+                self.modules["wandb"].finish()
+        return str(eval_dir)
 
     def save_detections(self, conf_thres: float, model: str, eval_dir: str):
         if self.registry == "wandb":
@@ -1744,12 +1727,14 @@ class MLProjectProcessor(ProjectProcessor):
                 registry=self.registry,
             )
             self.modules["yolo_utils"].add_data(
-                eval_dir, "detection_output", self.registry, self.run
+                path=eval_dir, name="detection_output", registry=self.registry, run=self.run
             )
 
     def save_detections_wandb(self, conf_thres: float, model: str, eval_dir: str):
         self.modules["yolo_utils"].set_config(conf_thres, model, eval_dir)
-        self.modules["yolo_utils"].add_data(eval_dir, "detection_output", self.run)
+        self.modules["yolo_utils"].add_data(
+                path=eval_dir, name="detection_output", registry=self.registry, run=self.run
+            )
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
             eval_dir, self.run, log=True
         )
@@ -1820,7 +1805,7 @@ class MLProjectProcessor(ProjectProcessor):
             path.mkdir(parents=True, exist_ok=True)  # make directory
 
         return path
-
+    
     def track_individuals(
         self,
         name: str,
