@@ -1446,7 +1446,7 @@ def upload_clips_to_zooniverse(
     # Upload the clips to Zooniverse (with metadata)
     new_subjects = []
 
-    logging.info("Uploading subjects to Zooniverse")
+    logging.info(f"Uploading subjects to Zooniverse")
     for clip_path, metadata in tqdm(
         subject_metadata.items(), total=len(subject_metadata)
     ):
@@ -1469,7 +1469,7 @@ def upload_clips_to_zooniverse(
     # Upload all subjects
     subject_set.add(new_subjects)
 
-    logging.info("Subjects uploaded to Zooniverse")
+    logging.info(f"Subjects uploaded to Zooniverse")
 
 
 ##########################
@@ -1935,7 +1935,7 @@ def upload_frames_to_zooniverse(
     subject_set.display_name = subject_set_name
     subject_set.save()
 
-    logging.info(subject_set_name, "subject set created")
+    logging.info(f"{subject_set_name} subject set created")
 
     # Save the df as the subject metadata
     subject_metadata = upload_to_zoo.set_index("frame_path").to_dict("index")
