@@ -1,7 +1,7 @@
 # base imports
 import os
 import sys
-import glob
+import subprocess
 import logging
 import asyncio
 import wandb
@@ -13,12 +13,10 @@ import ffmpeg
 import shutil
 from itertools import chain
 from pathlib import Path
-from tqdm import tqdm
-from ast import literal_eval
 import imagesize
 import ipysheet
 from IPython.display import display, clear_output
-from IPython.core.display import HTML
+import mlflow
 
 # util imports
 import kso_utils.tutorials_utils as t_utils
@@ -66,6 +64,7 @@ class ProjectProcessor:
     def __repr__(self):
         return repr(self.__dict__)
 
+    @property
     def keys(self):
         """Log keys of ProjectProcessor object"""
         logging.debug("Stored variable names.")
@@ -74,6 +73,7 @@ class ProjectProcessor:
     #############
     # Functions to initiate the project
     #############
+
     def connect_to_server(self):
         """
         It connects to the server and returns the server info
@@ -92,13 +92,12 @@ class ProjectProcessor:
         """
 
         # Create the folder to store the csv files if not exist
-        if not os.path.exists(self.project.csv_folder):
+        if not Path(self.project.csv_folder).exists():
             Path(self.project.csv_folder).mkdir(parents=True, exist_ok=True)
+
             # Recursively add permissions to folders created
-            [
-                os.chmod(root, 0o777)
-                for root, dirs, files in os.walk(self.project.csv_folder)
-            ]
+            for root, dirs, files in Path(self.project.csv_folder).iterdir():
+                root.chmod(0o777)
 
         # Download csv files from the server if needed and store their server path
         self.csv_paths = server_utils.download_init_csv(
@@ -115,7 +114,9 @@ class ProjectProcessor:
         # Retrieve a list with all the csv files in the folder with initival csvs
         csv_folder = Path(self.project.csv_folder)
         local_csv_files = [
-            filename for filename in os.listdir(csv_folder) if filename.endswith(".csv")
+            str(filename)
+            for filename in Path(csv_folder).iterdir()
+            if filename.suffix == ".csv"
         ]
 
         # Store the paths of the local csv files of interest into the "csv_paths" dictionary
@@ -127,7 +128,7 @@ class ProjectProcessor:
                     csv_key = f"local_{init_key}_csv"
 
                     # Store the path of the CSV file
-                    csv_path = csv_folder / filename
+                    csv_path = filename
                     self.csv_paths[csv_key] = csv_path
 
                     # Read the local CSV file into a pandas DataFrame
@@ -155,7 +156,7 @@ class ProjectProcessor:
         # Select only attributes of the propjectprocessor that are df of local csvs
         local_dfs = [
             key
-            for key in self.keys()
+            for key in self.keys
             if key.startswith("local_") and key.split("_")[1] in table_names
         ]
 
@@ -271,48 +272,139 @@ class ProjectProcessor:
         """
         return movie_utils.get_movie_path(filepath, self)
 
-    def preview_media(self, test: bool = False):
+    def choose_footage(self, preview_media: bool = False, test: bool = False):
         """
-        > The function `preview_media` is a function that takes in a `self` argument and returns a
+        > The function `choose_footage` is a function that takes in a `self` argument and returns a
         function `f` that takes in three arguments: `project`, `csv_paths`, and `available_movies_df`. The
-        function `f` is an asynchronous function that takes in the value of the `movie_selected` widget
-        and displays the movie preview
+        function `f` is an asynchronous function that takes in the value of the `movies_selected` widget
+        and previews the movies if specified
         """
-        movie_selected = kso_widgets.select_movie(self.available_movies_df)
 
-        if not test:
+        # Check if the necessary attribute is available
+        if not hasattr(self, "available_movies_df") or self.available_movies_df is None:
+            self.get_movie_info()
 
-            async def f(project, server_connection, available_movies_df):
-                x = await kso_widgets.single_wait_for_change(movie_selected, "value")
-                html, movie_path = movie_utils.preview_movie(
-                    project=project,
-                    available_movies_df=available_movies_df,
-                    movie_i=x,
-                    server_connection=server_connection,
-                )
-                display(html)
-                self.movie_selected = x
-                self.movie_path = movie_path
+        # Select the movie(s) of interest
+        import ipywidgets as widgets
+        from IPython.display import display
 
-            asyncio.create_task(
-                f(self.project, self.server_connection, self.available_movies_df)
-            )
+        def update_movie(change):
+            output = widgets.Output()
+            with output:
+                clear_output(wait=True)
+                selected_movies = change.new
 
-        else:
+                # Create a df with the selected movies
+                selected_movies_df = self.available_movies_df[
+                    self.available_movies_df["filename"].isin(selected_movies)
+                ].reset_index(drop=True)
 
-            def f(project, server_connection, available_movies_df):
-                x = movie_selected.options[0]
-                html, movie_path = movie_utils.preview_movie(
-                    project=project,
-                    available_movies_df=available_movies_df,
-                    movie_i=x,
-                    server_connection=server_connection,
-                )
-                display(html)
-                self.movie_selected = x
-                self.movie_path = movie_path
+                # Retrieve the paths of the movies selected
+                movies_paths = [
+                    movie_utils.get_movie_path(
+                        project=self.project,
+                        f_path=f_path,
+                        server_connection=self.server_connection,
+                    )
+                    for f_path in selected_movies_df["fpath"]
+                ]
 
-            f(self.project, self.server_connection, self.available_movies_df)
+                # Display the movie
+                if preview_media:
+                    # Display/preview each selected movie
+                    for (
+                        index,
+                        movie_row,
+                    ) in selected_movies_df.iterrows():
+                        movie_path = movies_paths[index]
+                        movie_metadata = pd.DataFrame(
+                            [movie_row.values], columns=movie_row.index
+                        )
+
+                        html = movie_utils.preview_movie(
+                            movie_path=movie_path,
+                            movie_metadata=movie_metadata,
+                        )
+                        display(html)
+
+                # Store the names and paths of the selected movies
+                self.movies_selected = selected_movies
+                self.movies_paths = movies_paths
+
+        def on_radio_button_change(change):
+            if change["type"] == "change" and change["name"] == "value":
+                selected_option = change["new"]
+
+                # Perform actions based on the selected radio button
+                if selected_option == "Uploaded Footage":
+                    # Code for "Uploaded Footage" option
+                    print("Uploaded Footage selected")
+                    select_movie_widg = kso_widgets.select_movie(
+                        self.available_movies_df
+                    )
+
+                    # Create an async function to choose and display movies of interest
+                    async def f(project, server_connection, available_movies_df):
+                        output = widgets.Output()
+                        select_movie_widg.observe(update_movie, "value")
+                        display(select_movie_widg, output)
+                        await asyncio.Event().wait()  # Wait indefinitely for user interaction
+
+                    loop = asyncio.get_event_loop()
+                    loop.create_task(
+                        f(
+                            self.project,
+                            self.server_connection,
+                            self.available_movies_df,
+                        )
+                    )
+
+                    if test:
+                        # For the test case, directly call the update_movie logic
+                        select_movie_widg.options = (select_movie_widg.options[0],)
+                        update_movie({"new": select_movie_widg.options[0]})
+                elif selected_option == "Custom Footage":
+                    # Code for "Custom Footage" option
+                    print("Custom Footage selected")
+
+                    # Define a callback function for folder selection
+                    def on_folder_selected(change):
+                        selected_folder = select_movie_widg.selected
+
+                        # Check if a folder is selected
+                        if selected_folder is not None:
+                            self.movies_paths = selected_folder
+                            print(f"Selected folder: {selected_folder}")
+                            # Add your code here to use the selected folder
+                        else:
+                            print("No folder selected")
+
+                    # Create a folder selection widget (replace this with your folder selection widget)
+                    select_movie_widg = kso_widgets.choose_footage(
+                        project=self.project,
+                        server_connection=self.server_connection,
+                        db_connection=self.db_connection,
+                        start_path=self.project.movie_folder
+                        if self.project.movie_folder not in [None, "None"]
+                        else ".",
+                        folder_type="custom footage",
+                    )
+
+                    # Register the callback function
+                    select_movie_widg.register_callback(on_folder_selected)
+
+        # Create radio buttons
+        radio_buttons = widgets.RadioButtons(
+            options=["Uploaded Footage", "Custom Footage"],
+            value="Uploaded Footage",
+            description="Choose footage source:",
+        )
+
+        # Register the callback function
+        radio_buttons.observe(on_radio_button_change)
+
+        # Display the radio buttons
+        display(radio_buttons)
 
     def check_meta_sync(self, meta_key: str):
         """
@@ -344,6 +436,11 @@ class ProjectProcessor:
         :param review_method: The method used to review the movies
         :param gpu_available: Boolean, whether or not a GPU is available
         """
+        # Check if the necessary attribute is available
+        if not hasattr(self, "available_movies_df") or self.available_movies_df is None:
+            raise AttributeError(
+                "Please run 'get_movie_info' before 'choose_footage' to set 'available_movies_df'."
+            )
 
         movie_utils.check_movies_meta(
             project=self.project,
@@ -395,7 +492,7 @@ class ProjectProcessor:
             return
         for index, movie in enumerate(movie_list):
             remote_fpath = Path(f"{movie_folder}", movie[1])
-            if os.path.exists(remote_fpath):
+            if Path(remote_fpath).exists():
                 logging.info(
                     "Filename "
                     + str(movie[1])
@@ -540,21 +637,23 @@ class ProjectProcessor:
             generate_export=generate_export,
         )
 
-    def check_movies_uploaded(self, movie_name: str):
+    def check_movies_uploaded(self, movies_selected: list):
         """
         This function checks if a movie has been uploaded to Zooniverse
 
-        :param movie_name: The name of the movie you want to check if it's uploaded
-        :type movie_name: str
+        :param movies_selected: The name of the movie(s) you want to check if it's uploaded
+        :type movies_selected: list
         """
-        movie_utils.check_movie_uploaded(
-            project=self.project, db_connection=self.db_connection, movie_i=movie_name
+        movie_utils.check_movies_uploaded(
+            project=self.project,
+            db_connection=self.db_connection,
+            movies_selected=movies_selected,
         )
 
     def generate_zoo_clips(
         self,
-        movie_name,
-        movie_path,
+        movies_selected: list,
+        movies_paths: list,
         use_gpu: bool = False,
         pool_size: int = 4,
         is_example: bool = False,
@@ -563,8 +662,8 @@ class ProjectProcessor:
         """
         > This function takes a movie name and path, and returns a list of clips from that movie
 
-        :param movie_name: The name of the movie you want to extract clips from
-        :param movie_path: The path to the movie you want to extract clips from
+        :param movies_selected: The name(s) of the movie(s) you want to extract clips from
+        :param movies_paths: The path(s) to the movie(s) you want to extract clips from
         :param use_gpu: If you have a GPU, set this to True, defaults to False
         :type use_gpu: bool (optional)
         :param pool_size: number of threads to use for clip extraction, defaults to 4
@@ -574,11 +673,23 @@ class ProjectProcessor:
         :type is_example: bool (optional)
         """
 
+        # Roadblock to ensure only one movie has been selected
+        # Option to generate clips from multiple movies is not available at this point
+        if len(movies_selected) > 1:
+            logging.info(
+                "The option to generate clips from multiple movies is not available at this point. Please select only one movie to gerenate clips from"
+            )
+            return
+
+        else:
+            movies_selected = str(movies_selected[0])
+            movies_paths = str(movies_paths[0])
+
         # Select the clips to be extracted
         clip_selection = kso_widgets.select_n_clips(
             project=self.project,
             db_connection=self.db_connection,
-            movie_i=movie_name,
+            movies_selected=movies_selected,
             is_example=is_example,
         )
         clip_modification = kso_widgets.clip_modification_widget()
@@ -595,8 +706,8 @@ class ProjectProcessor:
             def on_button_clicked(b):
                 self.generated_clips = t_utils.create_clips(
                     available_movies_df=self.available_movies_df,
-                    movie_i=movie_name,
-                    movie_path=movie_path,
+                    movies_selected=movies_selected,
+                    movies_paths=movies_paths,
                     clip_selection=clip_selection,
                     project=self.project,
                     modification_details={},
@@ -605,13 +716,14 @@ class ProjectProcessor:
                 )
 
                 mod_clips = t_utils.create_modified_clips(
-                    self.project,
-                    self.generated_clips.clip_path,
-                    movie_name,
-                    clip_modification.checks,
-                    use_gpu,
-                    pool_size,
+                    project=self.project,
+                    clips_list=self.generated_clips.clip_path,
+                    movies_selected=movies_selected,
+                    modification_details=clip_modification.checks,
+                    gpu_available=use_gpu,
+                    pool_size=pool_size,
                 )
+
                 # Temporary workaround to get both clip paths
                 self.generated_clips["modif_clip_path"] = mod_clips
                 # Temporary workaround to ensure site_id is an integer
@@ -628,8 +740,8 @@ class ProjectProcessor:
             clip_selection.result["clip_start_time"] = [0]
             self.generated_clips = t_utils.create_clips(
                 available_movies_df=self.available_movies_df,
-                movie_i=movie_name,
-                movie_path=movie_path,
+                movies_selected=movies_selected,
+                movies_paths=movies_paths,
                 clip_selection=clip_selection,
                 project=self.project,
                 modification_details={},
@@ -661,12 +773,13 @@ class ProjectProcessor:
             )
             # Clean up subjects after upload
             for temp_clip in upload_df["clip_path"].unique().tolist():
-                os.remove(temp_clip)
+                temp_clip_path = Path(temp_clip)
+                if temp_clip_path.exists():
+                    temp_clip_path.unlink()
 
             logging.info(f"Clips temporarily stored locally has been removed")
 
         elif subject_type == "frame":
-            species_list = []
             upload_df = zoo_utils.set_zoo_frame_metadata(
                 project=self.project,
                 db_connection=self.db_connection,
@@ -756,6 +869,8 @@ class ProjectProcessor:
     def extract_zoo_frames(
         self, n_frames_subject: int = 3, subsample_up_to: int = 100, test: bool = False
     ):
+        if not isinstance(self.species_of_interest, list):
+            self.species_of_interest = self.species_of_interest.value
         if test:
             species_list = self.aggregated_zoo_classifications.label.unique().tolist()
         else:
@@ -858,10 +973,9 @@ class ProjectProcessor:
             movie_files = sorted(
                 [
                     f
-                    for f in glob.glob(f"{input_path}/*")
-                    if os.path.isfile(f)
-                    and os.path.splitext(f)[1].lower()
-                    in [".mov", ".mp4", ".avi", ".mkv"]
+                    for f in input_path.iterdir()
+                    if f.is_file()
+                    and f.suffix.lower() in [".mov", ".mp4", ".avi", ".mkv"]
                 ]
             )
 
@@ -1016,75 +1130,40 @@ class MLProjectProcessor(ProjectProcessor):
         self.classes = classes
         self.run_history = None
         self.best_model_path = None
-        self.model_type = None
+        self.model_type = 1  # set as 1 for testing
         self.train, self.run, self.test = (None,) * 3
+
+        self.registry = "wandb"
+        if "MLFLOW_TRACKING_URI" in os.environ:
+            if os.environ["MLFLOW_TRACKING_URI"] is not None:
+                self.registry = "mlflow"
 
         # Before t6_utils gets loaded in, the val.py file in yolov5_tracker repository needs to be removed
         # to prevent the batch_size error, see issue kso-object-detection #187
-        path_to_val = os.path.join(sys.path[0], "yolov5_tracker/val.py")
+        path_to_val = Path(sys.path[0], "yolov5_tracker/val.py")
         try:
-            os.remove(path_to_val)
+            if path_to_val.exists():
+                path_to_val.unlink()
         except OSError:
             pass
 
         self.modules = g_utils.import_modules([])
         self.modules.update(g_utils.import_modules(["yolo_utils"], utils=True))
         self.modules.update(
-            g_utils.import_modules(["torch", "wandb", "yaml", "yolov5"], utils=False)
+            g_utils.import_modules(
+                ["torch", "wandb", "yaml", "ultralytics"],
+                utils=False,
+            )
         )
+        # Import model models for backwards compatibility
+        if self.registry == "wandb":
+            self.modules.update(
+                g_utils.import_model_modules(
+                    ["yolov5.train", "yolov5.detect", "yolov5.val"],
+                )
+            )
 
         self.team_name = "koster"
-
-        model_selected = t_utils.choose_model_type()
-
-        if test:
-            self.model_type = 1
-            self.modules.update(self.load_yolov5_modules())
-            if all(["train", "detect", "val"]) in self.modules:
-                self.train, self.run, self.test = (
-                    self.modules["train"],
-                    self.modules["detect"],
-                    self.modules["val"],
-                )
-        else:
-
-            async def f():
-                x = await kso_widgets.single_wait_for_change(model_selected, "value")
-                self.model_type = x
-                self.modules.update(self.load_yolov5_modules())
-                if all(["train", "detect", "val"]) in self.modules:
-                    self.train, self.run, self.test = (
-                        self.modules["train"],
-                        self.modules["detect"],
-                        self.modules["val"],
-                    )
-
-            asyncio.create_task(f())
-
-    def load_yolov5_modules(self):
-        # Model-specific imports
-        if self.model_type == 1:
-            module_names = ["yolov5.train", "yolov5.detect", "yolov5.val"]
-            logging.info("Object detection model loaded")
-            return g_utils.import_modules(module_names, utils=False, models=True)
-        elif self.model_type == 2:
-            logging.info("Image classification model loaded")
-            module_names = [
-                "yolov5.classify.train",
-                "yolov5.classify.predict",
-                "yolov5.classify.val",
-            ]
-            return g_utils.import_modules(module_names, utils=False, models=True)
-        elif self.model_type == 3:
-            logging.info("Image segmentation model loaded")
-            module_names = [
-                "yolov5.segment.train",
-                "yolov5.segment.predict",
-                "yolov5.segment.val",
-            ]
-            return g_utils.import_modules(module_names, utils=False, models=True)
-        else:
-            logging.info("Invalid model specification")
 
     def prepare_dataset(
         self,
@@ -1151,6 +1230,156 @@ class MLProjectProcessor(ProjectProcessor):
             button.on_click(on_button_clicked)
             display(button)
 
+    #############
+    # t5
+    #############
+    def choose_baseline_model(self, download_path: str, test: bool = False):
+        """
+        It downloads the latest version of the baseline model from WANDB
+        :return: The path to the baseline model.
+        """
+        if self.registry == "wandb":
+            api = wandb.Api()
+            # weird error fix (initialize api another time)
+            api.runs(path="koster/model-registry")
+            api = wandb.Api()
+            collections = [
+                coll
+                for coll in api.artifact_type(
+                    type_name="model", project="koster/model-registry"
+                ).collections()
+            ]
+
+            model_dict = {}
+            for artifact in collections:
+                model_dict[artifact.name] = artifact
+
+            model_widget = widgets.Dropdown(
+                options=[(name, model) for name, model in model_dict.items()],
+                value=None,
+                description="Select model:",
+                ensure_option=False,
+                disabled=False,
+                layout=widgets.Layout(width="50%"),
+                style={"description_width": "initial"},
+            )
+
+            main_out = widgets.Output()
+            display(model_widget, main_out)
+
+            def on_change(change):
+                with main_out:
+                    clear_output()
+                    try:
+                        for af in model_dict[change["new"].name].versions():
+                            artifact_dir = af.download(download_path)
+                            artifact_file = [
+                                str(i)
+                                for i in Path(artifact_dir).iterdir()
+                                if str(i).endswith(".pt")
+                            ][-1]
+                            logging.info(
+                                f"Baseline {af.name} successfully downloaded from WANDB"
+                            )
+                            model_widget.artifact_path = artifact_file
+                    except Exception as e:
+                        logging.error(
+                            f"Failed to download the baseline model. Please ensure you are logged in to WANDB. {e}"
+                        )
+
+            model_widget.observe(on_change, names="value")
+            if test:
+                model_widget.value = model_dict["baseline-yolov5"]
+            return model_widget
+
+        elif self.registry == "mlflow":
+            # Fetch model artifact list
+            from mlflow import MlflowClient
+
+            experiment = mlflow.get_experiment_by_name(self.project_name)
+            client = MlflowClient()
+
+            if experiment is not None:
+                experiment_id = experiment.experiment_id if experiment else None
+                runs = mlflow.search_runs(
+                    experiment_ids=experiment_id, output_format="list"
+                )
+                run_ids = [run.info.run_id for run in runs][-1:]
+                # Choose only the project directory
+                try:
+                    artifacts = [
+                        (
+                            list(
+                                filter(
+                                    lambda x: x.is_dir
+                                    and "input_datasets" not in x.path,
+                                    client.list_artifacts(i),
+                                )
+                            )[0],
+                            i,
+                        )
+                        for i in run_ids
+                    ]
+                    model_names = [
+                        str(
+                            Path(
+                                "runs:/",
+                                run_id,
+                                artifact.path,
+                                "best.pt",
+                            )
+                        )
+                        for artifact, run_id in artifacts
+                    ]
+                except IndexError:
+                    model_names = []
+            else:
+                model_names = []
+            model_names.append("No Model")
+
+            model_widget = widgets.Dropdown(
+                options=model_names,
+                value=None,
+                description="Select model:",
+                ensure_option=False,
+                disabled=False,
+                layout=widgets.Layout(width="50%"),
+                style={"description_width": "initial"},
+            )
+
+            main_out = widgets.Output()
+            display(model_widget, main_out)
+
+            def on_change(change):
+                with main_out:
+                    clear_output()
+                    try:
+                        for af in model_names:
+                            artifact_dir = mlflow.download_artifacts(
+                                artifact_uri=af, dst_path=download_path
+                            )
+                            artifact_file = [
+                                str(i)
+                                for i in Path(artifact_dir).iterdir()
+                                if str(i).endswith(".pt")
+                            ][-1]
+                            logging.info(
+                                f"Baseline {af.name} successfully downloaded from WANDB"
+                            )
+                            model_widget.artifact_path = artifact_file
+                    except Exception as e:
+                        logging.error(
+                            f"Failed to download the baseline model. Please ensure you are logged in to WANDB. {e}"
+                        )
+
+            model_widget.observe(on_change, names="value")
+
+            # Display the dropdown widget
+            display(model_widget)
+            return model_widget
+        else:
+            logging.error("Registry not supported.")
+
     def choose_entity(self, alt_name: bool = False):
         if self.team_name is None:
             return t_utils.choose_entity()
@@ -1173,72 +1402,135 @@ class MLProjectProcessor(ProjectProcessor):
         :param project_name: The name of the project you want to load the model from
         :return: The model_widget is being returned.
         """
-        model_dict = {}
-        model_info = {}
-        api = wandb.Api()
-        # weird error fix (initialize api another time)
+        if self.registry == "mlflow":
+            # Fetch model artifact list
+            from mlflow import MlflowClient
 
-        if self.team_name == "wildlife-ai":
-            logging.info("Please note: Using models from adi-ohad-heb-uni account.")
-            full_path = "adi-ohad-heb-uni/project-wildlife-ai"
-            api.runs(path=full_path).objects
-        else:
-            full_path = f"{self.team_name}/{self.project_name}"
+            experiment = mlflow.get_experiment_by_name(self.project_name)
+            client = MlflowClient()
 
-        runs = api.runs(full_path)
-
-        for run in runs:
-            model_artifacts = [
-                artifact
-                for artifact in chain(run.logged_artifacts(), run.used_artifacts())
-                if artifact.type == "model"
-            ]
-            if len(model_artifacts) > 0:
-                model_dict[run.name] = model_artifacts[0].name.split(":")[0]
-                model_info[model_artifacts[0].name.split(":")[0]] = run.summary
-
-        # Add "no movie" option to prevent conflicts
-        # models = np.append(list(model_dict.keys()),"No model")
-
-        model_widget = widgets.Dropdown(
-            options=[(name, model) for name, model in model_dict.items()],
-            description="Select model:",
-            ensure_option=False,
-            disabled=False,
-            layout=widgets.Layout(width="50%"),
-            style={"description_width": "initial"},
-        )
-
-        main_out = widgets.Output()
-        display(model_widget, main_out)
-
-        # Display model metrics
-        def on_change(change):
-            with main_out:
-                clear_output()
-                if change["new"] == "No file":
-                    logging.info("Choose another file")
-                else:
-                    if self.project_name == "model-registry":
-                        logging.info("No metrics available")
-                    else:
-                        logging.info(
-                            {
-                                k: v
-                                for k, v in model_info[change["new"]].items()
-                                if "metrics" in k
-                            }
+            if experiment is not None:
+                experiment_id = experiment.experiment_id if experiment else None
+                runs = mlflow.search_runs(
+                    experiment_ids=experiment_id, output_format="list"
+                )
+                run_ids = [run.info.run_id for run in runs][-1:]
+                # Choose only the project directory
+                try:
+                    artifacts = [
+                        (
+                            list(
+                                filter(
+                                    lambda x: x.is_dir
+                                    and "input_datasets" not in x.path,
+                                    client.list_artifacts(i),
+                                )
+                            )[0],
+                            i,
                         )
+                        for i in run_ids
+                    ]
+                    model_names = [
+                        str(
+                            Path(
+                                "runs:/",
+                                run_id,
+                                artifact.path,
+                                "best.pt",
+                            )
+                        )
+                        for artifact, run_id in artifacts
+                    ]
+                except IndexError:
+                    model_names = []
+            else:
+                model_names = []
+            model_names.append("No Model")
 
-        model_widget.observe(on_change, names="value")
-        return model_widget
+            # Create the dropdown widget
+            model_widget = widgets.Dropdown(
+                options=model_names,
+                description="Select model: ",
+            )
+
+            # Display the dropdown widget
+            display(model_widget)
+            return model_widget
+
+        elif self.registry == "wandb":
+            model_dict = {}
+            model_info = {}
+            api = wandb.Api()
+
+            # weird error fix (initialize api another time)
+            if self.team_name == "wildlife-ai":
+                logging.info("Please note: Using models from adi-ohad-heb-uni account.")
+                full_path = "adi-ohad-heb-uni/project-wildlife-ai"
+                api.runs(path=full_path).objects
+            else:
+                full_path = f"{self.team_name}/{self.project_name}"
+
+            runs = api.runs(full_path)
+
+            if len(runs) > 10:
+                runs = list(runs)[:10]
+
+            for run in runs:
+                model_artifacts = [
+                    artifact
+                    for artifact in chain(run.logged_artifacts(), run.used_artifacts())
+                    if artifact.type == "model"
+                ]
+                if len(model_artifacts) > 0:
+                    model_dict[run.name] = model_artifacts[0].name.split(":")[0]
+                    model_info[model_artifacts[0].name.split(":")[0]] = run.summary
+
+            # Add "no movie" option to prevent conflicts
+            # models = np.append(list(model_dict.keys()),"No model")
+
+            model_widget = widgets.Dropdown(
+                options=[(name, model) for name, model in model_dict.items()],
+                description="Select model:",
+                ensure_option=False,
+                disabled=False,
+                layout=widgets.Layout(width="50%"),
+                style={"description_width": "initial"},
+            )
+
+            main_out = widgets.Output()
+            display(model_widget, main_out)
+
+            # Display model metrics
+            def on_change(change):
+                with main_out:
+                    clear_output()
+                    if change["new"] == "No file":
+                        logging.info("Choose another file")
+                    else:
+                        if self.project_name == "model-registry":
+                            logging.info("No metrics available")
+                        else:
+                            logging.info(
+                                {
+                                    k: v
+                                    for k, v in model_info[change["new"]].items()
+                                    if "metrics" in k
+                                }
+                            )
+
+            model_widget.observe(on_change, names="value")
+            return model_widget
+
+        else:
+            logging.error("The chosen registry is not available at the moment.")
+            return
 
     def setup_paths(self, test: bool = False):
         if not isinstance(self.output_path, str) and self.output_path is not None:
             self.output_path = self.output_path.selected
         if test:
             self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
-                os.path.join(self.output_path, "ml-template-data"), self.model_type
+                Path(self.output_path, "ml-template-data"), self.model_type
             )
         else:
             self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
@@ -1247,6 +1539,70 @@ class MLProjectProcessor(ProjectProcessor):
 
     def choose_train_params(self):
         return t_utils.choose_train_params(self.model_type)
+
+    def train_yolo(
+        self,
+        exp_name: str,
+        weights: str,
+        project: str,
+        epochs: int = 1,
+        batch_size: int = 16,
+        img_size: int = 128,
+    ):
+        # Disable wandb (not necessary yet)
+        self.modules["ultralytics"].settings.update({"wandb": True})
+
+        if self.registry == "mlflow":
+            active_run = mlflow.active_run()
+
+            from mlflow.data.pandas_dataset import PandasDataset
+
+            parent_dir = Path(self.data_path).parent
+            train_df = pd.read_csv(Path(parent_dir, "train.txt"), delimiter="\t")
+            val_df = pd.read_csv(Path(parent_dir, "valid.txt"), delimiter="\t")
+            train_dataset: PandasDataset = mlflow.data.from_pandas(
+                train_df, source=Path(parent_dir, "train.txt")
+            )
+            val_dataset: PandasDataset = mlflow.data.from_pandas(
+                val_df, source=Path(parent_dir, "valid.txt")
+            )
+            if active_run:
+                mlflow.end_run()
+
+            try:
+                experiment_id = mlflow.create_experiment(
+                    self.project_name,
+                )
+            except:
+                current_experiment = dict(
+                    mlflow.get_experiment_by_name(self.project_name)
+                )
+                experiment_id = current_experiment["experiment_id"]
+
+            mlflow.start_run(experiment_id=experiment_id, run_name=exp_name)
+            mlflow.log_input(train_dataset, context="training")
+            mlflow.log_input(val_dataset, context="validation")
+            mlflow.log_artifacts(
+                Path(self.data_path).parent, artifact_path="input_datasets"
+            )
+        try:
+            if "yolov5" in weights:
+                weights = Path(weights).name
+
+            model = self.modules["ultralytics"].YOLO(weights)
+            model.train(
+                data=self.data_path,
+                project=project,
+                name=exp_name,
+                epochs=int(epochs),
+                batch=int(batch_size),
+                imgsz=img_size,
+            )
+        except Exception as e:
+            logging.info(f"Training failed due to: {e}")
+        # Close down run
+        if self.registry == "wandb":
+            self.modules["wandb"].finish()
 
     def train_yolov5(
         self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
@@ -1284,9 +1640,25 @@ class MLProjectProcessor(ProjectProcessor):
         else:
             logging.error("Segmentation model training not yet supported.")
 
+    def eval_yolo(self, exp_name: str, conf_thres: float):
+        # Find trained model weights
+        project_path = Path(self.project_name, exp_name)
+        self.tuned_weights = f"{Path(project_path, 'weights', 'best.pt')}"
+        try:
+            model = self.modules["ultralytics"].YOLO(self.tuned_weights)
+            model.val(
+                data=self.data_path,
+                conf=conf_thres,
+            )
+        except Exception as e:
+            logging.error(f"Encountered {e}, terminating run...")
+            self.modules["wandb"].finish()
+        logging.info("Run succeeded, finishing run...")
+        self.modules["wandb"].finish()
+
     def eval_yolov5(self, exp_name: str, conf_thres: float):
         # Find trained model weights
-        project_path = os.path.join(self.output_path, self.project_name, exp_name)
+        project_path = Path(self.project_name, exp_name)
         self.tuned_weights = f"{Path(project_path, 'weights', 'best.pt')}"
         try:
             self.modules["val"].run(
@@ -1304,10 +1676,72 @@ class MLProjectProcessor(ProjectProcessor):
         logging.info("Run succeeded, finishing run...")
         self.modules["wandb"].finish()
 
+    def detect_yolo(
+        self,
+        project: str,
+        name: str,
+        source: str,
+        conf_thres: float,
+        artifact_dir: str,
+        model: str,
+        img_size: int = 640,
+        save_output: bool = True,
+        test: bool = False,
+    ):
+        from yolov5.utils.general import increment_path
+
+        if self.registry == "mlflow":
+            active_run = mlflow.active_run()
+            if active_run:
+                mlflow.end_run()
+            experiment = mlflow.get_experiment_by_name(self.project_name)
+            mlflow.start_run(
+                run_name=self.project_name + "_detection",
+                experiment_id=experiment.experiment_id,
+            )
+            self.run = mlflow.active_run()
+        elif self.registry == "wandb":
+            self.run = self.modules["wandb"].init(
+                entity=self.team_name,
+                project="model-evaluations",
+                settings=self.modules["wandb"].Settings(start_method="thread"),
+            )
+        models = [
+            f
+            for f in Path(artifact_dir).iterdir()
+            if f.is_file()
+            and str(f).endswith((".pt", ".model"))
+            and "osnet" not in str(f)
+            and "best" in str(f)
+        ]
+        if len(models) > 0 and not test:
+            best_model = models[0]
+        else:
+            logging.info("No trained model found, using yolov8 base model...")
+            best_model = "yolov8s.pt"
+        model = self.modules["ultralytics"].YOLO(best_model)
+        if self.output_path is None:
+            project = Path("..", project)
+        else:
+            project = Path(self.output_path, project)
+        self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
+        model.predict(
+            project=project,
+            name=name,
+            source=source,
+            conf=conf_thres,
+            save_txt=True,
+            save_conf=True,
+            save=save_output,
+            imgsz=img_size,
+        )
+        self.save_detections(conf_thres, model.ckpt_path, self.eval_dir)
+
     def detect_yolov5(
         self,
         exp_name: str,
-        source: str,
+        movies_paths: list,
+        movies_selected: list,
         save_dir: str,
         conf_thres: float,
         artifact_dir: str,
@@ -1331,29 +1765,94 @@ class MLProjectProcessor(ProjectProcessor):
             and "osnet" not in str(f)
             and "best" in str(f)
         ][0]
-        self.modules["detect"].run(
-            weights=weights_path,
-            source=source,
-            conf_thres=conf_thres,
-            save_txt=True,
-            save_conf=True,
-            project=save_dir,
-            name=exp_name,
-            nosave=not save_output,
-        )
-        self.save_detections_wandb(conf_thres, weights_path, eval_dir)
-        if wandb.run is not None:
-            self.modules["wandb"].finish()
-        self.eval_dir = str(eval_dir)
+
+        for movie_path in movies_paths:
+            self.modules["detect"].run(
+                weights=weights_path,
+                source=movie_path,
+                conf_thres=conf_thres,
+                save_txt=True,
+                save_conf=True,
+                project=save_dir,
+                name=exp_name,
+                nosave=not save_output,
+            )
+            self.save_detections_wandb(conf_thres, weights_path, eval_dir)
+            if wandb.run is not None:
+                self.modules["wandb"].finish()
+        return str(eval_dir)
+
+    def save_detections(self, conf_thres: float, model: str, eval_dir: str):
+        if self.registry == "wandb":
+            self.modules["yolo_utils"].set_config(conf_thres, model, eval_dir)
+            self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+                eval_dir, self.run, log=True, registry=self.registry
+            )
+            self.modules["yolo_utils"].add_data(
+                eval_dir, "detection_output", self.registry, self.run
+            )
+        elif self.registry == "mlflow":
+            self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+                eval_dir,
+                self.run,
+                log=True,
+                registry=self.registry,
+            )
+            self.modules["yolo_utils"].add_data(
+                path=eval_dir,
+                name="detection_output",
+                registry=self.registry,
+                run=self.run,
+            )
 
     def save_detections_wandb(self, conf_thres: float, model: str, eval_dir: str):
         self.modules["yolo_utils"].set_config(conf_thres, model, eval_dir)
-        self.modules["yolo_utils"].add_data_wandb(
-            eval_dir, "detection_output", self.run
+        self.modules["yolo_utils"].add_data(
+            path=eval_dir, name="detection_output", registry=self.registry, run=self.run
         )
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-            self.team_name, self.project_name, eval_dir, self.run, wandb_log=True
+            eval_dir, self.run, log=True
         )
+
+    def segment_footage(self, source: str):
+        # This is a draft function for using FastSAM to identify objects
+        model = self.modules["ultralytics"].FastSAM("FastSAM-s.pt")
+        # Run inference on a frame
+        everything_results = model(
+            source, device="cpu", retina_masks=True, imgsz=128, conf=0.4, iou=0.9
+        )
+        # Prepare a Prompt Process object
+        prompt_process = self.modules["ultralytics"].models.fastsam.FastSAMPrompt(
+            source, everything_results, device="cpu"
+        )
+        # Everything prompt
+        ann = prompt_process.everything_prompt()
+        prompt_process.plot(annotations=ann, output="./")
+        return ann
+
+    def track_yolo(
+        self,
+        source: str,
+        artifact_dir: str,
+        conf_thres: float,
+    ):
+        model = self.modules["ultralytics"].YOLO(
+            [
+                f
+                for f in Path(artifact_dir).iterdir()
+                if f.is_file()
+                and str(f).endswith((".pt", ".model"))
+                and "osnet" not in str(f)
+                and "best" in str(f)
+            ][0]
+        )
+        latest_tracker = model.track(
+            source=source,
+            conf=conf_thres,
+            persist=True,
+        )
+        return latest_tracker
+        # self.modules["wandb"].finish()
 
     def increment_path(self, path, exist_ok=False, sep="", mkdir=False):
         # Increment file or directory path, i.e. runs/exp --> runs/exp{sep}2, runs/exp{sep}3, ... etc.
@@ -1389,6 +1888,7 @@ class MLProjectProcessor(ProjectProcessor):
         artifact_dir: str,
         conf_thres: float,
         img_size: tuple = (540, 540),
+        test: bool = False,
     ):
         if not hasattr(self, "eval_dir"):
             self.eval_dir = self.increment_path(
@@ -1403,30 +1903,61 @@ class MLProjectProcessor(ProjectProcessor):
             conf_thres=conf_thres,
             img_size=img_size,
             gpu=True if self.modules["torch"].cuda.is_available() else False,
+            test=test,
         )
+
         # Create a new run for tracking only if necessary
-        self.run = self.modules["wandb"].init(
-            entity=self.team_name,
-            project="model-evaluations",
-            name="track",
-            settings=self.modules["wandb"].Settings(start_method="thread"),
-        )
-        self.modules["yolo_utils"].set_config(conf_thres, artifact_dir, self.eval_dir)
-        self.modules["yolo_utils"].add_data_wandb(
-            Path(latest_tracker).parent.absolute(), "tracker_output", self.run
-        )
+        if self.registry == "wandb":
+            self.run = self.modules["wandb"].init(
+                entity=self.team_name,
+                project="model-evaluations",
+                name="track",
+                settings=self.modules["wandb"].Settings(start_method="thread"),
+            )
+            self.modules["yolo_utils"].set_config(
+                conf_thres, artifact_dir, self.eval_dir
+            )
+
         # self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-        #    self.team_name, self.project_name, eval_dir, self.run, wandb_log=True
+        #    self.team_name, self.project_name, eval_dir, self.run, log=True
         # )
         self.tracking_report = self.modules["yolo_utils"].generate_counts(
-            self.team_name,
-            self.project_name,
             self.eval_dir,
             latest_tracker,
             artifact_dir,
             self.run,
-            wandb_log=True,
+            log=True,
+            registry=self.registry,
         )
+        self.modules["yolo_utils"].add_data(
+            Path(latest_tracker).parent.absolute(),
+            "tracker_output",
+            self.registry,
+            self.run,
+        )
+        if self.registry == "wandb":
+            self.modules["wandb"].finish()
+        elif self.registry == "mlflow":
+            mlflow.end_run()
+
+    def enhance_yolo(
+        self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
+    ):
+        from datetime import datetime
+
+        run_name = f"enhance_run_{datetime.now()}"
+        self.run_path = Path(project_path, run_name)
+        logging.info("Enhancement running...")
+        model = self.modules["ultralytics"].YOLO(self.tuned_weights)
+        model.predict(
+            source=str(Path(in_path, "images")),
+            conf=conf_thres,
+            save_txt=True,
+            save_conf=True,
+            save=True,
+            imgsz=img_size,
+        )
+
         if wandb.run is not None:
             self.modules["wandb"].finish()
 
@@ -1436,7 +1967,7 @@ class MLProjectProcessor(ProjectProcessor):
         from datetime import datetime
 
         run_name = f"enhance_run_{datetime.now()}"
-        self.run_path = os.path.join(project_path, run_name)
+        self.run_path = Path(project_path, run_name)
         if self.model_type == 1:
             logging.info("Enhancement running...")
             self.modules["detect"].run(
@@ -1460,8 +1991,11 @@ class MLProjectProcessor(ProjectProcessor):
 
     def enhance_replace(self, data_path: str):
         if self.model_type == 1:
-            os.rename(f"{data_path}/labels", f"{data_path}/labels_org")
-            os.rename(f"{self.run_path}/labels", f"{data_path}/labels")
+            # Rename the 'labels' directory to 'labels_org'
+            data_path = Path(data_path)
+            data_path.joinpath("labels").rename(data_path.joinpath("labels_org"))
+            # Rename the 'labels' directory inside 'self.run_path' to 'labels'
+            self.run_path.joinpath("labels").rename(data_path.joinpath("labels"))
         else:
             logging.error("This option is not supported for other model types.")
 
@@ -1494,36 +2028,44 @@ class MLProjectProcessor(ProjectProcessor):
         :type download_path: str
         :return: The path to the downloaded model checkpoint.
         """
-        if self.team_name == "wildlife-ai":
-            logging.info("Please note: Using models from adi-ohad-heb-uni account.")
-            full_path = "adi-ohad-heb-uni/project-wildlife-ai"
-        else:
-            project_name = self.project.Project_name.replace(" ", "_")
-            full_path = f"{self.team_name}/{project_name.lower()}"
-        api = wandb.Api()
-        try:
-            api.artifact_type(type_name="model", project=full_path).collections()
-        except Exception as e:
-            logging.error(
-                f"No model collections found. No artifacts have been logged. {e}"
+        if self.registry == "mlflow":
+            artifact_dir = mlflow.artifacts.download_artifacts(
+                model_name, dst_path=download_path
             )
-            return None
-        collections = [
-            coll
-            for coll in api.artifact_type(
-                type_name="model", project=full_path
-            ).collections()
-        ]
-        model = [i for i in collections if i.name == model_name]
-        if len(model) > 0:
-            model = model[0]
+            return str(Path(artifact_dir).parent)
+
+        elif self.registry == "wandb":
+            if self.team_name == "wildlife-ai":
+                logging.info("Please note: Using models from adi-ohad-heb-uni account.")
+                full_path = "adi-ohad-heb-uni/project-wildlife-ai"
+            else:
+                full_path = f"{self.team_name}/{self.project_name.lower()}"
+            api = wandb.Api()
+            try:
+                api.artifact_type(type_name="model", project=full_path).collections()
+            except Exception as e:
+                logging.error(
+                    f"No model collections found. No artifacts have been logged. {e}"
+                )
+                return None
+            collections = [
+                coll
+                for coll in api.artifact_type(
+                    type_name="model", project=full_path
+                ).collections()
+            ]
+            model = [i for i in collections if i.name == model_name]
+            if len(model) > 0:
+                model = model[0]
+            else:
+                logging.error("No model found")
+            artifact = api.artifact(full_path + "/" + model.name + ":latest")
+            logging.info("Downloading model checkpoint...")
+            artifact_dir = artifact.download(root=download_path)
+            logging.info("Checkpoint downloaded.")
+            return Path(artifact_dir).resolve()
         else:
-            logging.error("No model found")
-        artifact = api.artifact(full_path + "/" + model.name + ":latest")
-        logging.info("Downloading model checkpoint...")
-        artifact_dir = artifact.download(root=download_path)
-        logging.info("Checkpoint downloaded.")
-        return os.path.realpath(artifact_dir)
+            return
 
     def get_best_model(self, metric="mAP_0.5", download_path: str = ""):
         # Get the best model from the run history according to the specified metric
@@ -1563,9 +2105,13 @@ class MLProjectProcessor(ProjectProcessor):
         logging.info("Downloading model checkpoint...")
         artifact_dir = artifact.download(root=download_path)
         logging.info("Checkpoint downloaded.")
-        self.best_model_path = os.path.realpath(artifact_dir)
+        self.best_model_path = Path(artifact_dir).resolve()
 
-    def get_dataset(self, model: str, team_name: str = "koster"):
+    def get_dataset(
+        self,
+        model: str,
+        team_name: str = "koster",
+    ):
         """
         It takes in a project name and a model name, and returns the paths to the train and val datasets
 
@@ -1575,35 +2121,42 @@ class MLProjectProcessor(ProjectProcessor):
         :type model: str
         :return: The return value is a list of two directories, one for the training data and one for the validation data.
         """
-        api = wandb.Api()
-        if "_" in model:
-            run_id = model.split("_")[1]
-            try:
-                run = api.run(f"{team_name}/{self.project_name}/runs/{run_id}")
-            except wandb.CommError:
-                logging.error("Run data not found")
-                return "empty_string", "empty_string"
-            datasets = [
-                artifact
-                for artifact in run.used_artifacts()
-                if artifact.type == "dataset"
-            ]
-            if len(datasets) == 0:
-                logging.error(
-                    "No datasets are linked to these runs. Please try another run."
-                )
-                return "empty_string", "empty_string"
-            dirs = []
-            for i in range(len(["train", "val"])):
-                artifact = datasets[i]
-                logging.info(f"Downloading {artifact.name} checkpoint...")
-                artifact_dir = artifact.download()
-                logging.info(f"{artifact.name} - Dataset downloaded.")
-                dirs.append(artifact_dir)
-            return dirs
+        if self.registry == "mlflow":
+            logging.error("This is not currently supported for MLflow")
+            return "", ""
+        elif self.registry == "wandb":
+            api = wandb.Api()
+            if "_" in model:
+                run_id = model.split("_")[1]
+                try:
+                    run = api.run(f"{team_name}/{self.project_name}/runs/{run_id}")
+                except wandb.CommError:
+                    logging.error("Run data not found")
+                    return "", ""
+                datasets = [
+                    artifact
+                    for artifact in run.used_artifacts()
+                    if artifact.type == "dataset"
+                ]
+                if len(datasets) == 0:
+                    logging.error(
+                        "No datasets are linked to these runs. Please try another run."
+                    )
+                    return "", ""
+                dirs = []
+                for i in range(len(["train", "val"])):
+                    artifact = datasets[i]
+                    logging.info(f"Downloading {artifact.name} checkpoint...")
+                    artifact_dir = artifact.download()
+                    logging.info(f"{artifact.name} - Dataset downloaded.")
+                    dirs.append(artifact_dir)
+                return dirs
+            else:
+                logging.error("Externally trained model. No data available.")
+                return "", ""
         else:
-            logging.error("Externally trained model. No data available.")
-            return "empty_string", "empty_string"
+            logging.error("Unsupported registry")
+            return "", ""
 
 
 class Annotator:
@@ -1628,9 +2181,9 @@ class Annotator:
         dataset = self.modules["fiftyone"].Dataset(self.dataset_name)
 
         # Add all the images in the directory to the dataset
-        for filename in os.listdir(self.images_path):
-            if filename.endswith(".jpg") or filename.endswith(".png"):
-                image_path = os.path.join(self.images_path, filename)
+        for filename in Path(self.images_path).iterdir():
+            if filename.suffix in [".jpg", ".png"]:
+                image_path = self.images_path / filename
                 sample = self.modules["fiftyone"].Sample(filepath=image_path)
                 dataset.add_sample(sample)
 
@@ -1667,20 +2220,20 @@ class Annotator:
         images = sorted(
             [
                 f
-                for f in os.listdir(self.images_path)
-                if os.path.isfile(os.path.join(self.images_path, f))
-                and f.endswith(".jpg")
+                for f in Path(self.images_path).iterdir()
+                if f.is_file() and f.suffix.lower() == ".jpg"
             ]
         )
         bbox_dict = {}
-        annot_path = os.path.join(Path(self.images_path).parent, "labels")
-        if len(os.listdir(annot_path)) > 0:
-            for label_file in os.listdir(annot_path):
-                image = os.path.join(self.images_path, images[0])
-                width, height = imagesize.get(image)
+        annot_path = Path(self.images_path).parent / "labels"
+
+        if any(annot_path.iterdir()):
+            for label_file in annot_path.iterdir():
+                image = self.images_path / images[0]
+                width, height = imagesize.get(str(image))
                 bboxes = []
-                bbox_dict[image] = []
-                with open(os.path.join(annot_path, label_file), "r") as f:
+                bbox_dict[str(image)] = []
+                with label_file.open("r") as f:
                     for line in f:
                         s = line.split(" ")
                         left = (float(s[1]) - (float(s[3]) / 2)) * width

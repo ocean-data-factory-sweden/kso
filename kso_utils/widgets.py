@@ -6,7 +6,6 @@ import subprocess
 import pandas as pd
 import numpy as np
 import cv2
-import math
 
 # widget imports
 import ipysheet
@@ -23,7 +22,6 @@ import asyncio
 from kso_utils.video_reader import VideoReader
 from kso_utils.project_utils import Project
 import kso_utils.movie_utils as movie_utils
-from kso_utils.db_utils import create_connection
 import kso_utils.tutorials_utils as t_utils
 
 # Logging
@@ -197,11 +195,11 @@ def gpu_select():
     return gpu_output_interact
 
 
-# Select the movie you want
+# Select the movie(s) you want
 def select_movie(available_movies_df: pd.DataFrame):
     """
     > This function takes in a dataframe of available movies and returns a widget that allows the user
-    to select a movie of interest
+    to select movie(s) of interest
 
     :param available_movies_df: a dataframe containing the list of available movies
     :return: The widget object
@@ -211,17 +209,16 @@ def select_movie(available_movies_df: pd.DataFrame):
     available_movies_tuple = tuple(sorted(available_movies_df.filename.unique()))
 
     # Widget to select the movie
-    select_movie_widget = widgets.Dropdown(
+    select_movie_widget = widgets.SelectMultiple(
         options=available_movies_tuple,
-        description="Movie of interest:",
+        description="Select movie(s):",
         ensure_option=False,
-        value=None,
+        value=(),
         disabled=False,
         layout=widgets.Layout(width="50%"),
         style={"description_width": "initial"},
     )
 
-    display(select_movie_widget)
     return select_movie_widget
 
 
@@ -238,53 +235,6 @@ def choose_folder(start_path: str = ".", folder_type: str = ""):
     fc.title = f"Choose location of {folder_type}"
     display(fc)
     return fc
-
-
-def choose_footage(
-    project: Project,
-    server_connection: dict,
-    db_connection,
-    start_path: str = ".",
-    folder_type: str = "",
-):
-    """
-    > This function enables users to select movies for ML purposes.
-
-    :param project: the project object
-    :param server_connection: a dictionary with the connection to the server
-    :param db_connection: SQL connection object
-    :param start_path: a string with the path of the origin for the folder
-    :param folder_type: a string with the names of the type of folder required
-    :return: A path of the folder of interest
-    """
-    if project.server == "AWS":
-        available_movies_df, _, _ = movie_utils.retrieve_movie_info_from_server(
-            project=project,
-            server_connection=server_connection,
-            db_connection=db_connection,
-        )
-        movie_dict = {
-            name: movie_utils.get_movie_path(f_path, project, server_connection)
-            for name, f_path in available_movies_df[0][["filename", "fpath"]].values
-        }
-        movie_widget = widgets.SelectMultiple(
-            options=[(name, movie) for name, movie in movie_dict.items()],
-            description="Select movie(s):",
-            ensure_option=False,
-            disabled=False,
-            layout=widgets.Layout(width="50%"),
-            style={"description_width": "initial"},
-        )
-
-        display(movie_widget)
-        return movie_widget
-
-    else:
-        # Specify the output folder
-        fc = FileChooser(start_path)
-        fc.title = f"Choose location of {folder_type}"
-        display(fc)
-        return fc
 
 
 ######################################################################
@@ -968,7 +918,7 @@ def to_clips(clip_length, clips_range, is_example: bool):
 def select_n_clips(
     project: Project,
     db_connection,
-    movie_i: str,
+    movies_selected: list,
     is_example: bool,
 ):
     """
@@ -978,13 +928,13 @@ def select_n_clips(
 
     :param project: the project object
     :param db_connection: SQL connection object
-    :param movie_i: the name of the movie of interest
+    :param movie_i: a list with the name of the movie(s) of interest
     :return: A dictionary with the starting points of the clips and the length of the clips.
     """
 
     # Query info about the movie of interest
     movie_df = pd.read_sql_query(
-        f"SELECT filename, duration, sampling_start, sampling_end FROM movies WHERE filename='{movie_i}'",
+        f"SELECT filename, duration, sampling_start, sampling_end FROM movies WHERE filename='{movies_selected}'",
         db_connection,
     )
 
@@ -1238,10 +1188,8 @@ def extract_custom_frames(
 
     # Determine which frames to extract based on the input parameters
     if num_frames is not None:
-        # Note: current workaround uses every 500 frames to avoid frame seeking error
-        frames_to_extract = random.sample(
-            range(frame_start, frame_end, 500), num_frames
-        )
+        # Note: if frame-seeking fails, use every 500th frame instead
+        frames_to_extract = random.sample(range(frame_start, frame_end, 1), num_frames)
     elif frame_skip is not None:
         frames_to_extract = range(frame_start, frame_end, frame_skip)
     else:
@@ -1303,3 +1251,50 @@ def extract_custom_frames(
         np.column_stack([input_movies, output_files, frames_to_extract]),
         columns=["movie_filename", "frame_path", "frame_number"],
     )
+
+
+def choose_footage(
+    project: Project,
+    server_connection: dict,
+    db_connection,
+    start_path: str = ".",
+    folder_type: str = "",
+):
+    """
+    > This function enables users to select movies for ML purposes.
+
+    :param project: the project object
+    :param server_connection: a dictionary with the connection to the server
+    :param db_connection: SQL connection object
+    :param start_path: a string with the path of the origin for the folder
+    :param folder_type: a string with the names of the type of folder required
+    :return: A path of the folder of interest
+    """
+    if project.server == "AWS":
+        available_movies_df, _, _ = movie_utils.retrieve_movie_info_from_server(
+            project=project,
+            server_connection=server_connection,
+            db_connection=db_connection,
+        )
+        movie_dict = {
+            name: movie_utils.get_movie_path(f_path, project, server_connection)
+            for name, f_path in available_movies_df[0][["filename", "fpath"]].values
+        }
+        movie_widget = widgets.SelectMultiple(
+            options=[(name, movie) for name, movie in movie_dict.items()],
+            description="Select movie(s):",
+            ensure_option=False,
+            disabled=False,
+            layout=widgets.Layout(width="50%"),
+            style={"description_width": "initial"},
+        )
+
+        display(movie_widget)
+        return movie_widget
+
+    else:
+        # Specify the output folder
+        fc = FileChooser(start_path)
+        fc.title = f"Choose location of {folder_type}"
+        display(fc)
+        return fc
