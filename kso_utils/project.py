@@ -288,6 +288,51 @@ class ProjectProcessor:
         import ipywidgets as widgets
         from IPython.display import display
 
+        def update_movie(change):
+            output = widgets.Output()
+            with output:
+                clear_output(wait=True)
+                selected_movies = change.new
+
+                # Create a df with the selected movies
+                selected_movies_df = self.available_movies_df[
+                    self.available_movies_df["filename"].isin(
+                        selected_movies
+                    )
+                ].reset_index(drop=True)
+
+                # Retrieve the paths of the movies selected
+                movies_paths = [
+                    movie_utils.get_movie_path(
+                        project=self.project,
+                        f_path=f_path,
+                        server_connection=self.server_connection,
+                    )
+                    for f_path in selected_movies_df["fpath"]
+                ]
+
+                # Display the movie
+                if preview_media:
+                    # Display/preview each selected movie
+                    for (
+                        index,
+                        movie_row,
+                    ) in selected_movies_df.iterrows():
+                        movie_path = movies_paths[index]
+                        movie_metadata = pd.DataFrame(
+                            [movie_row.values], columns=movie_row.index
+                        )
+
+                        html = movie_utils.preview_movie(
+                            movie_path=movie_path,
+                            movie_metadata=movie_metadata,
+                        )
+                        display(html)
+
+                # Store the names and paths of the selected movies
+                self.movies_selected = selected_movies
+                self.movies_paths = movies_paths
+
         def on_radio_button_change(change):
             if change["type"] == "change" and change["name"] == "value":
                 selected_option = change["new"]
@@ -299,51 +344,6 @@ class ProjectProcessor:
                     select_movie_widg = kso_widgets.select_movie(
                         self.available_movies_df
                     )
-
-                    def update_movie(change):
-                        output = widgets.Output()
-                        with output:
-                            clear_output(wait=True)
-                            selected_movies = change.new
-
-                            # Create a df with the selected movies
-                            selected_movies_df = self.available_movies_df[
-                                self.available_movies_df["filename"].isin(
-                                    selected_movies
-                                )
-                            ].reset_index(drop=True)
-
-                            # Retrieve the paths of the movies selected
-                            movies_paths = [
-                                movie_utils.get_movie_path(
-                                    project=self.project,
-                                    f_path=f_path,
-                                    server_connection=self.server_connection,
-                                )
-                                for f_path in selected_movies_df["fpath"]
-                            ]
-
-                            # Display the movie
-                            if preview_media:
-                                # Display/preview each selected movie
-                                for (
-                                    index,
-                                    movie_row,
-                                ) in selected_movies_df.iterrows():
-                                    movie_path = movies_paths[index]
-                                    movie_metadata = pd.DataFrame(
-                                        [movie_row.values], columns=movie_row.index
-                                    )
-
-                                    html = movie_utils.preview_movie(
-                                        movie_path=movie_path,
-                                        movie_metadata=movie_metadata,
-                                    )
-                                    display(html)
-
-                            # Store the names and paths of the selected movies
-                            self.movies_selected = selected_movies
-                            self.movies_paths = movies_paths
 
                     # Create an async function to choose and display movies of interest
                     async def f(project, server_connection, available_movies_df):
@@ -1737,7 +1737,7 @@ class MLProjectProcessor(ProjectProcessor):
             save=save_output,
             imgsz=img_size,
         )
-        self.save_detections(conf_thres, model, self.eval_dir)
+        self.save_detections(conf_thres, model.ckpt_path, self.eval_dir)
 
     def detect_yolov5(
         self,
