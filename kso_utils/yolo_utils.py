@@ -973,7 +973,8 @@ def set_config(conf_thres: float, model: str, eval_dir: str):
     """
     config = wandb.config
     config.confidence_threshold = conf_thres
-    config.model_name = model
+    if not "model_name" in config:
+        config.model_name = model
     config.evaluation_directory = eval_dir
     return config
 
