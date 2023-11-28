@@ -296,9 +296,7 @@ class ProjectProcessor:
 
                 # Create a df with the selected movies
                 selected_movies_df = self.available_movies_df[
-                    self.available_movies_df["filename"].isin(
-                        selected_movies
-                    )
+                    self.available_movies_df["filename"].isin(selected_movies)
                 ].reset_index(drop=True)
 
                 # Retrieve the paths of the movies selected
