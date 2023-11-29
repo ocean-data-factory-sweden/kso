@@ -10,6 +10,7 @@ jupyter_bbox_widget==0.5.0
 lida==0.0.10
 mlflow==2.8.0
 pims==0.6.1
+torch=2.1.1
 typing-extensions==4.5.0
 ultralytics==8.0.200
 wandb==0.16.0
