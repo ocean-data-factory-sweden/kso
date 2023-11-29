@@ -84,16 +84,16 @@ RUN apt-get update && \
         git \
         vim && \
     apt-get clean && \
-    # Copy over custom autobackend file to enable use of older YOLO models
-    cp \
-        /usr/src/app/kso/src/autobackend.py \
-        /usr/local/lib/python3.8/dist-packages/ultralytics/nn/autobackend.py && \
     # Install all python packages, numpy needs to be installed
     # first to avoid the lap build error
     python3 -m pip --no-cache-dir install --upgrade pip && \
     python3 -m pip --no-cache-dir install numpy && \
     python3 -m pip --no-cache-dir install \
         -r /usr/src/app/kso/requirements.txt && \
+    # Copy over custom autobackend file to enable use of older YOLO models
+    cp \
+        /usr/src/app/kso/src/autobackend.py \
+        /usr/local/lib/python3.8/dist-packages/ultralytics/nn/autobackend.py && \
     apt-get remove --autoremove -y python3-dev build-essential
 
 # Set environment variables
