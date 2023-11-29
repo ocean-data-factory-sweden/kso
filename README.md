@@ -189,28 +189,28 @@ pip install python-magic-bin
 [issues-shield]: https://img.shields.io/github/issues/ocean-data-factory-sweden/kso.svg?style=for-the-badge
 [issues-url]: https://github.com/ocean-data-factory-sweden/kso/issues
 [license-shield]: https://img.shields.io/github/license/ocean-data-factory-sweden/kso.svg?style=for-the-badge
-[license-url]: https://github.com/ocean-data-factory-sweden/kso/blob/master/LICENSE.txt
-[high-level-overview2]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/high-level-overview-2.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
-[high-level-overview]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/high-level-overview.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
-[Data_management_module]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/Koster_data_management_module.png?raw=true
-[object_detection_module]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/Koster_object_detection_module.png?raw=true
+[license-url]: https://github.com/ocean-data-factory-sweden/kso/blob/main/LICENSE.txt
+[high-level-overview2]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/high-level-overview-2.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
+[high-level-overview]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/high-level-overview.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
+[Data_management_module]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/Koster_data_management_module.png?raw=true
+[object_detection_module]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/Koster_object_detection_module.png?raw=true
 [koster_utils_repo]: https://github.com/ocean-data-factory-sweden/kso_utils
 [colablogo]: https://colab.research.google.com/assets/colab-badge.svg
 [binderlogo]: https://mybinder.org/badge_logo.svg
-[colab_tut_1]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/01_Check_and_update_csv_files.ipynb
-[binder_tut]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/master
-[colab_tut_2]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/02_Upload_new_footage.ipynb
-[colab_tut_3]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/03_Upload_clips_to_Zooniverse.ipynb
-[colab_tut_4]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/04_Upload_frames_to_Zooniverse.ipynb
-[colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/05_Train_ML_models.ipynb
-[colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/06_Evaluate_ML_Models.ipynb
-[colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/07_Transfer_ML_Models.ipynb
-[colab_tut_8]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/08_Analyse_Aggregate_Zooniverse_Annotations.ipynb
-[colab_tut_9]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/master/tutorials/10_Run_ML_Models_on_footage.ipynb
+[colab_tut_1]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/01_Check_and_update_csv_files.ipynb
+[binder_tut]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/main
+[colab_tut_2]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/02_Upload_new_footage.ipynb
+[colab_tut_3]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/03_Upload_clips_to_Zooniverse.ipynb
+[colab_tut_4]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/04_Upload_frames_to_Zooniverse.ipynb
+[colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/05_Train_ML_models.ipynb
+[colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/06_Evaluate_ML_Models.ipynb
+[colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/07_Transfer_ML_Models.ipynb
+[colab_tut_8]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/08_Analyse_Aggregate_Zooniverse_Annotations.ipynb
+[colab_tut_9]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/10_Run_ML_Models_on_footage.ipynb
 [objdecmodule]: https://github.com/ocean-data-factory-sweden/kso
 [YoloV5]: https://github.com/ultralytics/yolov5
 [YoloV8]: https://github.com/ultralytics/ultralytics
 [OBIS-site]: https://www.gbif.org/network/2b7c7b4f-4d4f-40d3-94de-c28b6fa054a6
-[Koster_info_diagram]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/Koster_information_flow.png?raw=true "Information architecture of the Koster Seafloor Observatory"
-[screenshot_loading]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/screenshot_loading.png?raw=true
-[screenshot_started]: https://github.com/ocean-data-factory-sweden/kso/blob/master/assets/screenshot_started.png?raw=true
+[Koster_info_diagram]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/Koster_information_flow.png?raw=true "Information architecture of the Koster Seafloor Observatory"
+[screenshot_loading]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/screenshot_loading.png?raw=true
+[screenshot_started]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/screenshot_started.png?raw=true
