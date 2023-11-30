@@ -1722,7 +1722,7 @@ class MLProjectProcessor(ProjectProcessor):
             logging.info("No trained model found, using yolov8 base model...")
             best_model = "yolov8s.pt"
         model = self.modules["ultralytics"].YOLO(best_model)
-        project = Path(save_dir, project)
+        project = Path(save_dir)
         self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
         if latest:
             model.predict(
