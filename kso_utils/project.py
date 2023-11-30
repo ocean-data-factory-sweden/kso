@@ -1688,6 +1688,7 @@ class MLProjectProcessor(ProjectProcessor):
         img_size: int = 640,
         save_output: bool = True,
         test: bool = False,
+        latest: bool = True,
     ):
         from yolov5.utils.general import increment_path
 
@@ -1723,16 +1724,28 @@ class MLProjectProcessor(ProjectProcessor):
         model = self.modules["ultralytics"].YOLO(best_model)
         project = Path(save_dir, project)
         self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
-        model.predict(
-            project=project,
-            name=name,
-            source=source,
-            conf=conf_thres,
-            save_txt=True,
-            save_conf=True,
-            save=save_output,
-            imgsz=img_size,
-        )
+        if latest:
+            model.predict(
+                project=project,
+                name=name,
+                source=source,
+                conf=conf_thres,
+                save_txt=True,
+                save_conf=True,
+                save=save_output,
+                imgsz=img_size,
+            )
+        else:
+            self.modules["detect"].run(
+                weights=best_model,
+                source=source,
+                conf_thres=conf_thres,
+                save_txt=True,
+                save_conf=True,
+                project=save_dir,
+                name=name,
+                nosave=not save_output,
+            )
         self.save_detections(conf_thres, model.ckpt_path, self.eval_dir)
 
     def detect_yolov5(
