@@ -1681,6 +1681,7 @@ class MLProjectProcessor(ProjectProcessor):
         project: str,
         name: str,
         source: str,
+        save_dir: str,
         conf_thres: float,
         artifact_dir: str,
         model: str,
@@ -1720,10 +1721,7 @@ class MLProjectProcessor(ProjectProcessor):
             logging.info("No trained model found, using yolov8 base model...")
             best_model = "yolov8s.pt"
         model = self.modules["ultralytics"].YOLO(best_model)
-        if self.output_path is None:
-            project = Path("..", project)
-        else:
-            project = Path(self.output_path, project)
+        project = Path(save_dir, project)
         self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
         model.predict(
             project=project,
