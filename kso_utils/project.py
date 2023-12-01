@@ -324,6 +324,8 @@ class ProjectProcessor:
 
                         # Display the movie
                         if preview_media:
+                            clear_output()
+                            display(select_movie_widg)
                             with movie_output:
                                 previews = []
 
@@ -350,27 +352,13 @@ class ProjectProcessor:
                             self.movies_selected = selected_movies
                             self.movies_paths = movies_paths
 
-                    # Create an async function to choose and display movies of interest
-                    # async def f(project, server_connection, available_movies_df):
-
                     select_movie_widg.observe(update_movie, "value")
                     display(select_movie_widg, output, movie_output)
-                    # await asyncio.Event().wait()  # Wait indefinitely for user interaction
-                    # await asyncio.sleep(1)
 
                     if test:
                         # For the test case, directly call the update_movie logic
                         select_movie_widg.options = (select_movie_widg.options[0],)
                         update_movie({"new": select_movie_widg.options[0]})
-
-                    # loop = asyncio.get_event_loop()
-                    # loop.create_task(
-                    #    f(
-                    #        self.project,
-                    #        self.server_connection,
-                    #        self.available_movies_df,
-                    #    )
-                    # )
 
                 elif selected_option == "Custom Footage":
                     clear_output()
