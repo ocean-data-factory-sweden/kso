@@ -958,7 +958,7 @@ def setup_paths(output_folder: str, model_type: str):
         return None, None
 
 
-def set_config(conf_thres: float, model: str, eval_dir: str):
+def set_config(**kwargs):
     """
     `set_config` takes in a confidence threshold, model name, and evaluation directory and returns a
     configuration object.
@@ -972,10 +972,11 @@ def set_config(conf_thres: float, model: str, eval_dir: str):
     :return: The config object is being returned.
     """
     config = wandb.config
-    config.confidence_threshold = conf_thres
-    if not "model_name" in config:
-        config.model_name = model
-    config.evaluation_directory = eval_dir
+    for key, value in kwargs.items():
+        if key == "model_name" and "model_name" in config:
+            pass
+        else:
+            setattr(config, key, value)
     return config
 
 
