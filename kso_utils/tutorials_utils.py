@@ -1726,7 +1726,7 @@ def generate_max_n_reports(annotations_csv_path: str):
     result = result[sorted(result.columns, key=sort_by_last_digit)]
 
     # Export result dataframe to folder
-    result.to_csv(Path(annotations_csv_path.parent), "max_n_report.csv")
+    result.to_csv(Path(Path(annotations_csv_path).parent, "max_n_report.csv"))
 
     ### Additional outputs ####
 
