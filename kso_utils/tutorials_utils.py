@@ -1691,6 +1691,71 @@ def choose_species(labels_path, model, project_name, team_name="koster"):
     return species
 
 
+def sort_by_last_digit(column_name):
+    return int(column_name[-1])
+
+
+def generate_max_n_reports(annotations_csv_path: str):
+    annot_df = pd.read_csv(annotations_csv_path)
+    # Remove frame number and txt extension from filename to represent individual movies
+    annot_df["filename"] = annot_df["filename"].apply(lambda x: x[: x.rfind("_")])
+
+    # Get max_n per class detected in each movie per frame
+    class_df = (
+        annot_df.groupby(["filename", "frame_no"])["class_id"]
+        .value_counts()
+        .unstack(fill_value=0)
+    )
+    class_df.columns = "max_n_" + class_df.columns.astype(str)
+
+    # Get the confidence range of each detection per frame
+    conf_df = (
+        annot_df.groupby(["filename", "frame_no", "class_id"])["conf"]
+        .agg(["min", "mean", "max"])
+        .unstack()
+    )
+
+    # Combine this information
+    result = pd.concat([class_df, conf_df], axis=1)
+    # Add conf to column names to distinguish from max_n
+    result.columns = [
+        c if isinstance(c, str) else "_conf_".join([str(x) for x in c])
+        for c in result.columns
+    ]
+    # Sort columns into the expected order as specified by Leon
+    result = result[sorted(result.columns, key=sort_by_last_digit)]
+
+    # Export result dataframe to folder
+    result.to_csv(Path(annotations_csv_path.parent), "max_n_report.csv")
+
+    ### Additional outputs ####
+
+    # Find the frame at which the maximum value occurred for each column
+    max_values = class_df.max()
+    max_frames = class_df.idxmax()
+
+    # Create a new DataFrame with both max values and corresponding frames
+    max_df = pd.DataFrame(
+        {
+            "max_value": max_values,
+            "filename": max_frames.apply(lambda x: x[0]),
+            "max_frame": max_frames.apply(lambda x: x[1]),
+        }
+    )
+
+    # Get minute by minute max_information
+    frame_nos = pd.Series(class_df.index.get_level_values(1).values)
+    frame_nos.index = class_df.index
+
+    # Right now, we assume fps of 29.97
+    class_df["minutes_no"] = (frame_nos / (29.97 * 60)).astype(int)
+    class_df.reset_index().groupby(["filename", "minutes_no"]).max().drop(
+        columns=["frame_no"], axis=1
+    ).reset_index().plot(figsize=(15, 5), x="minutes_no")
+
+    return max_df
+
+
 def detection_statistics(
     csv_path: str,
     metrics: list,
