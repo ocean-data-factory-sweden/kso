@@ -1799,8 +1799,15 @@ class MLProjectProcessor(ProjectProcessor):
                     yaml_data = yaml.safe_load(file)
                 return yaml_data
 
-            data_dict = read_yaml_file(self.data_path)
-            species_mapping = data_dict["names"]
+            # Set up valid paths for data and hyperparameters
+            self.setup_paths()
+            # Read species mapping into data dictionary
+            try:
+                data_dict = read_yaml_file(self.data_path)
+                species_mapping = data_dict["names"]
+            except:
+                species_mapping = {}
+
             self.modules["yolo_utils"].set_config(
                 conf=conf_thres,
                 model_name=model,
