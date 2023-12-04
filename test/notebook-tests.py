@@ -260,6 +260,7 @@ def test_t6():
         conf_thres=conf_thres.value,
         artifact_dir=artifact_dir,
         save_output=True,
+        save_dir=save_dir,
         test=True,
         model=model,
     )
