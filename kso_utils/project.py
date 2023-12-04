@@ -1457,6 +1457,7 @@ class MLProjectProcessor(ProjectProcessor):
         elif self.registry == "wandb":
             model_dict = {}
             model_info = {}
+            data_info = {}
             api = wandb.Api()
 
             # weird error fix (initialize api another time)
@@ -1481,6 +1482,7 @@ class MLProjectProcessor(ProjectProcessor):
                 if len(model_artifacts) > 0:
                     model_dict[run.name] = model_artifacts[0].name.split(":")[0]
                     model_info[model_artifacts[0].name.split(":")[0]] = run.summary
+                    data_info[model_artifacts[0].name.split(":")[0]] = run.config
 
             # Add "no movie" option to prevent conflicts
             # models = np.append(list(model_dict.keys()),"No model")
@@ -1490,6 +1492,7 @@ class MLProjectProcessor(ProjectProcessor):
                 description="Select model:",
                 ensure_option=False,
                 disabled=False,
+                value=None,
                 layout=widgets.Layout(width="50%"),
                 style={"description_width": "initial"},
             )
@@ -1507,6 +1510,7 @@ class MLProjectProcessor(ProjectProcessor):
                         if self.project_name == "model-registry":
                             logging.info("No metrics available")
                         else:
+                            self.data_path = data_info[change["new"]]["data"]
                             logging.info(
                                 {
                                     k: v
@@ -1799,8 +1803,6 @@ class MLProjectProcessor(ProjectProcessor):
                     yaml_data = yaml.safe_load(file)
                 return yaml_data
 
-            # Set up valid paths for data and hyperparameters
-            self.setup_paths()
             # Read species mapping into data dictionary
             try:
                 data_dict = read_yaml_file(self.data_path)
