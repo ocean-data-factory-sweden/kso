@@ -99,6 +99,7 @@ RUN apt-get update && \
 # Set environment variables
 ENV WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
     WANDB_CACHE_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
+    WANDB_DATA_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
     PYTHONPATH=$PYTHONPATH:/usr/src/app/kso
 
 # Set everything up to work with the jupyter notebooks
