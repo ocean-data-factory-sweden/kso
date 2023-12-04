@@ -1,9 +1,8 @@
 # base imports
 import os
 import sys
-import subprocess
 import logging
-import asyncio
+import yaml
 import wandb
 import datetime
 import numpy as np
@@ -1793,7 +1792,14 @@ class MLProjectProcessor(ProjectProcessor):
 
     def save_detections(self, conf_thres: float, model: str, eval_dir: str):
         if self.registry == "wandb":
-            data_dict = self.run.rawconfig["data_dict"]
+            import yaml
+
+            def read_yaml_file(file_path):
+                with open(file_path, "r") as file:
+                    yaml_data = yaml.safe_load(file)
+                return yaml_data
+
+            data_dict = read_yaml_file(self.data_path)
             species_mapping = data_dict["names"]
             self.modules["yolo_utils"].set_config(
                 conf=conf_thres,
