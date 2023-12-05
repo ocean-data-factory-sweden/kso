@@ -490,7 +490,7 @@ def frame_aggregation(
         project=project,
         server_connection=server_connection,
         db_connection=db_connection,
-    )[0]
+    )
 
     # If at least one movie is linked to the project
     logging.info(f"There are {len(movie_df)} movies")
