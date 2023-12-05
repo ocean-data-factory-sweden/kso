@@ -969,8 +969,8 @@ class ProjectProcessor:
         def on_button_clicked(b):
             movie_files = sorted(
                 [
-                    f
-                    for f in input_path.iterdir()
+                    str(f)
+                    for f in Path(input_path).iterdir()
                     if f.is_file()
                     and f.suffix.lower() in [".mov", ".mp4", ".avi", ".mkv"]
                 ]
