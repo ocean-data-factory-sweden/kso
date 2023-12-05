@@ -1726,27 +1726,53 @@ class MLProjectProcessor(ProjectProcessor):
         project = Path(save_dir)
         self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
         if latest:
-            model.predict(
-                project=project,
-                name=name,
-                source=source,
-                conf=conf_thres,
-                save_txt=True,
-                save_conf=True,
-                save=save_output,
-                imgsz=img_size,
-            )
+            if isinstance(source, list):
+                for src in source:
+                    model.predict(
+                        project=project,
+                        name=name,
+                        source=src,
+                        conf=conf_thres,
+                        save_txt=True,
+                        save_conf=True,
+                        save=save_output,
+                        imgsz=img_size,
+                    )
+            else:
+                model.predict(
+                    project=project,
+                    name=name,
+                    source=source,
+                    conf=conf_thres,
+                    save_txt=True,
+                    save_conf=True,
+                    save=save_output,
+                    imgsz=img_size,
+                )
         else:
-            self.modules["detect"].run(
-                weights=best_model,
-                source=source,
-                conf_thres=conf_thres,
-                save_txt=True,
-                save_conf=True,
-                project=save_dir,
-                name=name,
-                nosave=not save_output,
-            )
+            if isinstance(source, list):
+                for src in source:
+                    self.modules["detect"].run(
+                        weights=best_model,
+                        source=src,
+                        conf_thres=conf_thres,
+                        save_txt=True,
+                        save_conf=True,
+                        project=save_dir,
+                        name=name,
+                        nosave=not save_output,
+                    )
+            else:
+                self.modules["detect"].run(
+                    weights=best_model,
+                    source=source,
+                    conf_thres=conf_thres,
+                    save_txt=True,
+                    save_conf=True,
+                    project=save_dir,
+                    name=name,
+                    nosave=not save_output,
+                )
         self.save_detections(conf_thres, model.ckpt_path, self.eval_dir)
 
     def detect_yolov5(
