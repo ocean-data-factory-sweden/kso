@@ -399,7 +399,7 @@ def extract_clips(
                 "-c:a",
                 "copy",
                 "-c:v",
-                "h264_nvenc",
+                "copy",
                 str(output_clip_path),
             ]
         )
@@ -430,7 +430,7 @@ def extract_clips(
                 "-c:a",
                 "copy",
                 "-c:v",
-                "h264_nvenc",
+                "copy",
                 # "-b:v",
                 # b_v,
                 str(output_clip_path),
