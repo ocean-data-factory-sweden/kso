@@ -241,8 +241,8 @@ def modify_clips(
     """
     if gpu_available:
         # Set up input prompt
-        init_prompt = f"ffmpeg_python.input('{clip_i}')" #, hwaccel='cuda', hwaccel_output_format='cuda')"
-        default_output_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p')"
+        init_prompt = f"ffmpeg_python.input('{clip_i}', hwaccel='cuda', hwaccel_output_format='cuda')"
+        default_output_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='h264_nvenc')"
         full_prompt = init_prompt
         mod_prompt = ""
 
