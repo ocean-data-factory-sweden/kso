@@ -282,16 +282,16 @@ def split_frames(data_path: str, perc_test: float):
         if counter >= index_test + 1:
             # Avoid leaking frames into test set
             if movie_name != latest_movie or movie_name == title:
-                file_valid.write(pathAndFilename + "\n")
+                file_valid.write(str(pathAndFilename) + "\n")
             else:
-                file_train.write(pathAndFilename + "\n")
+                file_train.write(str(pathAndFilename) + "\n")
             counter += 1
         else:
             latest_movie = movie_name
             # if random.uniform(0, 1) <= 0.5:
             #    file_train.write(pathAndFilename + "\n")
             # else:
-            file_train.write(pathAndFilename + "\n")
+            file_train.write(str(pathAndFilename) + "\n")
             counter += 1
 
 
