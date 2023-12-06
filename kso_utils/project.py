@@ -348,8 +348,8 @@ class ProjectProcessor:
                                 # Store the names and paths of the selected movies
 
                             display(*previews, movie_output)
-                            self.movies_selected = selected_movies
-                            self.movies_paths = movies_paths
+                        self.movies_selected = selected_movies
+                        self.movies_paths = movies_paths
 
                     select_movie_widg.observe(update_movie, "value")
                     display(select_movie_widg, output, movie_output)
@@ -372,6 +372,7 @@ class ProjectProcessor:
                         if selected_folder is not None:
                             self.movies_paths = selected_folder
                             print(f"Selected folder: {selected_folder}")
+                            self.movies_selected = selected_folder
                             # Add your code here to use the selected folder
                         else:
                             print("No folder selected")
