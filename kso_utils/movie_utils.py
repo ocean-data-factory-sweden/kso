@@ -454,7 +454,7 @@ def convert_video(
                 "-filter:v",
                 fps_output,
                 "-c:v",
-                "h264",  # ensures correct codec
+                "copy",  # ensures correct codec
                 "-crf",
                 "22",  # compresses the video
                 str(conv_fpath),
@@ -474,7 +474,7 @@ def convert_video(
                 "-filter:v",
                 fps_output,
                 "-c:v",
-                "h264",  # ensures correct codec
+                "copy",  # ensures correct codec
                 str(conv_fpath),
             ]
         )
