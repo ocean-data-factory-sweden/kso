@@ -973,7 +973,7 @@ class ProjectProcessor:
                     str(f)
                     for f in Path(input_path).iterdir()
                     if f.is_file()
-                    and f.suffix.lower() in [".mov", ".mp4", ".avi", ".mkv"]
+                    and f.suffix.lower() in [".mov", ".mp4", ".avi", ".mkv", ".mpg"]
                 ]
             )
 
