@@ -1746,7 +1746,7 @@ def modify_frames(
         ):
             if not os.path.exists(row["modif_frame_path"]):
                 # Set up input prompt
-                init_prompt = f"ffmpeg.input('{row['frame_path']}')"
+                init_prompt = f'ffmpeg.input("{row["frame_path"]}")'
                 full_prompt = init_prompt
                 # Set up modification
                 for transform in modification_details.values():
