@@ -760,16 +760,14 @@ def frame_aggregation(
     ):
         if movie_bool:
             file_path = Path(name[1])
-            file, ext = file_path.name, file_path.suffix
-            file_base = Path(file).name
-            file_out = Path(out_path, "labels", f"{file_base}_frame_{name[0]}.txt")
-            img_out = Path(out_path, "images", f"{file_base}_frame_{name[0]}.jpg")
+            file, ext = file_path.stem, file_path.suffix
+            file_out = Path(out_path, "labels", f"{file}_frame_{name[0]}.txt")
+            img_out = Path(out_path, "images", f"{file}_frame_{name[0]}.jpg")
         else:
             file_path = Path(name[0])
-            file, ext = file_path.name, file_path.suffix
-            file_base = Path(file).name
-            file_out = Path(out_path, "labels", f"{file_base}.txt")
-            img_out = Path(out_path, "images", f"{file_base}.jpg")
+            file, ext = file_path.stem, file_path.suffix
+            file_out = Path(out_path, "labels", f"{file}.txt")
+            img_out = Path(out_path, "images", f"{file}.jpg")
 
         # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
         if out_format == "yolo":
