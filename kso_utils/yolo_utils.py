@@ -282,16 +282,16 @@ def split_frames(data_path: str, perc_test: float):
         if counter >= index_test + 1:
             # Avoid leaking frames into test set
             if movie_name != latest_movie or movie_name == title:
-                file_valid.write(pathAndFilename + "\n")
+                file_valid.write(str(pathAndFilename) + "\n")
             else:
-                file_train.write(pathAndFilename + "\n")
+                file_train.write(str(pathAndFilename) + "\n")
             counter += 1
         else:
             latest_movie = movie_name
             # if random.uniform(0, 1) <= 0.5:
             #    file_train.write(pathAndFilename + "\n")
             # else:
-            file_train.write(pathAndFilename + "\n")
+            file_train.write(str(pathAndFilename) + "\n")
             counter += 1
 
 
@@ -490,7 +490,7 @@ def frame_aggregation(
         project=project,
         server_connection=server_connection,
         db_connection=db_connection,
-    )[0]
+    )
 
     # If at least one movie is linked to the project
     logging.info(f"There are {len(movie_df)} movies")
@@ -760,16 +760,14 @@ def frame_aggregation(
     ):
         if movie_bool:
             file_path = Path(name[1])
-            file, ext = file_path.name, file_path.suffix
-            file_base = Path(file).name
-            file_out = Path(out_path, "labels", f"{file_base}_frame_{name[0]}.txt")
-            img_out = Path(out_path, "images", f"{file_base}_frame_{name[0]}.jpg")
+            file, ext = file_path.stem, file_path.suffix
+            file_out = Path(out_path, "labels", f"{file}_frame_{name[0]}.txt")
+            img_out = Path(out_path, "images", f"{file}_frame_{name[0]}.jpg")
         else:
-            file_path = Path(name[1])
-            file, ext = file_path.name, file_path.suffix
-            file_base = Path(file).name
-            file_out = Path(out_path, "labels", f"{file_base}.txt")
-            img_out = Path(out_path, "images", f"{file_base}.jpg")
+            file_path = Path(name)
+            file, ext = file_path.stem, file_path.suffix
+            file_out = Path(out_path, "labels", f"{file}.txt")
+            img_out = Path(out_path, "images", f"{file}.jpg")
 
         # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
         if out_format == "yolo":

@@ -241,10 +241,8 @@ def modify_clips(
     """
     if gpu_available:
         # Set up input prompt
-        init_prompt = f"ffmpeg_python.input('{clip_i}', hwaccel='cuda', hwaccel_output_format='cuda')"
-        default_output_prompt = (
-            f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='h264_nvenc',)"
-        )
+        init_prompt = f"ffmpeg_python.input('{clip_i}')"
+        default_output_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p')"
         full_prompt = init_prompt
         mod_prompt = ""
 
@@ -256,7 +254,7 @@ def modify_clips(
                 # Unnest the modification detail dict
                 df = pd.json_normalize(modification_details, sep="_")
                 crf = df.filter(regex="crf$", axis=1).values[0][0]
-                out_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='h264_nvenc')"
+                out_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p')"
 
         if len(mod_prompt) > 0:
             full_prompt += mod_prompt
@@ -277,7 +275,7 @@ def modify_clips(
     else:
         # Set up input prompt
         init_prompt = f"ffmpeg_python.input('{clip_i}')"
-        default_output_prompt = f".output('{output_clip_path}', crf=20, pix_fmt='yuv420p', vcodec='libx264')"
+        default_output_prompt = f".output('{output_clip_path}', crf=20, pix_fmt='yuv420p')"
         full_prompt = init_prompt
         mod_prompt = ""
 
@@ -289,7 +287,7 @@ def modify_clips(
                 # Unnest the modification detail dict
                 df = pd.json_normalize(modification_details, sep="_")
                 crf = df.filter(regex="crf$", axis=1).values[0][0]
-                out_prompt = f".output('{output_clip_path}', crf={crf}, preset='veryfast', pix_fmt='yuv420p', vcodec='libx264')"
+                out_prompt = f".output('{output_clip_path}', crf={crf}, preset='veryfast', pix_fmt='yuv420p')"
 
         if len(mod_prompt) > 0:
             full_prompt += mod_prompt
@@ -399,7 +397,7 @@ def extract_clips(
                 "-c:a",
                 "copy",
                 "-c:v",
-                "h264_nvenc",
+                "copy",
                 str(output_clip_path),
             ]
         )
@@ -430,7 +428,7 @@ def extract_clips(
                 "-c:a",
                 "copy",
                 "-c:v",
-                "h264_nvenc",
+                "copy",
                 # "-b:v",
                 # b_v,
                 str(output_clip_path),
@@ -443,7 +441,7 @@ def extract_clips(
         full_prompt = init_prompt
         mod_prompt = ""
         output_prompt = ""
-        def_output_prompt = f".output('{str(output_clip_path)}', ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', crf=20, pix_fmt='yuv420p', vcodec='libx264')"
+        def_output_prompt = f".output('{str(output_clip_path)}', ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', crf=20, pix_fmt='yuv420p')"
 
         # Set up modification
         for transform in modification_details.values():
@@ -454,7 +452,7 @@ def extract_clips(
                 # Unnest the modification detail dict
                 df = pd.json_normalize(modification_details, sep="_")
                 crf = df.filter(regex="crf$", axis=1).values[0][0]
-                output_prompt = f".output('{str(output_clip_path)}', crf={crf}, ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', preset='veryfast', pix_fmt='yuv420p', vcodec='libx264')"
+                output_prompt = f".output('{str(output_clip_path)}', crf={crf}, ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', preset='veryfast', pix_fmt='yuv420p')"
 
         # Run the modification
         try:
@@ -1608,29 +1606,6 @@ def format_to_gbif(
         )
 
 
-# Function to display a list of statistics to choose to compute for the detections over each footage
-def choose_statistics():
-    statistics = widgets.SelectMultiple(
-        options=[
-            "Mean same species per frame",
-            "Mean different species per frame",
-            "Max same species per frame",
-            "Max different species per frame",
-            "Min same species per frame",
-            "Min different species per frame",
-        ],
-        description="Statistics",
-        disabled=False,
-        layout=widgets.Layout(width="max-content"),
-        style={"description_width": "initial"},
-    )
-
-    main_out = widgets.Output()
-    display(statistics, main_out)
-
-    return statistics
-
-
 # Auxiliary function to obtain a dictionary with the mapping between the class ids used by the detection model and the species names
 def get_species_mapping(model, project_name, team_name="koster"):
     import wandb
@@ -1650,52 +1625,11 @@ def get_species_mapping(model, project_name, team_name="koster"):
     return species_mapping
 
 
-def choose_species(labels_path, model, project_name, team_name="koster"):
-    """
-    > This function creates a widget that allows the user to choose the species of interest.
-
-    :param labels_path: the path to the folder containing the annotations.csv file
-    :param model: the name of the model in wandb used to obtain the detections
-    :param project_name: name of the project in wandb
-    :param team_name: name of the team. By default, it is set to the "koster" team.
-
-    """
-    # Read the annotations.csv file
-    annotations = pd.read_csv(os.path.join(labels_path, "annotations.csv"))
-
-    # Obtain the list of unique class ids from the annotations.csv file
-    species_ids = annotations["class_id"].unique()
-
-    # Obtain a dictionary with the mapping between the class ids and the species names and create a dataframe from it
-    species_mapping = get_species_mapping(model, project_name, team_name)
-    species_df = pd.DataFrame.from_dict(species_mapping, orient="index")
-    species_df.reset_index(inplace=True)
-    species_df.columns = ["id", "species"]
-    species_df["id"] = species_df["id"].astype(int)
-
-    # Filter the dataframe to consider only the species available in the annotations.csv file
-    species_df = species_df[species_df["id"].isin(species_ids)]
-    species_list = species_df["species"].tolist()
-
-    # Create the widget with the list of available species
-    species = widgets.SelectMultiple(
-        options=species_list,
-        description="Species",
-        disabled=False,
-        layout=widgets.Layout(width="25%"),
-        style={"description_width": "initial"},
-    )
-    main_out = widgets.Output()
-    display(species, main_out)
-
-    return species
-
-
 def sort_by_last_digit(column_name):
     return int(column_name[-1])
 
 
-def generate_max_n_reports(annotations_csv_path: str):
+def agg_template_project(annotations_csv_path: str):
     annot_df = pd.read_csv(annotations_csv_path)
     # Remove frame number and txt extension from filename to represent individual movies
     annot_df["filename"] = annot_df["filename"].apply(lambda x: x[: x.rfind("_")])
@@ -1757,7 +1691,7 @@ def generate_max_n_reports(annotations_csv_path: str):
 
 
 def detection_statistics(
-    csv_path: str,
+    eval_dir: str,
     metrics: list,
     model: str,
     project_name: str,
@@ -1771,7 +1705,7 @@ def detection_statistics(
     > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
     and saves the results in different csv files.
 
-    :param csv_path: the path to the folder containing the annotations.csv file
+    :param eval_dir: the path to the folder containing the annotations.csv file
     :param metrics: a list of the statistics to compute
     :param model: the name of the model in wandb used to obtain the detections
     :param project_name: name of the project in wandb
@@ -1786,142 +1720,138 @@ def detection_statistics(
     if save:
         if save_folder is None:
             # By default, save the results in the same folder as the annotations.csv file
-            save_folder = csv_path
+            save_folder = eval_dir
         elif not os.path.exists(save_folder):
             # Create the folder if it doesn't exist
             os.makedirs(save_folder)
 
     # Read the annotations.csv file
-    df = pd.read_csv(os.path.join(csv_path, "annotations.csv"))
+    df = pd.read_csv(os.path.join(eval_dir, "annotations.csv"))
 
-    # Obtain a dictionary with the mapping between the class ids and the species names
-    species_mapping = get_species_mapping(model, project_name, team_name)
+    # if species is not None:
+    # Filter the dataframe to consider only the species of interest
+    #    df_filtered = df[df["species_name"].isin(species)]
 
-    # Add a column with the species name corresponding to each class id
-    df["species_name"] = df.apply(
-        lambda row: species_mapping[str(row["class_id"])], axis=1
-    )
-
-    if species is not None:
-        # Filter the dataframe to consider only the species of interest
-        df_filtered = df[df["species_name"].isin(species)]
-
-    else:
-        # Consider all the available species
-        df_filtered = df
+    # else:
+    # Consider all the available species
+    df_filtered = df
 
     # Add a column with the footage name
-    df_filtered["footage"] = df_filtered.apply(
-        lambda row: "_".join(row.filename.split("_")[:-1]), axis=1
-    )
-    # print(df_filtered.head())
+    df_filtered["footage"] = df_filtered["filename"].apply(lambda x: x[: x.rfind("_")])
 
     # If the user wants to compute statistics over the detections of the same species
-    if any("same" in sub for sub in metrics):
-        df_grouped = df_filtered.copy()
-        # Create an additional column to compute the number of detections of the same species in each frame
-        df_grouped["class_count"] = df_grouped["class_id"]
-        # Count the number of detections of the same species in each frame
-        df_grouped = df_grouped.groupby(
-            ["footage", "filename", "species_name", "class_count"],
-            as_index=False,
-            sort=True,
-        )["class_count"].aggregate("count")
-        # df_grouped.to_csv(os.path.join(save_folder, 'group_same.csv'),index=False)
-        # print("count", df_grouped.head())
+    if metrics is not None:
+        metrics = metrics.value
 
-        # Compute the mean, min and max number of detections of each species over the frames of each footage
-        df_grouped = (
-            df_grouped.groupby(["footage", "species_name"])["class_count"]
-            .agg(["mean", "min", "max"])
-            .reset_index()
-        )
-        # print(df_grouped)
-        statistics_same = pd.DataFrame()
+        if any("same" in sub for sub in metrics):
+            df_grouped = df_filtered.copy()
+            # Create an additional column to compute the number of detections of the same species in each frame
+            df_grouped["class_count"] = df_grouped["class_id"]
+            # Count the number of detections of the same species in each frame
+            df_grouped = df_grouped.groupby(
+                ["footage", "filename", "species_name", "class_count"],
+                as_index=False,
+                sort=True,
+            )["class_count"].aggregate("count")
 
-        # Save the results in a dataframe
-        statistics_same[["footage", "species"]] = df_grouped[
-            ["footage", "species_name"]
-        ]
-        if "Mean same species per frame" in metrics:
-            statistics_same["Mean same species per frame"] = df_grouped["mean"]
-        if "Max same species per frame" in metrics:
-            statistics_same["Max same species per frame"] = df_grouped["max"]
-        if "Min same species per frame" in metrics:
-            statistics_same["Min same species per frame"] = df_grouped["min"]
-
-        if save:
-            logging.info(
-                "Saving statistics of same species per frame into {}".format(
-                    os.path.join(save_folder, "statistics_same_species.csv")
-                )
+            # Compute the mean, min and max number of detections of each species over the frames of each footage
+            df_grouped = (
+                df_grouped.groupby(["footage", "species_name"])["class_count"]
+                .agg(["mean", "min", "max"])
+                .reset_index()
             )
-            statistics_same.to_csv(
-                os.path.join(save_folder, "statistics_same_species_prueba.csv"),
-                index=False,
-            )
-        if print_results:
-            print(
-                "-------------------- Statistics of same species per frame ---------------------"
-            )
-            print(
-                tb(
-                    statistics_same,
-                    headers="keys",
-                    tablefmt="psql",
-                    showindex=False,
-                    floatfmt=".3f",
-                )
-            )
+            # print(df_grouped)
+            statistics_same = pd.DataFrame()
 
-    # If the user wants to compute statistics over the detections of different species
-    if any("different" in sub for sub in metrics):
-        # Count the number of different species in each frame
-        df_grouped = df_filtered.groupby(
-            ["footage", "filename"], as_index=False, sort=True
-        )["class_id"].aggregate(lambda x: len(np.unique(x)))
-        # print(df_grouped)
-        # df_grouped.to_csv(os.path.join(save_folder, 'group_different.csv'),index=False)
-
-        # Compute the mean, min and max number of different species over the frames of each footage
-        df_grouped = (
-            df_grouped.groupby(["footage"])["class_id"]
-            .agg(["mean", "min", "max"])
-            .reset_index()
-        )
-        # print(df_grouped)
-
-        # Save the results in a dataframe
-        statistics_different = pd.DataFrame()
-        statistics_different["footage"] = df_grouped["footage"]
-        if "Mean different species per frame" in metrics:
-            statistics_different["Mean different species per frame"] = df_grouped[
-                "mean"
+            # Save the results in a dataframe
+            statistics_same[["footage", "species"]] = df_grouped[
+                ["footage", "species_name"]
             ]
-        if "Max different species per frame" in metrics:
-            statistics_different["Max different species per frame"] = df_grouped["max"]
-        if "Min different species per frame" in metrics:
-            statistics_different["Min different species per frame"] = df_grouped["min"]
-        if save:
-            logging.info(
-                "Saving statistics of different species per frame into {}".format(
-                    os.path.join(save_folder, "statistics_different_species.csv")
+            if "Mean same species per frame" in metrics:
+                statistics_same["Mean same species per frame"] = df_grouped["mean"]
+            if "Max same species per frame" in metrics:
+                statistics_same["Max same species per frame"] = df_grouped["max"]
+            if "Min same species per frame" in metrics:
+                statistics_same["Min same species per frame"] = df_grouped["min"]
+
+            if save:
+                logging.info(
+                    "Saving statistics of same species per frame into {}".format(
+                        os.path.join(save_folder, "statistics_same_species.csv")
+                    )
                 )
-            )
-            statistics_different.to_csv(
-                os.path.join(save_folder, "statistics_different_species.csv"),
-                index=False,
-            )
-        if print_results:
-            print(
-                "-------------------- Statistics of different species per frame ---------------------"
-            )
-            print(
-                tb(
-                    statistics_different,
-                    headers="keys",
-                    tablefmt="psql",
-                    showindex=False,
-                    floatfmt=".3f",
+                statistics_same.to_csv(
+                    os.path.join(save_folder, "statistics_same_species_prueba.csv"),
+                    index=False,
                 )
+            if print_results:
+                print(
+                    "-------------------- Statistics of same species per frame ---------------------"
+                )
+                print(
+                    tb(
+                        statistics_same,
+                        headers="keys",
+                        tablefmt="psql",
+                        showindex=False,
+                        floatfmt=".3f",
+                    )
+                )
+
+        # If the user wants to compute statistics over the detections of different species
+        if any("different" in sub for sub in metrics):
+            # Count the number of different species in each frame
+            df_grouped = df_filtered.groupby(
+                ["footage", "filename"], as_index=False, sort=True
+            )["class_id"].aggregate(lambda x: len(np.unique(x)))
+            # print(df_grouped)
+            # df_grouped.to_csv(os.path.join(save_folder, 'group_different.csv'),index=False)
+
+            # Compute the mean, min and max number of different species over the frames of each footage
+            df_grouped = (
+                df_grouped.groupby(["footage"])["class_id"]
+                .agg(["mean", "min", "max"])
+                .reset_index()
             )
+            # print(df_grouped)
+
+            # Save the results in a dataframe
+            statistics_different = pd.DataFrame()
+            statistics_different["footage"] = df_grouped["footage"]
+            if "Mean different species per frame" in metrics:
+                statistics_different["Mean different species per frame"] = df_grouped[
+                    "mean"
+                ]
+            if "Max different species per frame" in metrics:
+                statistics_different["Max different species per frame"] = df_grouped[
+                    "max"
+                ]
+            if "Min different species per frame" in metrics:
+                statistics_different["Min different species per frame"] = df_grouped[
+                    "min"
+                ]
+            if save:
+                logging.info(
+                    "Saving statistics of different species per frame into {}".format(
+                        os.path.join(save_folder, "statistics_different_species.csv")
+                    )
+                )
+                statistics_different.to_csv(
+                    os.path.join(save_folder, "statistics_different_species.csv"),
+                    index=False,
+                )
+            if print_results:
+                print(
+                    "-------------------- Statistics of different species per frame ---------------------"
+                )
+                print(
+                    tb(
+                        statistics_different,
+                        headers="keys",
+                        tablefmt="psql",
+                        showindex=False,
+                        floatfmt=".3f",
+                    )
+                )
+    else:
+        self.agg_fn()
