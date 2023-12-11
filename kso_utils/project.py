@@ -2101,7 +2101,7 @@ class MLProjectProcessor(ProjectProcessor):
         elif self.registry == "wandb":
             if self.team_name == "wildlife-ai":
                 logging.info("Please note: Using models from adi-ohad-heb-uni account.")
-                full_path = "adi-ohad-heb-uni/project-wildlife-ai"            
+                full_path = "adi-ohad-heb-uni/project-wildlife-ai"
             elif self.project_name == "template_project":
                 full_path = f"{self.team_name}/spyfish_aotearoa"
             else:
