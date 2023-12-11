@@ -275,7 +275,9 @@ def modify_clips(
     else:
         # Set up input prompt
         init_prompt = f"ffmpeg_python.input('{clip_i}')"
-        default_output_prompt = f".output('{output_clip_path}', crf=20, pix_fmt='yuv420p')"
+        default_output_prompt = (
+            f".output('{output_clip_path}', crf=20, pix_fmt='yuv420p')"
+        )
         full_prompt = init_prompt
         mod_prompt = ""
 
@@ -1625,18 +1627,52 @@ def get_species_mapping(model, project_name, team_name="koster"):
     return species_mapping
 
 
-def sort_by_last_digit(column_name):
-    return int(column_name[-1])
+def aggregate_detections(
+    annotations_csv_path: str,
+    model_registry: str,
+    model: str = None,
+    project_name: str = None,
+    team_name: str = None,
+):
+    """
+    > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+    and saves the results in different csv files.
 
+    :param annotations_csv_path: the path to the folder containing the annotations.csv file or the annotations.csv
+    :param model_registry: the name of the model register (e.g wandb, mlflow)
+    :param model: the name of the model in wandb used to obtain the detections
+    :param project_name: name of the project in wandb
+    :param team_name: name of the team in wandb.
 
-def agg_template_project(annotations_csv_path: str):
-    annot_df = pd.read_csv(annotations_csv_path)
+    """
+
+    # Read the annotations.csv file
+    df = pd.read_csv(Path(annotations_csv_path, "annotations.csv"))
+
+    # Check if the DataFrame is not empty
+    if df.empty:
+        raise ValueError(
+            "There are no labels to aggregate, run the model again with a lower threshold or try a different model."
+        )
+
+    if model_registry == "wandb":
+        # Set the name of the template project
+        if project_name == "template_project":
+            project_name = "spyfish_aotearoa"
+
+        # Obtain a dictionary with the mapping between the class ids and the species names
+        species_mapping = get_species_mapping(model, project_name, team_name)
+
+        print(species_mapping)
+        # Add a column with the species name corresponding to each class id
+        df["species_name"] = df["class_id"].astype(str).map(species_mapping)
+
     # Remove frame number and txt extension from filename to represent individual movies
-    annot_df["filename"] = annot_df["filename"].apply(lambda x: x[: x.rfind("_")])
+    df["filename"] = df["filename"].apply(lambda x: x[: x.rfind("_")])
 
     # Get max_n per class detected in each movie per frame
     class_df = (
-        annot_df.groupby(["filename", "frame_no"])["class_id"]
+        df.groupby(["filename", "frame_no"])["species_name"]
         .value_counts()
         .unstack(fill_value=0)
     )
@@ -1644,20 +1680,19 @@ def agg_template_project(annotations_csv_path: str):
 
     # Get the confidence range of each detection per frame
     conf_df = (
-        annot_df.groupby(["filename", "frame_no", "class_id"])["conf"]
+        df.groupby(["filename", "frame_no", "species_name"])["conf"]
         .agg(["min", "mean", "max"])
         .unstack()
     )
 
     # Combine this information
     result = pd.concat([class_df, conf_df], axis=1)
+
     # Add conf to column names to distinguish from max_n
     result.columns = [
         c if isinstance(c, str) else "_conf_".join([str(x) for x in c])
         for c in result.columns
     ]
-    # Sort columns into the expected order as specified by Leon
-    result = result[sorted(result.columns, key=sort_by_last_digit)]
 
     # Export result dataframe to folder
     result.to_csv(Path(Path(annotations_csv_path).parent, "max_n_report.csv"))
@@ -1681,177 +1716,27 @@ def agg_template_project(annotations_csv_path: str):
     frame_nos = pd.Series(class_df.index.get_level_values(1).values)
     frame_nos.index = class_df.index
 
-    # Right now, we assume fps of 29.97
-    class_df["minutes_no"] = (frame_nos / (29.97 * 60)).astype(int)
-    class_df.reset_index().groupby(["filename", "minutes_no"]).max().drop(
-        columns=["frame_no"], axis=1
-    ).reset_index().plot(figsize=(15, 5), x="minutes_no")
+    # # Right now, we assume fps of 29.97
+    # class_df["minutes_no"] = (frame_nos / (29.97 * 60)).astype(int)
+    # class_df.reset_index().groupby(["filename", "minutes_no"]).max().drop(
+    #     columns=["frame_no"], axis=1
+    # ).reset_index().plot(figsize=(15, 5), x="minutes_no")
 
     return max_df
 
 
-def detection_statistics(
-    eval_dir: str,
-    metrics: list,
-    model: str,
-    project_name: str,
-    team_name: str = "koster",
-    species: list = None,
-    save: bool = True,
-    save_folder: str = None,
-    print_results: bool = True,
-):
-    """
-    > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
-    and saves the results in different csv files.
+# def export_aggregate_detections(
+#     annotations_csv_path: str,
+#     save_folder: str = None,
+#     print_results: bool = True,
+# ):
+#     """
+#     > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+#     and saves the results in different csv files.
 
-    :param eval_dir: the path to the folder containing the annotations.csv file
-    :param metrics: a list of the statistics to compute
-    :param model: the name of the model in wandb used to obtain the detections
-    :param project_name: name of the project in wandb
-    :param team_name: name of the team. By default, it is set to the "koster" team.
-    :param species: a list of the species of interest. If None, all the species are considered (it is the default option)
-    :param save: True if you want to save the results in csv files, False otherwise
-    :param save_folder: the path to the folder where you want to save the csv files. If None, the results are saved in the same folder as the annotations.csv file
-    :param print_results: True if you want to print the results (in a tabular format), False otherwise
+#     :param annotations_csv_path: the path to the folder containing the annotations.csv file or the annotations.csv
+#     :param save_folder: the path to the folder where you want to save the csv files. If None, the results are saved in the same folder as the annotations.csv file
 
-    """
-
-    if save:
-        if save_folder is None:
-            # By default, save the results in the same folder as the annotations.csv file
-            save_folder = eval_dir
-        elif not os.path.exists(save_folder):
-            # Create the folder if it doesn't exist
-            os.makedirs(save_folder)
-
-    # Read the annotations.csv file
-    df = pd.read_csv(os.path.join(eval_dir, "annotations.csv"))
-
-    # if species is not None:
-    # Filter the dataframe to consider only the species of interest
-    #    df_filtered = df[df["species_name"].isin(species)]
-
-    # else:
-    # Consider all the available species
-    df_filtered = df
-
-    # Add a column with the footage name
-    df_filtered["footage"] = df_filtered["filename"].apply(lambda x: x[: x.rfind("_")])
-
-    # If the user wants to compute statistics over the detections of the same species
-    if metrics is not None:
-        metrics = metrics.value
-
-        if any("same" in sub for sub in metrics):
-            df_grouped = df_filtered.copy()
-            # Create an additional column to compute the number of detections of the same species in each frame
-            df_grouped["class_count"] = df_grouped["class_id"]
-            # Count the number of detections of the same species in each frame
-            df_grouped = df_grouped.groupby(
-                ["footage", "filename", "species_name", "class_count"],
-                as_index=False,
-                sort=True,
-            )["class_count"].aggregate("count")
-
-            # Compute the mean, min and max number of detections of each species over the frames of each footage
-            df_grouped = (
-                df_grouped.groupby(["footage", "species_name"])["class_count"]
-                .agg(["mean", "min", "max"])
-                .reset_index()
-            )
-            # print(df_grouped)
-            statistics_same = pd.DataFrame()
-
-            # Save the results in a dataframe
-            statistics_same[["footage", "species"]] = df_grouped[
-                ["footage", "species_name"]
-            ]
-            if "Mean same species per frame" in metrics:
-                statistics_same["Mean same species per frame"] = df_grouped["mean"]
-            if "Max same species per frame" in metrics:
-                statistics_same["Max same species per frame"] = df_grouped["max"]
-            if "Min same species per frame" in metrics:
-                statistics_same["Min same species per frame"] = df_grouped["min"]
-
-            if save:
-                logging.info(
-                    "Saving statistics of same species per frame into {}".format(
-                        os.path.join(save_folder, "statistics_same_species.csv")
-                    )
-                )
-                statistics_same.to_csv(
-                    os.path.join(save_folder, "statistics_same_species_prueba.csv"),
-                    index=False,
-                )
-            if print_results:
-                print(
-                    "-------------------- Statistics of same species per frame ---------------------"
-                )
-                print(
-                    tb(
-                        statistics_same,
-                        headers="keys",
-                        tablefmt="psql",
-                        showindex=False,
-                        floatfmt=".3f",
-                    )
-                )
-
-        # If the user wants to compute statistics over the detections of different species
-        if any("different" in sub for sub in metrics):
-            # Count the number of different species in each frame
-            df_grouped = df_filtered.groupby(
-                ["footage", "filename"], as_index=False, sort=True
-            )["class_id"].aggregate(lambda x: len(np.unique(x)))
-            # print(df_grouped)
-            # df_grouped.to_csv(os.path.join(save_folder, 'group_different.csv'),index=False)
-
-            # Compute the mean, min and max number of different species over the frames of each footage
-            df_grouped = (
-                df_grouped.groupby(["footage"])["class_id"]
-                .agg(["mean", "min", "max"])
-                .reset_index()
-            )
-            # print(df_grouped)
-
-            # Save the results in a dataframe
-            statistics_different = pd.DataFrame()
-            statistics_different["footage"] = df_grouped["footage"]
-            if "Mean different species per frame" in metrics:
-                statistics_different["Mean different species per frame"] = df_grouped[
-                    "mean"
-                ]
-            if "Max different species per frame" in metrics:
-                statistics_different["Max different species per frame"] = df_grouped[
-                    "max"
-                ]
-            if "Min different species per frame" in metrics:
-                statistics_different["Min different species per frame"] = df_grouped[
-                    "min"
-                ]
-            if save:
-                logging.info(
-                    "Saving statistics of different species per frame into {}".format(
-                        os.path.join(save_folder, "statistics_different_species.csv")
-                    )
-                )
-                statistics_different.to_csv(
-                    os.path.join(save_folder, "statistics_different_species.csv"),
-                    index=False,
-                )
-            if print_results:
-                print(
-                    "-------------------- Statistics of different species per frame ---------------------"
-                )
-                print(
-                    tb(
-                        statistics_different,
-                        headers="keys",
-                        tablefmt="psql",
-                        showindex=False,
-                        floatfmt=".3f",
-                    )
-                )
-    else:
-        self.agg_fn()
+#     # By default, save the results in the same folder as the annotations.csv file
+#     if save_folder is None:
+#         save_folder = eval_dir
