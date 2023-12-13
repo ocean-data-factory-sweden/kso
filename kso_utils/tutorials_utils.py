@@ -1634,7 +1634,8 @@ def sort_by_last_digit(column_name):
 def agg_template_project(
     annotations_csv_path: str,
     fps: float = 29.97,
-    frame_thres: int = 60,
+    thres: int = 5,  # number of seconds for thresholding in interval
+    int_length: int = 10,  # length in seconds of interval for filtering
     plot: bool = False,
 ):
     """
@@ -1648,11 +1649,11 @@ def agg_template_project(
     default value of 29.97, but you can change it to the actual frames per second of your video if it is
     different
     :type fps: float
-    :param frame_thres: The `frame_thres` parameter is used to filter out columns in the `result_df`
-    DataFrame where the corresponding `frame_count` column has a value less than `frame_thres`. This
-    means that only columns with a minimum number of frames per minute greater than or equal to
-    `frame_thres, defaults to 60
-    :type frame_thres: int (optional)
+    :param thres: The `thres` parameter is used to filter out columns in the `result_df`
+    DataFrame where the corresponding `frame_count` column has a value less than `thres`. This
+    means that only columns with a minimum number of frames per interval greater than or equal to
+    `thres, defaults to 5
+    :type thres: int (optional)
     :param plot: A boolean parameter that determines whether to plot the results or not. If set to True,
     the function will generate plots showing the number of maximum detections per minute and the number
     of species frame detections per minute, defaults to False
@@ -1660,6 +1661,12 @@ def agg_template_project(
     :return: a DataFrame called max_df, which contains information about the maximum value, filename,
     and frame number at which the maximum value occurred for each column in the class_df DataFrame.
     """
+    try:
+        assert int_length > thres
+    except AssertionError:
+        logging.error("Cannot have threshold below interval length.")
+        return
+
     annot_df = pd.read_csv(annotations_csv_path)
     # Remove frame number and txt extension from filename to represent individual movies
     annot_df["filename"] = annot_df["filename"].apply(lambda x: x[: x.rfind("_")])
@@ -1711,31 +1718,36 @@ def agg_template_project(
     frame_nos = pd.Series(class_df.index.get_level_values(1).values)
     frame_nos.index = class_df.index
 
-    # Right now, we assume fps of 29.97
-    class_df["minutes_no"] = (frame_nos / (fps * 60)).astype(int)
+    # Create interval column
+    class_df["interval_no"] = (frame_nos / (fps * int_length)).astype(int)
 
-    # Group by "filename", "minutes_no", and "class_id" to count frames per minute for each class_id
-    frame_count_per_minute = (
-        class_df.groupby(["filename", "minutes_no"])
+    frame_count_per_interval = (
+        class_df.groupby(["filename", "interval_no"])
         .apply(lambda group: group.iloc[:, :-1].ge(1).sum())
         .reset_index(drop=False)
     )
 
-    frame_count_per_minute.rename(
+    frame_count_per_interval["minutes_no"] = (
+        frame_count_per_interval["interval_no"] / (60 / int_length)
+    ).astype(
+        int
+    ) + 1  # Add one to make minutes more interpretable
+
+    frame_count_per_interval.rename(
         columns=lambda col: "t_" + col if "max" in col else col, inplace=True
     )
 
     # Perform the original operations (reset_index, groupby, max, drop columns)
     result_df = (
         class_df.reset_index()
-        .groupby(["filename", "minutes_no"])
+        .groupby(["filename", "interval_no"])
         .max()
         .drop(columns=["frame_no"], axis=1)
     )
 
     # Merge the frame_count_per_minute DataFrame with the result_df on the common columns
     result_df = pd.merge(
-        result_df, frame_count_per_minute, on=["filename", "minutes_no"], how="left"
+        result_df, frame_count_per_interval, on=["filename", "interval_no"], how="left"
     )
 
     # If there are NaN values in the new column, replace them with 0
@@ -1747,40 +1759,42 @@ def agg_template_project(
     # Set the ggplot style
     plt.style.use("ggplot")
 
-    def adjust_max_values(df, frame_thres=0):
+    def adjust_max_values(df, thres=0):
         for col in df.columns:
             if "max" in col and "t_" not in col:
-                mask = df["t_" + col] >= frame_thres
+                mask = df["t_" + col] >= thres * fps
                 df[col] = df[col].where(mask, 0)
 
     def plot_bars(df, x_column):
         plt.figure(figsize=(15, 5))
         for col in df.columns:
             if "max" in col and "t_" not in col:
-                bars = plt.plot(df[x_column], df[col], marker="o", label=col)
+                bars = plt.bar(df[x_column], df[col], label=col)
         plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
         plt.xlabel(x_column)
         plt.ylabel("Count")
-        plt.title(f"n_max per minute. frame threshold: {frame_thres} ")
+        plt.title(f"n_max per minute. frame threshold: {thres*fps} ")
 
     def plot_lines(df, x_column):
         plt.figure(figsize=(15, 5))
         for col in df.columns:
             if "t_" in col:
-                line = plt.plot(df[x_column], df[col], marker="o", label=col)
+                line = plt.plot(df[x_column], df[col], label=col)
         # Add a horizontal line at y=3 (example)
-        plt.axhline(y=frame_thres, color="r", linestyle="--", label="Threshold")
+        plt.axhline(y=thres * fps, color="r", linestyle="--", label="Threshold")
         plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
         plt.xlabel(x_column)
         plt.ylabel("Count")
-        plt.title("No. of species frame detections per minute")
+        plt.title(
+            f"No. of species frame detections per interval, interval length: {int_length}"
+        )
 
     # Specify the columns for x and y axes
     x_column = "minutes_no"
 
     # Plotting
     if plot:
-        adjust_max_values(result_df, frame_thres=frame_thres)
+        adjust_max_values(result_df, thres=thres)
         plot_bars(result_df, x_column)
         plot_lines(result_df, x_column)
 
