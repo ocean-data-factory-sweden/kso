@@ -1586,14 +1586,20 @@ def extract_frames_for_zoo(
 
     # Specify the temp location to store the frames
     temp_frames_folder = "_".join(species_list) + "_frames/"
+    # Make sure that folder names do not exceed a certain length
     if len(temp_frames_folder) > 260:
         curr = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         temp_frames_folder = f"{curr}_various_frames/"
 
     if project.server == "SNIC":
         # Specify volume allocated by SNIC
-        snic_path = "/mimer/NOBACKUP/groups/snic2021-6-9"
-        folder_name = f"{snic_path}/tmp_dir/frames/"
+        if Path("/mimer").exists():
+            folder_name = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/frames"
+        elif Path("/tmp").exists() and not Path("/mimer").exists():
+            folder_name = "/tmp/frames"
+        else:
+            logging.error("No suitable writable path found.")
+            return
         frames_folder = str(Path(folder_name, temp_frames_folder))
     else:
         frames_folder = temp_frames_folder
@@ -1710,8 +1716,13 @@ def modify_frames(
     # Specify the folder to host the modified frames
     if project.server == "SNIC":
         # Specify volume allocated by SNIC
-        snic_path = "/mimer/NOBACKUP/groups/snic2021-6-9"
-        folder_name = Path(snic_path, "tmp_dir", "frames")
+        if Path("/mimer").exists():
+            folder_name = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/frames"
+        elif Path("/tmp").exists() and not Path("/mimer").exists():
+            folder_name = "/tmp/frames"
+        else:
+            logging.error("No suitable writable path found.")
+            return
         mod_frames_folder = str(
             Path(folder_name, "modified_" + "_".join(species_i) + "_frames/")
         )
