@@ -1600,10 +1600,7 @@ def format_to_gbif(
         logging.info("This sections is currently under development")
 
     # If classifications have been created by ml algorithms
-    if classified_by == "ml_algorithms":
-        # Calculate the corresponding second of the frame in the movie
-        df["second_in_movie"] = (df["frame_no"] / df["fps"]).astype(int)
-
+    if classified_by == "ml_algorithms":        
         # Rename columns to match Darwin Data Core Standards
         df = df.rename(
             columns={
@@ -1728,7 +1725,7 @@ def aggregate_detections(
 
     # Remove frame number and txt extension from filename to represent individual movies
     df["movie_filename"] = (
-        df["filename"].str.split("/").str[-1].str.rsplit("_", 1).str[0]
+        df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
     )
 
     # Add movie ids info from the movies selected in choose_footage
@@ -1814,54 +1811,56 @@ def aggregate_detections(
             table_name="species",
         )
 
-    # Plotting
-    if plot:
-        print("Plotting the results is a WIP")
-        # import matplotlib.pyplot as plt
-        # import seaborn as sns
-
-        # # Set the ggplot style
-        # plt.style.use("ggplot")
-
-        # def adjust_max_values(df, thres=0):
-        #     for col in df.columns:
-        #         if "max" in col and "t_" not in col:
-        #             mask = df["t_" + col] >= thres * fps
-        #             df[col] = df[col].where(mask, 0)
-
-        # def plot_bars(df, x_column):
-        #     plt.figure(figsize=(15, 5))
-        #     for col in df.columns:
-        #         if "max" in col and "t_" not in col:
-        #             bars = plt.bar(df[x_column], df[col], label=col)
-        #     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-        #     plt.xlabel(x_column)
-        #     plt.ylabel("Count")
-        #     plt.title(f"n_max per minute. frame threshold: {thres*fps} ")
-
-        # def plot_lines(df, x_column):
-        #     plt.figure(figsize=(15, 5))
-        #     for col in df.columns:
-        #         if "t_" in col:
-        #             line = plt.plot(df[x_column], df[col], label=col)
-        #     # Add a horizontal line at y=3 (example)
-        #     plt.axhline(y=thres * fps, color="r", linestyle="--", label="Threshold")
-        #     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-        #     plt.xlabel(x_column)
-        #     plt.ylabel("Count")
-        #     plt.title(
-        #         f"No. of species frame detections per interval, interval length: {int_length}"
-        #     )
-
-        # # Specify the columns for x and y axes
-        # x_column = "minutes_no"
-
-        # adjust_max_values(df, thres=thres)
-        # plot_bars(df, x_column)
-        # plot_lines(df, x_column)
-
-        # # Customize the plot
-        # plt.tight_layout()
-        # plt.show()
+        # Calculate the corresponding second of the frame in the movie
+        df["second_in_movie"] = (df["frame_no"] / df["fps"]).astype(int)
 
     return df
+
+def plot_aggregate_detections(
+    df,
+    thres: int = 5,  # number of seconds for thresholding in interval
+    int_length: int = 10
+):
+    """
+    > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+    and saves the results in different csv files.
+
+    :param df: df of the aggregated detections
+    :param thres: The `thres` parameter is used to filter out columns in the `result_df`
+    DataFrame where the corresponding `frame_count` column has a value less than `thres`. This
+    means that only columns with a minimum number of frames per interval greater than or equal to
+    `thres, defaults to 5
+    :param int_length: An integer value specifying the length in seconds of interval for filtering
+
+    """
+    
+    # Convert 'second_in_movie' to datetime format
+    df['second_in_movie'] = pd.to_datetime(df['second_in_movie'], unit='s')
+
+    # Group by 10-second intervals
+    interval = pd.Grouper(key='second_in_movie', freq= str(int_length) + "S")
+    
+    # Group by species and minute, calculate the count
+    max_count_per_species = df.groupby(['movie_id','commonName', interval])['max_n'].max().reset_index()
+
+    import matplotlib.pyplot as plt
+    # Plot each movie separately
+    movies = max_count_per_species['movie_id'].unique()
+
+    for movie_id in movies:
+        movie_data = max_count_per_species[max_count_per_species['movie_id'] == movie_id]
+        
+        # Create a separate line plot for each species
+        species_list = movie_data['commonName'].unique()
+        
+        plt.figure(figsize=(10, 6))
+        
+        for species in species_list:
+            species_data = movie_data[movie_data['commonName'] == species]
+            plt.plot(species_data['second_in_movie'], species_data['max_n'], label=species)
+        plt.xlabel('Timestamp (seconds)')
+        plt.ylabel('Max Individuals Recorded in a Minute')
+        plt.title(f'Max Individuals Recorded Every Minute for Movie {movie_id}')
+        plt.legend()
+        plt.show()
+
