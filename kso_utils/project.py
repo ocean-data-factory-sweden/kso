@@ -311,6 +311,7 @@ class ProjectProcessor:
                         selected_movies_df = self.available_movies_df[
                             self.available_movies_df["filename"].isin(selected_movies)
                         ].reset_index(drop=True)
+
                         # Retrieve the paths of the movies selected
                         movies_paths = [
                             movie_utils.get_movie_path(
@@ -345,11 +346,22 @@ class ProjectProcessor:
 
                                     previews.append(html)
 
-                                # Store the names and paths of the selected movies
-
                             display(*previews, movie_output)
+                        # Store the ids, names and paths of the selected movies
                         self.movies_selected = selected_movies
                         self.movies_paths = movies_paths
+
+                        # Remove movie extension to match yolo_format labels
+                        selected_movies_no_ext = tuple(
+                            filename.rsplit(".", 1)[0] for filename in selected_movies
+                        )
+                        self.movies_selected_id = {
+                            key: value
+                            for key, value in zip(
+                                selected_movies_no_ext,
+                                selected_movies_df["movie_id"].to_list(),
+                            )
+                        }
 
                     select_movie_widg.observe(update_movie, "value")
                     display(select_movie_widg, output, movie_output)
@@ -1078,21 +1090,21 @@ class ProjectProcessor:
 
         logging.info(f"The classications have been downloaded to {csv_filename}")
 
-    def download_gbif_occurrences(self, classified_by):
+    def download_gbif_occurrences(self, classified_by, df):
         if classified_by == "citizen_scientists":
             # Add the site and movie information to the classifications based on the subject information
-            class_df = zoo_utils.add_subject_site_movie_info_to_class(
+            df = zoo_utils.add_subject_site_movie_info_to_class(
                 self.project,
                 self.db_connection,
                 self.csv_paths,
-                self.aggregated_zoo_classifications,
+                df,
             )
 
         # Format the classifications to Darwin Core Standard occurrences
         occurrence_df = t_utils.format_to_gbif(
             self.project,
             self.db_connection,
-            class_df,
+            df,
             self.csv_paths,
             classified_by,
             self.zoo_info,
@@ -1108,6 +1120,22 @@ class ProjectProcessor:
         occurrence_df.to_csv(csv_filename, index=False)
 
         logging.info(f"The occurences have been downloaded to {csv_filename}")
+
+    #############
+    # t9
+    #############
+    def download_detections_csv(self, agg_df):
+        # Download the processed detections as a csv file
+        csv_filename = (
+            self.project.csv_folder
+            + self.project.Project_name
+            + str(datetime.date.today())
+            + "detections.csv"
+        )
+
+        agg_df.to_csv(csv_filename, index=False)
+
+        logging.info(f"The detections have been downloaded to {csv_filename}")
 
 
 class MLProjectProcessor(ProjectProcessor):
@@ -1473,8 +1501,8 @@ class MLProjectProcessor(ProjectProcessor):
 
             runs = api.runs(full_path)
 
-            if len(runs) > 10:
-                runs = list(runs)[:10]
+            # if len(runs) > 10:
+            #     runs = list(runs)[:10]
 
             for run in runs:
                 model_artifacts = [
