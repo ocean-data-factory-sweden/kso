@@ -1618,7 +1618,7 @@ def format_to_gbif(
         logging.info("This sections is currently under development")
 
     # If classifications have been created by ml algorithms
-    if classified_by == "ml_algorithms":        
+    if classified_by == "ml_algorithms":
         # Rename columns to match Darwin Data Core Standards
         df = df.rename(
             columns={
@@ -1741,7 +1741,6 @@ def aggregate_detections(
             "There are no labels to aggregate, run the model again with a lower threshold or try a different model."
         )
 
-
     # Remove frame number and txt extension from filename to represent individual movies
     df["movie_filename"] = (
         df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
@@ -1835,11 +1834,11 @@ def aggregate_detections(
 
     return df
 
-  
+
 def plot_aggregate_detections(
     df,
     thres: int = 5,  # number of seconds for thresholding in interval
-    int_length: int = 10
+    int_length: int = 10,
 ):
     """
     > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
@@ -1853,34 +1852,40 @@ def plot_aggregate_detections(
     :param int_length: An integer value specifying the length in seconds of interval for filtering
 
     """
-    
+
     # Convert 'second_in_movie' to datetime format
-    df['second_in_movie'] = pd.to_datetime(df['second_in_movie'], unit='s')
+    df["second_in_movie"] = pd.to_datetime(df["second_in_movie"], unit="s")
 
     # Group by 10-second intervals
-    interval = pd.Grouper(key='second_in_movie', freq= str(int_length) + "S")
-    
+    interval = pd.Grouper(key="second_in_movie", freq=str(int_length) + "S")
+
     # Group by species and minute, calculate the count
-    max_count_per_species = df.groupby(['movie_id','commonName', interval])['max_n'].max().reset_index()
+    max_count_per_species = (
+        df.groupby(["movie_id", "commonName", interval])["max_n"].max().reset_index()
+    )
 
     import matplotlib.pyplot as plt
+
     # Plot each movie separately
-    movies = max_count_per_species['movie_id'].unique()
+    movies = max_count_per_species["movie_id"].unique()
 
     for movie_id in movies:
-        movie_data = max_count_per_species[max_count_per_species['movie_id'] == movie_id]
-        
+        movie_data = max_count_per_species[
+            max_count_per_species["movie_id"] == movie_id
+        ]
+
         # Create a separate line plot for each species
-        species_list = movie_data['commonName'].unique()
-        
+        species_list = movie_data["commonName"].unique()
+
         plt.figure(figsize=(10, 6))
-        
+
         for species in species_list:
-            species_data = movie_data[movie_data['commonName'] == species]
-            plt.plot(species_data['second_in_movie'], species_data['max_n'], label=species)
-        plt.xlabel('Timestamp (seconds)')
-        plt.ylabel('Max Individuals Recorded in a Minute')
-        plt.title(f'Max Individuals Recorded Every Minute for Movie {movie_id}')
+            species_data = movie_data[movie_data["commonName"] == species]
+            plt.plot(
+                species_data["second_in_movie"], species_data["max_n"], label=species
+            )
+        plt.xlabel("Timestamp (seconds)")
+        plt.ylabel("Max Individuals Recorded in a Minute")
+        plt.title(f"Max Individuals Recorded Every Minute for Movie {movie_id}")
         plt.legend()
         plt.show()
-
