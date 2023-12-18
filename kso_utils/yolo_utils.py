@@ -1001,44 +1001,54 @@ def generate_csv_report(
     evaluation_path: str, run, log: bool = False, registry: str = "wandb"
 ):
     """
-    > We read the labels from the `labels` folder, and create a dictionary with the filename as the key,
-    and the list of labels as the value. We then convert this dictionary to a dataframe, and write it to
-    a csv file
+    Generate a CSV report from labels in the evaluation folder.
 
     :param evaluation_path: The path to the evaluation folder
     :type evaluation_path: str
-    :return: A dataframe with the following columns:
-        filename, class_id, frame_no, x, y, w, h, conf
+    :return: A dataframe with columns: filename, class_id, frame_no, x, y, w, h, conf
     """
-    labels = Path(evaluation_path, "labels").iterdir()
+    labels_path = Path(evaluation_path, "labels")
     data_dict = {}
-    for f in labels:
-        # Convert PosixPath to string
-        f = str(f)
-        frame_no = int(f.split("_")[-1].replace(".txt", ""))
-        data_dict[f] = []
-        with open(Path(f), "r") as infile:
+
+    for label_file in labels_path.iterdir():
+        try:
+            frame_no = int(label_file.stem.split("_")[-1])
+        except ValueError:
+            logging.error(
+                "Custom frames not linked to uploaded movies, no frame numbers available"
+            )
+            frame_no = None
+
+        with open(label_file, "r") as infile:
             lines = infile.readlines()
             for line in lines:
-                class_id, x, y, w, h, conf = line.split(" ")
-                data_dict[f].append([class_id, frame_no, x, y, w, h, float(conf)])
-    dlist = [[key, *i] for key, value in data_dict.items() for i in value]
+                parts = line.split()
+                class_id, x, y, w, h, conf = parts[:6]
+                data_dict[label_file] = data_dict.get(label_file, []) + [
+                    [class_id, frame_no, x, y, w, h, float(conf)]
+                ]
+
+    dlist = [[key, *i] for key, values in data_dict.items() for i in values]
+
+    # Convert list of lists to output dataframe
     detect_df = pd.DataFrame.from_records(
         dlist, columns=["filename", "class_id", "frame_no", "x", "y", "w", "h", "conf"]
     )
+
+    # Export to CSV
     csv_out = Path(evaluation_path, "annotations.csv")
     detect_df.sort_values(
         by="frame_no", key=lambda x: np.argsort(index_natsorted(detect_df["filename"]))
     ).to_csv(csv_out, index=False)
-    logging.info("Report created at {}".format(csv_out))
+
+    logging.info(f"Report created at {csv_out}")
+
     if log:
         if registry == "wandb":
-            # wandb.init(resume="allow", id=run.id)
             wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
         elif registry == "mlflow":
             pass
-            # seems like csv file gets logged anyway
-            # mlflow.log_table(data=detect_df.to_dict(orient='dict'), artifact_file=str(Path("detection_output", "annotations.json")))
+
     return detect_df
 
 

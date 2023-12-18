@@ -673,8 +673,14 @@ def view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
             temp_image_path = "temp.jpg"
         except:
             # Specify volume allocated by SNIC
-            snic_path = "/mimer/NOBACKUP/groups/snic2021-6-9"
-            temp_image_path = f"{snic_path}/tmp_dir/temp.jpg"
+            if Path("/mimer").exists():
+                snic_tmp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir"
+            elif Path("/tmp").exists() and not Path("/mimer").exists():
+                snic_tmp_path = "/tmp"
+            else:
+                logging.error("No suitable writable path found.")
+                return
+            temp_image_path = str(Path(snic_tmp_path, "temp.jpg"))
 
         finally:
             # Remove temporary file
@@ -1366,10 +1372,16 @@ def create_clips(
 
     # Specify output path for zooniverse clip extraction
     if project.server == "SNIC":
-        temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/"
+        if Path("/mimer").exists():
+            temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir"
+        elif Path("/tmp").exists() and not Path("/mimer").exists():
+            temp_path = "/tmp"
+        else:
+            logging.error("No suitable writable path found.")
+            return
     else:
         temp_path = "."
-    clips_folder = str(Path(temp_path, "tmp_dir", movies_selected + "_zooniverseclips"))
+    clips_folder = str(Path(temp_path, movies_selected + "_zooniverseclips"))
 
     # Set the filename of the clips
     potential_start_df["clip_filename"] = (
@@ -1441,10 +1453,16 @@ def create_modified_clips(
 
     # Specify output path for modified clip extraction
     if project.server == "SNIC":
-        temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/"
+        if Path("/mimer").exists():
+            temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir"
+        elif Path("/tmp").exists() and not Path("/mimer").exists():
+            temp_path = "/tmp"
+        else:
+            logging.error("No suitable writable path found.")
+            return
     else:
         temp_path = "."
-    mod_clips_folder = str(Path(temp_path, "tmp_dir", mod_clip_folder))
+    mod_clips_folder = str(Path(temp_path, mod_clip_folder))
 
     # Remove existing modified clips
     if os.path.exists(mod_clips_folder):
@@ -1723,6 +1741,7 @@ def aggregate_detections(
             "There are no labels to aggregate, run the model again with a lower threshold or try a different model."
         )
 
+
     # Remove frame number and txt extension from filename to represent individual movies
     df["movie_filename"] = (
         df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
@@ -1816,6 +1835,7 @@ def aggregate_detections(
 
     return df
 
+  
 def plot_aggregate_detections(
     df,
     thres: int = 5,  # number of seconds for thresholding in interval
