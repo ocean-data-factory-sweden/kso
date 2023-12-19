@@ -1501,8 +1501,8 @@ class MLProjectProcessor(ProjectProcessor):
 
             runs = api.runs(full_path)
 
-            # if len(runs) > 10:
-            #     runs = list(runs)[:10]
+            if len(runs) > 100:
+                runs = list(runs)[:100]
 
             for run in runs:
                 model_artifacts = [
