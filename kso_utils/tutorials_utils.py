@@ -1987,4 +1987,5 @@ def detection_statistics(
                     )
                 )
     else:
-        self.agg_fn()
+        pass
+        # self.agg_fn()
