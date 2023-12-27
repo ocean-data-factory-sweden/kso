@@ -245,6 +245,7 @@ def extract_metadata(subj_df: pd.DataFrame):
 
 # Function to clean label (no non-alpha characters)
 def clean_label(label_string: str):
+    label_string = label_string.replace("_", "")
     label_string = label_string.upper()
     label_string = label_string.replace(" ", "")
     pattern = r"[^A-Za-z0-9]+"
