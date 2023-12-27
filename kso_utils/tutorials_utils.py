@@ -1884,7 +1884,8 @@ def plot_aggregate_detections(
             plt.plot(
                 species_data["second_in_movie"], species_data["max_n"], label=species
             )
-        plt.xlabel("Timestamp (seconds)")
+
+            plt.xlabel("Timestamp (seconds)")
         plt.ylabel("Max Individuals Recorded in a Minute")
         plt.title(f"Max Individuals Recorded Every Minute for Movie {movie_id}")
         plt.legend()
