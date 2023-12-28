@@ -490,7 +490,7 @@ def frame_aggregation(
         project=project,
         server_connection=server_connection,
         db_connection=db_connection,
-    )
+    )[0]
 
     # If at least one movie is linked to the project
     logging.info(f"There are {len(movie_df)} movies")
@@ -911,7 +911,6 @@ def tracking_frames(
 
     return t_bbox
 
-
 def setup_paths(output_folder: str, model_type: str):
     """
     It takes the output folder and returns the path to the data file and the path to the hyperparameters
@@ -1020,6 +1019,7 @@ def generate_csv_report(
             frame_no = None
 
         with open(label_file, "r") as infile:
+
             lines = infile.readlines()
             for line in lines:
                 parts = line.split()
@@ -1048,6 +1048,7 @@ def generate_csv_report(
             wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
         elif registry == "mlflow":
             pass
+
 
     return detect_df
 
@@ -1222,6 +1223,7 @@ def track_objects(
         "tracking_method": "deepocsort",
         "save_id_crops": False,
     }
+
 
     args = SimpleNamespace(**track_dict)
     track.run(args)

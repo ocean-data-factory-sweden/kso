@@ -1843,7 +1843,6 @@ def plot_aggregate_detections(
     """
     > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
     and saves the results in different csv files.
-
     :param df: df of the aggregated detections
     :param thres: The `thres` parameter is used to filter out columns in the `result_df`
     DataFrame where the corresponding `frame_count` column has a value less than `thres`. This

@@ -1496,6 +1496,7 @@ class MLProjectProcessor(ProjectProcessor):
                 api.runs(path=full_path).objects
             elif self.project_name == "template_project":
                 full_path = f"{self.team_name}/spyfish_aotearoa"
+
             else:
                 full_path = f"{self.team_name}/{self.project_name}"
 
@@ -2049,6 +2050,7 @@ class MLProjectProcessor(ProjectProcessor):
             save=True,
             imgsz=img_size,
         )
+
 
         if wandb.run is not None:
             self.modules["wandb"].finish()
