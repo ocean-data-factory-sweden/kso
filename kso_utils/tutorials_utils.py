@@ -241,10 +241,8 @@ def modify_clips(
     """
     if gpu_available:
         # Set up input prompt
-        init_prompt = f"ffmpeg_python.input('{clip_i}', hwaccel='cuda', hwaccel_output_format='cuda')"
-        default_output_prompt = (
-            f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='h264_nvenc',)"
-        )
+        init_prompt = f"ffmpeg_python.input('{clip_i}')"
+        default_output_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p')"
         full_prompt = init_prompt
         mod_prompt = ""
 
@@ -256,7 +254,7 @@ def modify_clips(
                 # Unnest the modification detail dict
                 df = pd.json_normalize(modification_details, sep="_")
                 crf = df.filter(regex="crf$", axis=1).values[0][0]
-                out_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p', vcodec='h264_nvenc')"
+                out_prompt = f".output('{output_clip_path}', pix_fmt='yuv420p')"
 
         if len(mod_prompt) > 0:
             full_prompt += mod_prompt
@@ -277,7 +275,9 @@ def modify_clips(
     else:
         # Set up input prompt
         init_prompt = f"ffmpeg_python.input('{clip_i}')"
-        default_output_prompt = f".output('{output_clip_path}', crf=20, pix_fmt='yuv420p', vcodec='libx264')"
+        default_output_prompt = (
+            f".output('{output_clip_path}', crf=20, pix_fmt='yuv420p')"
+        )
         full_prompt = init_prompt
         mod_prompt = ""
 
@@ -289,7 +289,7 @@ def modify_clips(
                 # Unnest the modification detail dict
                 df = pd.json_normalize(modification_details, sep="_")
                 crf = df.filter(regex="crf$", axis=1).values[0][0]
-                out_prompt = f".output('{output_clip_path}', crf={crf}, preset='veryfast', pix_fmt='yuv420p', vcodec='libx264')"
+                out_prompt = f".output('{output_clip_path}', crf={crf}, preset='veryfast', pix_fmt='yuv420p')"
 
         if len(mod_prompt) > 0:
             full_prompt += mod_prompt
@@ -310,12 +310,12 @@ def modify_clips(
     logging.info(f"Clip {clip_i} modified successfully")
 
 
-def review_clip_selection(clip_selection, movie_i: str, clip_modification):
+def review_clip_selection(clip_selection, movies_selected: str, clip_modification):
     """
     > This function reviews the clips that will be created from the movie selected
 
     :param clip_selection: the object that contains the results of the clip selection
-    :param movie_i: the movie you want to create clips from
+    :param movies_selected: the movie(s) you want to create clips from
     :param clip_modification: The modification that will be applied to the clips
     """
     start_trim = clip_selection.kwargs["clips_range"][0]
@@ -323,7 +323,7 @@ def review_clip_selection(clip_selection, movie_i: str, clip_modification):
 
     # Review the clips that will be created
     logging.info(
-        f"You are about to create {round(clip_selection.result)} clips from {movie_i}"
+        f"You are about to create {round(clip_selection.result)} clips from {movies_selected}"
     )
     logging.info(
         f"starting at {datetime.timedelta(seconds=start_trim)} and ending at {datetime.timedelta(seconds=end_trim)}"
@@ -399,7 +399,7 @@ def extract_clips(
                 "-c:a",
                 "copy",
                 "-c:v",
-                "h264_nvenc",
+                "copy",
                 str(output_clip_path),
             ]
         )
@@ -430,7 +430,7 @@ def extract_clips(
                 "-c:a",
                 "copy",
                 "-c:v",
-                "h264_nvenc",
+                "copy",
                 # "-b:v",
                 # b_v,
                 str(output_clip_path),
@@ -443,7 +443,7 @@ def extract_clips(
         full_prompt = init_prompt
         mod_prompt = ""
         output_prompt = ""
-        def_output_prompt = f".output('{str(output_clip_path)}', ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', crf=20, pix_fmt='yuv420p', vcodec='libx264')"
+        def_output_prompt = f".output('{str(output_clip_path)}', ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', crf=20, pix_fmt='yuv420p')"
 
         # Set up modification
         for transform in modification_details.values():
@@ -454,7 +454,7 @@ def extract_clips(
                 # Unnest the modification detail dict
                 df = pd.json_normalize(modification_details, sep="_")
                 crf = df.filter(regex="crf$", axis=1).values[0][0]
-                output_prompt = f".output('{str(output_clip_path)}', crf={crf}, ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', preset='veryfast', pix_fmt='yuv420p', vcodec='libx264')"
+                output_prompt = f".output('{str(output_clip_path)}', crf={crf}, ss={str(upl_second_i)}, t={str(clip_length)}, movflags='+faststart', preset='veryfast', pix_fmt='yuv420p')"
 
         # Run the modification
         try:
@@ -673,8 +673,14 @@ def view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
             temp_image_path = "temp.jpg"
         except:
             # Specify volume allocated by SNIC
-            snic_path = "/mimer/NOBACKUP/groups/snic2021-6-9"
-            temp_image_path = f"{snic_path}/tmp_dir/temp.jpg"
+            if Path("/mimer").exists():
+                snic_tmp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir"
+            elif Path("/tmp").exists() and not Path("/mimer").exists():
+                snic_tmp_path = "/tmp"
+            else:
+                logging.error("No suitable writable path found.")
+                return
+            temp_image_path = str(Path(snic_tmp_path, "temp.jpg"))
 
         finally:
             # Remove temporary file
@@ -1286,8 +1292,8 @@ class WidgetMaker(widgets.VBox):
 
 def create_clips(
     available_movies_df: pd.DataFrame,
-    movie_i: str,
-    movie_path: str,
+    movies_selected: str,
+    movies_paths: str,
     clip_selection,
     project: Project,
     modification_details: dict,
@@ -1298,8 +1304,8 @@ def create_clips(
     This function takes a movie and extracts clips from it
 
     :param available_movies_df: the dataframe with the movies that are available for the project
-    :param movie_i: the name of the movie you want to extract clips from
-    :param movie_path: the path to the movie you want to extract clips from
+    :param movies_selected: the name(s) of the movie(s) you want to extract clips from
+    :param movies_paths: the path(s) to the movie(s) you want to extract clips from
     :param clip_selection: a ClipSelection object
     :param project: the project object
     :param modification_details: a dictionary with the following keys:
@@ -1349,29 +1355,37 @@ def create_clips(
         list_clip_start = [clip_selection.result["clip_start_time"]]
 
     # Filter the df for the movie of interest
-    movie_i_df = available_movies_df[
-        available_movies_df["filename"] == movie_i
+    movies_selected_df = available_movies_df[
+        available_movies_df["filename"] == movies_selected
     ].reset_index(drop=True)
 
     # Add the list of starting seconds to the df
-    movie_i_df["list_clip_start"] = list_clip_start
+    movies_selected_df["list_clip_start"] = list_clip_start
 
     # Reshape the dataframe with the starting seconds for the new clips
-    potential_start_df = expand_list(movie_i_df, "list_clip_start", "upl_seconds")
+    potential_start_df = expand_list(
+        movies_selected_df, "list_clip_start", "upl_seconds"
+    )
 
     # Add the length of the clips to df (to keep track of the length of each uploaded clip)
     potential_start_df["clip_length"] = clip_length
 
     # Specify output path for zooniverse clip extraction
     if project.server == "SNIC":
-        temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/"
+        if Path("/mimer").exists():
+            temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir"
+        elif Path("/tmp").exists() and not Path("/mimer").exists():
+            temp_path = "/tmp"
+        else:
+            logging.error("No suitable writable path found.")
+            return
     else:
         temp_path = "."
-    clips_folder = str(Path(temp_path, "tmp_dir", movie_i + "_zooniverseclips"))
+    clips_folder = str(Path(temp_path, movies_selected + "_zooniverseclips"))
 
     # Set the filename of the clips
     potential_start_df["clip_filename"] = (
-        movie_i
+        movies_selected
         + "_clip_"
         + potential_start_df["upl_seconds"].astype(str)
         + "_"
@@ -1399,7 +1413,7 @@ def create_clips(
     ):
         # Extract the videos and store them in the folder
         extract_clips(
-            movie_path,
+            movies_paths,
             clip_length,
             row["upl_seconds"],
             row["clip_path"],
@@ -1416,7 +1430,7 @@ def create_clips(
 def create_modified_clips(
     project: Project,
     clips_list: list,
-    movie_i: str,
+    movies_selected: str,
     modification_details: dict,
     gpu_available: bool,
     pool_size: int = 4,
@@ -1426,7 +1440,7 @@ def create_modified_clips(
     GPU availability flag, and returns a list of modified clips
 
     :param clips_list: a list of the paths to the clips you want to modify
-    :param movie_i: the path to the movie you want to extract clips from
+    :param movies_selected: the path(s) to the movie(s) you want to extract clips from
     :param modification_details: a dictionary with the modifications to be applied to the clips. The keys are the names of the modifications and the values are the parameters of the modifications
     :param project: the project object
     :param gpu_available: True if you have a GPU available, False if you don't
@@ -1435,14 +1449,20 @@ def create_modified_clips(
     """
 
     # Specify the folder to host the modified clips
-    mod_clip_folder = "modified_" + movie_i + "_clips"
+    mod_clip_folder = "modified_" + movies_selected + "_clips"
 
     # Specify output path for modified clip extraction
     if project.server == "SNIC":
-        temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/"
+        if Path("/mimer").exists():
+            temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir"
+        elif Path("/tmp").exists() and not Path("/mimer").exists():
+            temp_path = "/tmp"
+        else:
+            logging.error("No suitable writable path found.")
+            return
     else:
         temp_path = "."
-    mod_clips_folder = str(Path(temp_path, "tmp_dir", mod_clip_folder))
+    mod_clips_folder = str(Path(temp_path, mod_clip_folder))
 
     # Remove existing modified clips
     if os.path.exists(mod_clips_folder):
@@ -1599,34 +1619,60 @@ def format_to_gbif(
 
     # If classifications have been created by ml algorithms
     if classified_by == "ml_algorithms":
-        logging.info("This sections is currently under development")
+        # Rename columns to match Darwin Data Core Standards
+        df = df.rename(
+            columns={
+                "created_on": "eventDate",
+                "max_n": "individualCount",
+                "commonName": "vernacularName",
+            }
+        )
+
+        # Create relevant columns for GBIF
+        df["occurrenceID"] = (
+            project.Project_name
+            + "_"
+            + df["siteName"]
+            + "_"
+            + df["eventDate"].astype(str)
+            + "_"
+            + df["second_in_movie"].astype(str)
+            + "_"
+            + df["vernacularName"].astype(str)
+        )
+
+        # Set the basis of record as machine observation
+        df["basisOfRecord"] = "MachineObservation"
+
+        # If coord uncertainity doesn't exist set to 30 metres
+        df["coordinateUncertaintyInMeters"] = df.get(
+            "coordinateUncertaintyInMeters", 30
+        )
+
+        # Select columns relevant for GBIF occurrences
+        df = df[
+            [
+                "occurrenceID",
+                "basisOfRecord",
+                "vernacularName",
+                "scientificName",
+                "eventDate",
+                "countryCode",
+                "taxonRank",
+                "kingdom",
+                "decimalLatitude",
+                "decimalLongitude",
+                "geodeticDatum",
+                "coordinateUncertaintyInMeters",
+                "individualCount",
+            ]
+        ]
+
+        return df
     else:
         raise ValueError(
             "Specify who classified the species of interest (citizen_scientists, biologists or ml_algorithms)"
         )
-
-
-# Function to display a list of statistics to choose to compute for the detections over each footage
-def choose_statistics():
-    statistics = widgets.SelectMultiple(
-        options=[
-            "Mean same species per frame",
-            "Mean different species per frame",
-            "Max same species per frame",
-            "Max different species per frame",
-            "Min same species per frame",
-            "Min different species per frame",
-        ],
-        description="Statistics",
-        disabled=False,
-        layout=widgets.Layout(width="max-content"),
-        style={"description_width": "initial"},
-    )
-
-    main_out = widgets.Output()
-    display(statistics, main_out)
-
-    return statistics
 
 
 # Auxiliary function to obtain a dictionary with the mapping between the class ids used by the detection model and the species names
@@ -1648,206 +1694,198 @@ def get_species_mapping(model, project_name, team_name="koster"):
     return species_mapping
 
 
-def choose_species(labels_path, model, project_name, team_name="koster"):
-    """
-    > This function creates a widget that allows the user to choose the species of interest.
-
-    :param labels_path: the path to the folder containing the annotations.csv file
-    :param model: the name of the model in wandb used to obtain the detections
-    :param project_name: name of the project in wandb
-    :param team_name: name of the team. By default, it is set to the "koster" team.
-
-    """
-    # Read the annotations.csv file
-    annotations = pd.read_csv(os.path.join(labels_path, "annotations.csv"))
-
-    # Obtain the list of unique class ids from the annotations.csv file
-    species_ids = annotations["class_id"].unique()
-
-    # Obtain a dictionary with the mapping between the class ids and the species names and create a dataframe from it
-    species_mapping = get_species_mapping(model, project_name, team_name)
-    species_df = pd.DataFrame.from_dict(species_mapping, orient="index")
-    species_df.reset_index(inplace=True)
-    species_df.columns = ["id", "species"]
-    species_df["id"] = species_df["id"].astype(int)
-
-    # Filter the dataframe to consider only the species available in the annotations.csv file
-    species_df = species_df[species_df["id"].isin(species_ids)]
-    species_list = species_df["species"].tolist()
-
-    # Create the widget with the list of available species
-    species = widgets.SelectMultiple(
-        options=species_list,
-        description="Species",
-        disabled=False,
-        layout=widgets.Layout(width="25%"),
-        style={"description_width": "initial"},
-    )
-    main_out = widgets.Output()
-    display(species, main_out)
-
-    return species
-
-
-def detection_statistics(
-    csv_path: str,
-    metrics: list,
-    model: str,
-    project_name: str,
-    team_name: str = "koster",
-    species: list = None,
-    save: bool = True,
-    save_folder: str = None,
-    print_results: bool = True,
+def aggregate_detections(
+    project: Project,
+    db_connection,
+    csv_paths: dict,
+    annotations_csv_path: str,
+    model_registry: str,
+    movies_selected_id: dict = None,
+    model: str = None,
+    project_name: str = None,
+    team_name: str = None,
+    thres: int = 5,  # number of seconds for thresholding in interval
+    int_length: int = 10,
+    plot: bool = False,
 ):
     """
     > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
     and saves the results in different csv files.
 
-    :param csv_path: the path to the folder containing the annotations.csv file
-    :param metrics: a list of the statistics to compute
+    :param project: the project object
+    :param db_connection: SQL connection object
+    :param csv_paths: a dictionary with the paths of the csvs used to initiate the db
+    :param annotations_csv_path: the path to the folder containing the annotations.csv file or the annotations.csv
+    :param movies_selected_id: the ids of the movies selected in earlier steps (note if the selection changes b, mlflow)
+    :param model_registry: the name of the model register (e.g wandb, mlflow)
     :param model: the name of the model in wandb used to obtain the detections
     :param project_name: name of the project in wandb
-    :param team_name: name of the team. By default, it is set to the "koster" team.
-    :param species: a list of the species of interest. If None, all the species are considered (it is the default option)
-    :param save: True if you want to save the results in csv files, False otherwise
-    :param save_folder: the path to the folder where you want to save the csv files. If None, the results are saved in the same folder as the annotations.csv file
-    :param print_results: True if you want to print the results (in a tabular format), False otherwise
+    :param team_name: name of the team in wandb.
+    :param thres: The `thres` parameter is used to filter out columns in the `result_df`
+    DataFrame where the corresponding `frame_count` column has a value less than `thres`. This
+    means that only columns with a minimum number of frames per interval greater than or equal to
+    `thres, defaults to 5
+    :param int_length: An integer value specifying the length in seconds of interval for filtering
+    :param plot: A boolean parameter that determines whether to plot the results or not. If set to True,
+    the function will generate plots showing the number of maximum detections per minute and the number
+    of species frame detections per minute, defaults to False
 
     """
 
-    if save:
-        if save_folder is None:
-            # By default, save the results in the same folder as the annotations.csv file
-            save_folder = csv_path
-        elif not os.path.exists(save_folder):
-            # Create the folder if it doesn't exist
-            os.makedirs(save_folder)
-
     # Read the annotations.csv file
-    df = pd.read_csv(os.path.join(csv_path, "annotations.csv"))
+    df = pd.read_csv(Path(annotations_csv_path, "annotations.csv"))
 
-    # Obtain a dictionary with the mapping between the class ids and the species names
-    species_mapping = get_species_mapping(model, project_name, team_name)
+    # Check if the DataFrame is not empty
+    if df.empty:
+        raise ValueError(
+            "There are no labels to aggregate, run the model again with a lower threshold or try a different model."
+        )
 
-    # Add a column with the species name corresponding to each class id
-    df["species_name"] = df.apply(
-        lambda row: species_mapping[str(row["class_id"])], axis=1
+    # Remove frame number and txt extension from filename to represent individual movies
+    df["movie_filename"] = (
+        df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
     )
 
-    if species is not None:
-        # Filter the dataframe to consider only the species of interest
-        df_filtered = df[df["species_name"].isin(species)]
+    # Add movie ids info from the movies selected in choose_footage
+    if movies_selected_id:
+        # Create a new column with the mapped values
+        df["movie_id"] = df["movie_filename"].apply(
+            lambda x: dict(movies_selected_id).get(x, None)
+        )
+
+        # Define the movie col of interest
+        movie_group_col = "movie_id"
 
     else:
-        # Consider all the available species
-        df_filtered = df
+        # Define the movie col of interest
+        movie_group_col = "movie_filename"
 
-    # Add a column with the footage name
-    df_filtered["footage"] = df_filtered.apply(
-        lambda row: "_".join(row.filename.split("_")[:-1]), axis=1
+    # Map the class id to species labels
+    if model_registry == "wandb":
+        # Set the name of the template project
+        if project_name == "template_project":
+            project_name = "spyfish_aotearoa"
+
+        # Obtain a dictionary with the mapping between the class ids and the species names
+        species_mapping = get_species_mapping(model, project_name, team_name)
+
+        # Add a column with the species name corresponding to each class id
+        df["commonName"] = df["class_id"].astype(str).map(species_mapping)
+
+        # Define the movie col of interest
+        sp_group_col = "commonName"
+
+    else:
+        # Define the movie col of interest
+        sp_group_col = "class_id"
+
+    # Get max_n per class detected in each movie per frame
+    df["max_n"] = df.groupby([movie_group_col, "frame_no"])[sp_group_col].transform(
+        "count"
     )
 
-    # If the user wants to compute statistics over the detections of the same species
-    if any("same" in sub for sub in metrics):
-        df_grouped = df_filtered.copy()
-        # Create an additional column to compute the number of detections of the same species in each frame
-        df_grouped["class_count"] = df_grouped["class_id"]
-        # Count the number of detections of the same species in each frame
-        df_grouped = df_grouped.groupby(
-            ["footage", "filename", "species_name", "class_count"],
-            as_index=False,
-            sort=True,
-        )["class_count"].aggregate("count")
+    # Specify the columns for which we want unique confidence values
+    columns_conf = [movie_group_col, "frame_no", sp_group_col]
 
-        # Compute the mean, min and max number of detections of each species over the frames of each footage
-        df_grouped = (
-            df_grouped.groupby(["footage", "species_name"])["class_count"]
-            .agg(["mean", "min", "max"])
-            .reset_index()
+    # Get the confidence range of each detection per frame and add three columns
+    df["min_conf"] = df.groupby(columns_conf)["conf"].transform("min")
+    df["mean_conf"] = df.groupby(columns_conf)["conf"].transform("mean")
+    df["max_conf"] = df.groupby(columns_conf)["conf"].transform("max")
+
+    # Create a boolean mask for duplicated rows based on the specified columns
+    mask_duplicates = df.duplicated(subset=columns_conf, keep=False)
+
+    # Keep only unique rows based on grouped columns
+    df = df[~mask_duplicates]
+
+    # Retrieve the max counts and conf.levels of uploaded footage
+    if all(column_name in df.columns for column_name in ["movie_id", "commonName"]):
+        from kso_utils.db_utils import add_db_info_to_df
+
+        # Combine the movie info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="movies",
         )
-        statistics_same = pd.DataFrame()
 
-        # Save the results in a dataframe
-        statistics_same[["footage", "species"]] = df_grouped[
-            ["footage", "species_name"]
+        # Combine the site info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="sites",
+        )
+
+        # Combine the species info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="species",
+        )
+
+        # Calculate the corresponding second of the frame in the movie
+        df["second_in_movie"] = (df["frame_no"] / df["fps"]).astype(int)
+
+    return df
+
+
+def plot_aggregate_detections(
+    df,
+    thres: int = 5,  # number of seconds for thresholding in interval
+    int_length: int = 10,
+):
+    """
+    > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+    and saves the results in different csv files.
+    :param df: df of the aggregated detections
+    :param thres: The `thres` parameter is used to filter out columns in the `result_df`
+    DataFrame where the corresponding `frame_count` column has a value less than `thres`. This
+    means that only columns with a minimum number of frames per interval greater than or equal to
+    `thres, defaults to 5
+    :param int_length: An integer value specifying the length in seconds of interval for filtering
+
+    """
+
+    # Convert 'second_in_movie' to datetime format
+    df["second_in_movie"] = pd.to_datetime(df["second_in_movie"], unit="s")
+
+    # Group by 10-second intervals
+    interval = pd.Grouper(key="second_in_movie", freq=str(int_length) + "S")
+
+    # Group by species and minute, calculate the count
+    max_count_per_species = (
+        df.groupby(["movie_id", "commonName", interval])["max_n"].max().reset_index()
+    )
+
+    import matplotlib.pyplot as plt
+
+    # Plot each movie separately
+    movies = max_count_per_species["movie_id"].unique()
+
+    for movie_id in movies:
+        movie_data = max_count_per_species[
+            max_count_per_species["movie_id"] == movie_id
         ]
-        if "Mean same species per frame" in metrics:
-            statistics_same["Mean same species per frame"] = df_grouped["mean"]
-        if "Max same species per frame" in metrics:
-            statistics_same["Max same species per frame"] = df_grouped["max"]
-        if "Min same species per frame" in metrics:
-            statistics_same["Min same species per frame"] = df_grouped["min"]
 
-        if save:
-            logging.info(
-                "Saving statistics of same species per frame into {}".format(
-                    os.path.join(save_folder, "statistics_same_species.csv")
-                )
-            )
-            statistics_same.to_csv(
-                os.path.join(save_folder, "statistics_same_species_prueba.csv"),
-                index=False,
-            )
-        if print_results:
-            print(
-                "-------------------- Statistics of same species per frame ---------------------"
-            )
-            print(
-                tb(
-                    statistics_same,
-                    headers="keys",
-                    tablefmt="psql",
-                    showindex=False,
-                    floatfmt=".3f",
-                )
+        # Create a separate line plot for each species
+        species_list = movie_data["commonName"].unique()
+
+        plt.figure(figsize=(10, 6))
+
+        for species in species_list:
+            species_data = movie_data[movie_data["commonName"] == species]
+            plt.plot(
+                species_data["second_in_movie"], species_data["max_n"], label=species
             )
 
-    # If the user wants to compute statistics over the detections of different species
-    if any("different" in sub for sub in metrics):
-        # Count the number of different species in each frame
-        df_grouped = df_filtered.groupby(
-            ["footage", "filename"], as_index=False, sort=True
-        )["class_id"].aggregate(lambda x: len(np.unique(x)))
-
-        # Compute the mean, min and max number of different species over the frames of each footage
-        df_grouped = (
-            df_grouped.groupby(["footage"])["class_id"]
-            .agg(["mean", "min", "max"])
-            .reset_index()
-        )
-
-        # Save the results in a dataframe
-        statistics_different = pd.DataFrame()
-        statistics_different["footage"] = df_grouped["footage"]
-        if "Mean different species per frame" in metrics:
-            statistics_different["Mean different species per frame"] = df_grouped[
-                "mean"
-            ]
-        if "Max different species per frame" in metrics:
-            statistics_different["Max different species per frame"] = df_grouped["max"]
-        if "Min different species per frame" in metrics:
-            statistics_different["Min different species per frame"] = df_grouped["min"]
-        if save:
-            logging.info(
-                "Saving statistics of different species per frame into {}".format(
-                    os.path.join(save_folder, "statistics_different_species.csv")
-                )
-            )
-            statistics_different.to_csv(
-                os.path.join(save_folder, "statistics_different_species.csv"),
-                index=False,
-            )
-        if print_results:
-            print(
-                "-------------------- Statistics of different species per frame ---------------------"
-            )
-            print(
-                tb(
-                    statistics_different,
-                    headers="keys",
-                    tablefmt="psql",
-                    showindex=False,
-                    floatfmt=".3f",
-                )
-            )
+            plt.xlabel("Timestamp (seconds)")
+        plt.ylabel("Max Individuals Recorded in a Minute")
+        plt.title(f"Max Individuals Recorded Every Minute for Movie {movie_id}")
+        plt.legend()
+        plt.show()

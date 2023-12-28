@@ -493,17 +493,18 @@ def add_db_info_to_df(
 
     # Set species table
     elif table_name == "species":
+        # Save the name of the columns to merge dfs on
+        left_on_col = "commonName"
+        right_on_col = "commonName"
+
         if "label" in df.columns:
-            df["commonName"] = df["label"]
+            df[right_on_col] = df["label"]
 
         from kso_utils.zooniverse_utils import clean_label
 
         # Match format of species name to Zooniverse labels
-        sql_df["commonName"] = sql_df["commonName"].apply(clean_label)
-
-        # Save the name of the columns to merge dfs on
-        left_on_col = "commonName"
-        right_on_col = "commonName"
+        sql_df[right_on_col] = sql_df[right_on_col].apply(clean_label)
+        df[left_on_col] = df[left_on_col].apply(clean_label)
 
     else:
         logging.error(
@@ -518,6 +519,20 @@ def add_db_info_to_df(
     comb_df = pd.merge(
         df, sql_df, how="left", left_on=left_on_col, right_on=right_on_col
     )
+
+    # Check for rows with NaN values in the merged DataFrame
+    missing_values = comb_df[right_on_col].isnull()
+
+    # If there are missing values, raise an issue
+    if missing_values.any():
+        # Get the indices of the missing values
+        missing_indices = missing_values[missing_values].index
+
+        # Print a warning or raise an exception with relevant information
+        logging.error(
+            f"Some rows in df do not have corresponding values in sql_df. Rows with missing values: {missing_indices}"
+        )
+
     # Drop the id column to prevent duplicated column issues
     comb_df = comb_df.drop(columns=["id"], errors="ignore")
 

@@ -54,7 +54,7 @@ def test_t1():
     # Retrieve and display movies
     pp.get_movie_info()
     # Preview the media (pre-selected)
-    pp.preview_media(test=True)
+    pp.choose_footage(preview_media=True, test=True)
 
     # Check species dataframe
     pp.check_species_meta()
@@ -104,15 +104,16 @@ def test_t3(zoo_user, zoo_pass):
     # Connect to zooniverse w/ Github credential
     pp.connect_zoo_project(zoo_cred=[zoo_user, zoo_pass])
     # Pre-selected test movie
-    pp.movie_selected = "movie_1.mp4"
+    pp.movies_selected = ["movie_1.mp4"]
+    pp.movies_paths = ["https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4"]
     # Check whether movie has been uploaded previously
-    pp.check_movies_uploaded(pp.movie_selected)
+    pp.check_movies_uploaded(pp.movies_selected)
     # Do not use GPU by default
     gpu_available = kso_widgets.gpu_select()
     # Generate a default number of clips for testing
     pp.generate_zoo_clips(
-        movie_name=pp.movie_selected,
-        movie_path=pp.movie_path,
+        movies_selected=pp.movies_selected,
+        movies_paths=pp.movies_paths,
         is_example=True,
         use_gpu=gpu_available.result,
         test=True,
@@ -259,9 +260,10 @@ def test_t6():
         conf_thres=conf_thres.value,
         artifact_dir=artifact_dir,
         save_output=True,
+        save_dir=save_dir,
         test=True,
+        model=model,
     )
-    eval_dir = exp_path
 
     # Note: investigating training and validation datasets is not currently tested.
 
@@ -275,7 +277,6 @@ def test_t6():
         name=track_exp_name,
         source=source,
         artifact_dir=artifact_dir,
-        eval_dir=eval_dir,
         conf_thres=conf_thres.value,
         img_size=(640, 640),
         test=True,

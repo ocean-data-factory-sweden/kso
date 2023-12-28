@@ -149,7 +149,9 @@ def retrieve_zoo_info(
 
             # Save the info as pandas data frame
             try:
-                export_df = pd.read_csv(io.StringIO(export.content.decode("utf-8")))
+                export_df = pd.read_csv(
+                    io.StringIO(export.content.decode("utf-8")), low_memory=False
+                )
             except pd.errors.ParserError:
                 logging.error(
                     "Export retrieval time out, please try again in 1 minute or so."
@@ -243,6 +245,7 @@ def extract_metadata(subj_df: pd.DataFrame):
 
 # Function to clean label (no non-alpha characters)
 def clean_label(label_string: str):
+    label_string = label_string.replace("_", "")
     label_string = label_string.upper()
     label_string = label_string.replace(" ", "")
     pattern = r"[^A-Za-z0-9]+"
@@ -1444,7 +1447,7 @@ def upload_clips_to_zooniverse(
     # Upload the clips to Zooniverse (with metadata)
     new_subjects = []
 
-    logging.info("Uploading subjects to Zooniverse")
+    logging.info(f"Uploading subjects to Zooniverse")
     for clip_path, metadata in tqdm(
         subject_metadata.items(), total=len(subject_metadata)
     ):
@@ -1467,7 +1470,7 @@ def upload_clips_to_zooniverse(
     # Upload all subjects
     subject_set.add(new_subjects)
 
-    logging.info("Subjects uploaded to Zooniverse")
+    logging.info(f"Subjects uploaded to Zooniverse")
 
 
 ##########################
@@ -1584,14 +1587,20 @@ def extract_frames_for_zoo(
 
     # Specify the temp location to store the frames
     temp_frames_folder = "_".join(species_list) + "_frames/"
+    # Make sure that folder names do not exceed a certain length
     if len(temp_frames_folder) > 260:
         curr = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         temp_frames_folder = f"{curr}_various_frames/"
 
     if project.server == "SNIC":
         # Specify volume allocated by SNIC
-        snic_path = "/mimer/NOBACKUP/groups/snic2021-6-9"
-        folder_name = f"{snic_path}/tmp_dir/frames/"
+        if Path("/mimer").exists():
+            folder_name = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/frames"
+        elif Path("/tmp").exists() and not Path("/mimer").exists():
+            folder_name = "/tmp/frames"
+        else:
+            logging.error("No suitable writable path found.")
+            return
         frames_folder = str(Path(folder_name, temp_frames_folder))
     else:
         frames_folder = temp_frames_folder
@@ -1708,8 +1717,13 @@ def modify_frames(
     # Specify the folder to host the modified frames
     if project.server == "SNIC":
         # Specify volume allocated by SNIC
-        snic_path = "/mimer/NOBACKUP/groups/snic2021-6-9"
-        folder_name = f"{snic_path}/tmp_dir/frames/"
+        if Path("/mimer").exists():
+            folder_name = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/frames"
+        elif Path("/tmp").exists() and not Path("/mimer").exists():
+            folder_name = "/tmp/frames"
+        else:
+            logging.error("No suitable writable path found.")
+            return
         mod_frames_folder = str(
             Path(folder_name, "modified_" + "_".join(species_i) + "_frames/")
         )
@@ -1719,10 +1733,8 @@ def modify_frames(
             mod_frames_folder = project.output_path + mod_frames_folder
 
     # Specify the path of the modified frames
-    frames_to_upload_df["modif_frame_path"] = (
-        mod_frames_folder
-        + "_modified_"
-        + frames_to_upload_df["frame_path"].apply(lambda x: os.path.basename(x))
+    frames_to_upload_df["modif_frame_path"] = frames_to_upload_df["frame_path"].apply(
+        lambda x: str(Path(mod_frames_folder, Path(x).name)), 1
     )
 
     # Remove existing modified clips
@@ -1746,7 +1758,7 @@ def modify_frames(
         ):
             if not os.path.exists(row["modif_frame_path"]):
                 # Set up input prompt
-                init_prompt = f"ffmpeg.input('{row['frame_path']}')"
+                init_prompt = f'ffmpeg.input("{row["frame_path"]}")'
                 full_prompt = init_prompt
                 # Set up modification
                 for transform in modification_details.values():
@@ -1935,7 +1947,7 @@ def upload_frames_to_zooniverse(
     subject_set.display_name = subject_set_name
     subject_set.save()
 
-    logging.info(subject_set_name, "subject set created")
+    logging.info(f"{subject_set_name} subject set created")
 
     # Save the df as the subject metadata
     subject_metadata = upload_to_zoo.set_index("frame_path").to_dict("index")

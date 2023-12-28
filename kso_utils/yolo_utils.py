@@ -19,6 +19,7 @@ import base64
 import ffmpeg
 import mlflow
 import ipywidgets as widgets
+import matplotlib.pyplot as plt
 from jupyter_bbox_widget import BBoxWidget
 from IPython.display import display, clear_output, HTML
 from PIL import Image as PILImage, ImageDraw
@@ -281,16 +282,16 @@ def split_frames(data_path: str, perc_test: float):
         if counter >= index_test + 1:
             # Avoid leaking frames into test set
             if movie_name != latest_movie or movie_name == title:
-                file_valid.write(pathAndFilename + "\n")
+                file_valid.write(str(pathAndFilename) + "\n")
             else:
-                file_train.write(pathAndFilename + "\n")
+                file_train.write(str(pathAndFilename) + "\n")
             counter += 1
         else:
             latest_movie = movie_name
             # if random.uniform(0, 1) <= 0.5:
             #    file_train.write(pathAndFilename + "\n")
             # else:
-            file_train.write(pathAndFilename + "\n")
+            file_train.write(str(pathAndFilename) + "\n")
             counter += 1
 
 
@@ -665,7 +666,7 @@ def frame_aggregation(
                 if track_frames:
                     # Track n frames after object is detected
                     tboxes[named_tuple].extend(
-                        track_frames(
+                        tracking_frames(
                             video_dict[final_name],
                             grouped_fields[-1],
                             bboxes[named_tuple],
@@ -678,7 +679,7 @@ def frame_aggregation(
                             (
                                 grouped_fields[-1],
                                 grouped_fields[1] + box[0],
-                                grouped_fields[-1],
+                                grouped_fields[0],
                                 video_dict[final_name][grouped_fields[1]].shape[1],
                                 video_dict[final_name][grouped_fields[1]].shape[0],
                             )
@@ -759,16 +760,14 @@ def frame_aggregation(
     ):
         if movie_bool:
             file_path = Path(name[1])
-            file, ext = file_path.name, file_path.suffix
-            file_base = Path(file).name
-            file_out = Path(out_path, "labels", f"{file_base}_frame_{name[0]}.txt")
-            img_out = Path(out_path, "images", f"{file_base}_frame_{name[0]}.jpg")
+            file, ext = file_path.stem, file_path.suffix
+            file_out = Path(out_path, "labels", f"{file}_frame_{name[0]}.txt")
+            img_out = Path(out_path, "images", f"{file}_frame_{name[0]}.jpg")
         else:
-            file_path = Path(name[1])
-            file, ext = file_path.name, file_path.suffix
-            file_base = Path(file).name
-            file_out = Path(out_path, "labels", f"{file_base}.txt")
-            img_out = Path(out_path, "images", f"{file_base}.jpg")
+            file_path = Path(name)
+            file, ext = file_path.stem, file_path.suffix
+            file_out = Path(out_path, "labels", f"{file}.txt")
+            img_out = Path(out_path, "images", f"{file}.jpg")
 
         # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
         if out_format == "yolo":
@@ -802,15 +801,17 @@ def frame_aggregation(
 
             save_name = name[1] if name[1] in video_dict else unswedify(name[1])
             if save_name in video_dict:
-                PIL.Image.fromarray(
-                    video_dict[save_name][name[0]][:, :, [2, 1, 0]]
-                ).save(img_out)
+                img_array = video_dict[save_name][name[0]][:, :, [2, 1, 0]]
+                img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+                PIL.Image.fromarray(img_array).save(img_out)
         else:
             if link_bool:
                 image_output = PIL.Image.open(requests.get(name, stream=True).raw)
             else:
                 image_output = np.asarray(PIL.Image.open(name))
-            PIL.Image.fromarray(np.asarray(image_output)).save(img_out)
+            img_array = np.asarray(image_output)
+            img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+            PIL.Image.fromarray(img_array).save(img_out)
 
     logging.info("Frames extracted successfully")
 
@@ -862,7 +863,7 @@ def createTrackerByName(trackerType: str):
     return tracker
 
 
-def track_frames(
+def tracking_frames(
     video, class_ids: list, bboxes: list, start_frame: int, last_frame: int
 ):
     """
@@ -896,7 +897,7 @@ def track_frames(
     t_bbox = []
     t = 0
     # Process video and track objects
-    for current_frame in range(start_frame + 1, last_frame + 1):
+    for current_frame in range(int(start_frame) + 1, int(last_frame) + 1):
         frame = video[current_frame]  # [0]
 
         # get updated location of objects in subsequent frames
@@ -909,66 +910,6 @@ def track_frames(
                 )
 
     return t_bbox
-
-
-def choose_baseline_model(download_path: str, test: bool = False):
-    """
-    It downloads the latest version of the baseline model from WANDB
-    :return: The path to the baseline model.
-    """
-    api = wandb.Api()
-    # weird error fix (initialize api another time)
-    api.runs(path="koster/model-registry")
-    api = wandb.Api()
-    collections = [
-        coll
-        for coll in api.artifact_type(
-            type_name="model", project="koster/model-registry"
-        ).collections()
-    ]
-
-    model_dict = {}
-    for artifact in collections:
-        model_dict[artifact.name] = artifact
-
-    model_widget = widgets.Dropdown(
-        options=[(name, model) for name, model in model_dict.items()],
-        value=None,
-        description="Select model:",
-        ensure_option=False,
-        disabled=False,
-        layout=widgets.Layout(width="50%"),
-        style={"description_width": "initial"},
-    )
-
-    main_out = widgets.Output()
-    display(model_widget, main_out)
-
-    def on_change(change):
-        with main_out:
-            clear_output()
-            try:
-                for af in model_dict[change["new"].name].versions():
-                    artifact_dir = af.download(download_path)
-                    artifact_file = [
-                        str(i)
-                        for i in Path(artifact_dir).iterdir()
-                        if str(i).endswith(".pt")
-                    ][-1]
-                    logging.info(
-                        f"Baseline {af.name} successfully downloaded from WANDB"
-                    )
-                    model_widget.artifact_path = artifact_file
-            except Exception as e:
-                logging.error(
-                    f"Failed to download the baseline model. Please ensure you are logged in to WANDB. {e}"
-                )
-
-    model_widget.observe(on_change, names="value")
-    if test:
-        model_widget.value = model_dict["baseline-yolov5"]
-    return model_widget
-
 
 def setup_paths(output_folder: str, model_type: str):
     """
@@ -1014,7 +955,7 @@ def setup_paths(output_folder: str, model_type: str):
         return None, None
 
 
-def set_config(conf_thres: float, model: str, eval_dir: str):
+def set_config(**kwargs):
     """
     `set_config` takes in a confidence threshold, model name, and evaluation directory and returns a
     configuration object.
@@ -1028,9 +969,11 @@ def set_config(conf_thres: float, model: str, eval_dir: str):
     :return: The config object is being returned.
     """
     config = wandb.config
-    config.confidence_threshold = conf_thres
-    config.model_name = model
-    config.evaluation_directory = eval_dir
+    for key, value in kwargs.items():
+        if key == "model_name" and "model_name" in config:
+            pass
+        else:
+            setattr(config, key, value)
     return config
 
 
@@ -1057,44 +1000,56 @@ def generate_csv_report(
     evaluation_path: str, run, log: bool = False, registry: str = "wandb"
 ):
     """
-    > We read the labels from the `labels` folder, and create a dictionary with the filename as the key,
-    and the list of labels as the value. We then convert this dictionary to a dataframe, and write it to
-    a csv file
+    Generate a CSV report from labels in the evaluation folder.
 
     :param evaluation_path: The path to the evaluation folder
     :type evaluation_path: str
-    :return: A dataframe with the following columns:
-        filename, class_id, frame_no, x, y, w, h, conf
+    :return: A dataframe with columns: filename, class_id, frame_no, x, y, w, h, conf
     """
-    labels = Path(evaluation_path, "labels").iterdir()
+    labels_path = Path(evaluation_path, "labels")
     data_dict = {}
-    for f in labels:
-        # Convert PosixPath to string
-        f = str(f)
-        frame_no = int(f.split("_")[-1].replace(".txt", ""))
-        data_dict[f] = []
-        with open(Path(f), "r") as infile:
+
+    for label_file in labels_path.iterdir():
+        try:
+            frame_no = int(label_file.stem.split("_")[-1])
+        except ValueError:
+            logging.error(
+                "Custom frames not linked to uploaded movies, no frame numbers available"
+            )
+            frame_no = None
+
+        with open(label_file, "r") as infile:
+
             lines = infile.readlines()
             for line in lines:
-                class_id, x, y, w, h, conf = line.split(" ")
-                data_dict[f].append([class_id, frame_no, x, y, w, h, float(conf)])
-    dlist = [[key, *i] for key, value in data_dict.items() for i in value]
+                parts = line.split()
+                class_id, x, y, w, h, conf = parts[:6]
+                data_dict[label_file] = data_dict.get(label_file, []) + [
+                    [class_id, frame_no, x, y, w, h, float(conf)]
+                ]
+
+    dlist = [[key, *i] for key, values in data_dict.items() for i in values]
+
+    # Convert list of lists to output dataframe
     detect_df = pd.DataFrame.from_records(
         dlist, columns=["filename", "class_id", "frame_no", "x", "y", "w", "h", "conf"]
     )
+
+    # Export to CSV
     csv_out = Path(evaluation_path, "annotations.csv")
     detect_df.sort_values(
         by="frame_no", key=lambda x: np.argsort(index_natsorted(detect_df["filename"]))
     ).to_csv(csv_out, index=False)
-    logging.info("Report created at {}".format(csv_out))
+
+    logging.info(f"Report created at {csv_out}")
+
     if log:
         if registry == "wandb":
-            wandb.init(resume="must", id=run.id)
             wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
         elif registry == "mlflow":
             pass
-            # seems like csv file gets logged anyway
-            # mlflow.log_table(data=detect_df.to_dict(orient='dict'), artifact_file=str(Path("detection_output", "annotations.json")))
+
+
     return detect_df
 
 
@@ -1233,7 +1188,7 @@ def track_objects(
         and ".pt" in str(f)
         and "osnet" not in str(f)
         and "best" in str(f)
-    ][0]
+    ]
 
     if len(models) > 0 and not test:
         best_model = models[0]
@@ -1243,59 +1198,32 @@ def track_objects(
 
     best_model = Path(best_model)
 
-    if not gpu:
-        track_dict = {
-            "name": name,
-            "source": source_dir,
-            "conf": conf_thres,
-            "yolo_model": best_model,
-            "reid_model": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
-            "imgsz": img_size,
-            "device": "0" if torch.cuda.is_available() else "cpu",
-            "project": Path(f"{tracker_folder}/runs/track/"),
-            "save": True,
-            "save_mot": True,
-            "save_txt": True,
-            "iou": 0.7,
-            "show": False,
-            "show_conf": True,
-            "show_labels": True,
-            "verbose": True,
-            "exist_ok": True,
-            "classes": None,
-            "vid_stride": 1,
-            "line_width": None,
-            "tracking_method": "deepocsort",
-            "half": True,
-            "per_class": False,
-            "save_id_crops": False,
-        }
-    else:
-        track_dict = {
-            "name": name,
-            "source": source_dir,
-            "conf": conf_thres,
-            "yolo_weights": best_model,
-            "reid_weights": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
-            "imgsz": img_size,
-            "project": Path(f"{tracker_folder}/runs/track/"),
-            "device": "0" if torch.cuda.is_available() else "cpu",
-            "save": True,
-            "save_mot": True,
-            "save_txt": True,
-            "half": True,
-            "iou": 0.7,
-            "show": False,
-            "show_conf": True,
-            "show_labels": True,
-            "verbose": True,
-            "exist_ok": True,
-            "classes": None,
-            "vid_stride": 1,
-            "line_width": None,
-            "tracking_method": "deepocsort",
-            "save_id_crops": False,
-        }
+    track_dict = {
+        "name": name,
+        "source": source_dir,
+        "conf": conf_thres,
+        "yolo_model": best_model,
+        "reid_model": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
+        "imgsz": img_size,
+        "project": Path(f"{tracker_folder}/runs/track/"),
+        "device": "0" if torch.cuda.is_available() else "cpu",
+        "save": True,
+        "save_mot": True,
+        "save_txt": True,
+        "half": True,
+        "iou": 0.7,
+        "show": False,
+        "show_conf": True,
+        "show_labels": True,
+        "verbose": True,
+        "exist_ok": True,
+        "classes": None,
+        "vid_stride": 1,
+        "line_width": None,
+        "tracking_method": "deepocsort",
+        "save_id_crops": False,
+    }
+
 
     args = SimpleNamespace(**track_dict)
     track.run(args)
@@ -1817,6 +1745,101 @@ def view_file(path: str):
         widget.Image()
 
     return widget
+
+
+def adjust_tracking(
+    tracking_folder: str,
+    avg_diff_frames: int,
+    min_frames_length: int,
+    plot_result: bool = False,
+):
+    """Clean tracking output by removing noisy class changes and short-duration detections."""
+    tracking_df = pd.read_csv(str(Path(tracking_folder, "tracking.csv")))
+
+    import torch
+
+    try:
+        model = torch.load(
+            Path(
+                [
+                    f
+                    for f in Path(tracking_folder).parent.iterdir()
+                    if f.is_file() and "best.pt" in str(f)
+                ][-1]
+            )
+        )
+        names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
+
+    except:
+        logging.error("Model not found, using class_id.")
+        names = {}
+
+    if plot_result:
+        fig, ax = plt.subplots(figsize=(15, 5))
+
+        scatter = ax.scatter(
+            x=tracking_df["frame_no"],
+            y=tracking_df["tracker_id"],
+            c=tracking_df["class_id"],
+        )
+
+        # produce a legend with the unique colors from the scatter
+        legend1 = ax.legend(
+            *scatter.legend_elements(), loc="upper left", title="Classes"
+        )
+        ax.grid()
+        ax.add_artist(legend1)
+        plt.show()
+
+    def custom_tracking_diff(x):
+        """Compute the maximum difference between frame numbers"""
+        diff_series = np.diff(x)
+        if len(diff_series) > 0:
+            return diff_series.max()
+        else:
+            return 1
+
+    def custom_class(x):
+        """Choose class by rounding average of classifications"""
+        if len(names) > 0:
+            return names[int(np.round(x.median()))]
+        else:
+            return int(np.round(x.median()))
+
+    diff_df = (
+        tracking_df.groupby(["tracker_id"])
+        .agg({"frame_no": custom_tracking_diff})
+        .sort_values(by="frame_no")
+    )
+    length_df = (
+        tracking_df.groupby("tracker_id")
+        .agg({"frame_no": "count", "class_id": custom_class})
+        .sort_values(by="frame_no", ascending=False)
+    )
+    total_df = pd.merge(diff_df, length_df, left_index=True, right_index=True)
+    total_df.rename(
+        columns={"frame_no_x": "max_frame_diff", "frame_no_y": "frame_length"},
+        inplace=True,
+    )
+    if len(names) > 0:
+        total_df.rename(columns={"class_id": "species_name"}, inplace=True)
+    total_df = pd.merge(
+        total_df,
+        tracking_df[["tracker_id", "frame_no"]].groupby("tracker_id").first(),
+        on="tracker_id",
+    )
+    logging.info(
+        f"Saving tracking file to {str(Path(tracking_folder, 'tracking_clean.csv'))}"
+    )
+    filtered_df = total_df[
+        (total_df.max_frame_diff <= avg_diff_frames)
+        & (total_df.frame_length >= min_frames_length)
+    ].sort_index()
+    if len(names) > 0:
+        logging.info(filtered_df["species_name"].value_counts())
+    else:
+        logging.info(filtered_df["class_id"].value_counts())
+    return filtered_df.to_csv(str(Path(tracking_folder, "tracking_clean.csv")))
 
 
 def main():

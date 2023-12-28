@@ -241,67 +241,45 @@ def retrieve_movie_info_from_server(
 
 # Function to preview underwater movies
 def preview_movie(
-    project: Project,
-    available_movies_df: pd.DataFrame,
-    movie_i: str,
-    server_connection: dict,
+    movie_path: str,
+    movie_metadata: pd.DataFrame,
 ):
     """
-    It takes a movie filename and returns a HTML object that can be displayed in the notebook
+    It takes a movie filename and its associated metadata and returns a HTML object that can be displayed in the notebook
 
-    :param project: the project object
-    :param available_movies_df: a dataframe with all the movies in the database
-    :param movie_i: the filename of the movie you want to preview
-    :param server_connection: a dictionary with the connection to the server
-    :return: A tuple of two elements:
-        1. HTML object
-        2. Movie path
+    :param movie_path: the filename of the movie you want to preview
+    :param movie_metadata: the metadata of the movie you want to preview
+    :return: HTML object
     """
 
-    # Select the movie of interest
-    movie_selected = available_movies_df[
-        available_movies_df["filename"] == movie_i
-    ].reset_index(drop=True)
-    movie_selected_view = movie_selected.T
-    movie_selected_view.columns = ["Movie summary"]
+    # Adjust the width of the video and metadata sections based on your preference
+    video_width = "60%"  # Adjust as needed
+    metadata_width = "40%"  # Adjust as needed
 
-    # Make sure only one movie is selected
-    if len(movie_selected.index) > 1:
-        logging.info(
-            "There are several movies with the same filename. This should be fixed!"
-        )
-        return None
-
-    else:
-        # Generate temporary path to the selected movie
-        movie_path = get_movie_path(
-            project=project,
-            f_path=movie_selected["fpath"].values[0],
-            server_connection=server_connection,
-        )
-
-        html_code = f"""<html>
-                <div style="display: flex; justify-content: space-around; align-items: center">
-                <div>
-                  <video width=500 controls>
-                  <source src={movie_path}>
-                  </video>
+    html_code = f"""<html>
+            <div style="display: flex; align-items: center; width: 100%;">
+                <div style="width: {video_width}; padding-right: 10px;">
+                    <video width="100%" controls>
+                        <source src={movie_path}>
+                    </video>
                 </div>
-                <div>{movie_selected_view.to_html()}</div>
+                <div style="width: {metadata_width}; overflow: auto;">
+                    {movie_metadata.T.to_html()}
                 </div>
-                </html>"""
+            </div>
+            </html>"""
 
-        return HTML(html_code), movie_path
+    return HTML(html_code)
 
 
-def check_movie_uploaded(project: Project, db_connection, movie_i: str):
+def check_movies_uploaded(project: Project, db_connection, movies_selected: list):
     """
     This function takes in a movie name and a dictionary containing the path to the database and returns
     a boolean value indicating whether the movie has already been uploaded to Zooniverse
 
     :param project: the project object
-    :param movie_i: the name of the movie you want to check
-    :type movie_i: str
+    :param movies_selected: the name of the movie(s) you want to check
+    :type movies_selected: list
     :param db_connection: SQL connection object
     """
     from kso_utils.db_utils import get_df_from_db_table
@@ -325,17 +303,16 @@ def check_movie_uploaded(project: Project, db_connection, movie_i: str):
     subjects_df = subjects_df[subjects_df["subject_type"] == "clip"]
 
     # Save the video filenames of the clips uploaded to Zooniverse
-    videos_uploaded = subjects_df.filename.dropna().unique()
+    clips_uploaded = subjects_df[
+        subjects_df["filename"].apply(
+            lambda x: any(movie in x for movie in movies_selected)
+        )
+    ]
 
-    # Check if selected movie has already been uploaded
-    already_uploaded = any(mv in movie_i for mv in videos_uploaded)
-
-    if already_uploaded:
-        clips_uploaded = subjects_df[subjects_df["filename"].str.contains(movie_i)]
-        logging.info(f"{movie_i} has clips already uploaded.")
-        logging.info(clips_uploaded.head())
+    if clips_uploaded.empty:
+        logging.info(f"{movies_selected} has not been uploaded to Zooniverse yet")
     else:
-        logging.info(f"{movie_i} has not been uploaded to Zooniverse yet")
+        logging.info(f"{clips_uploaded} clips have already been uploaded.")
 
 
 # Function to extract selected frames from videos
@@ -436,7 +413,7 @@ def convert_video(
     :param movie_path: The local path- or url to the movie file you want to convert
     :type movie_path: str
     :param movie_filename: The filename of the movie file you want to convert
-    :type movie_path: str
+    :type movie_filename: str
     :param gpu_available: Boolean, whether or not a GPU is available
     :type gpu_available: bool
     :param compression: Boolean, whether or not movie compression is required
@@ -477,7 +454,7 @@ def convert_video(
                 "-filter:v",
                 fps_output,
                 "-c:v",
-                "h264_nvenc",  # ensures correct codec
+                "copy",  # ensures correct codec
                 "-crf",
                 "22",  # compresses the video
                 str(conv_fpath),
@@ -497,7 +474,7 @@ def convert_video(
                 "-filter:v",
                 fps_output,
                 "-c:v",
-                "h264_nvenc",  # ensures correct codec
+                "copy",  # ensures correct codec
                 str(conv_fpath),
             ]
         )
@@ -511,7 +488,7 @@ def convert_video(
                 "-filter:v",
                 fps_output,
                 "-c:v",
-                "h264",  # ensures correct codec
+                "copy",  # ensures correct codec
                 "-crf",
                 "22",  # compresses the video
                 str(conv_fpath),
@@ -527,7 +504,7 @@ def convert_video(
                 "-filter:v",
                 fps_output,
                 "-c:v",
-                "h264",  # ensures correct codec
+                "copy",  # ensures correct codec
                 str(conv_fpath),
             ]
         )
@@ -951,8 +928,16 @@ def select_project_movies(
     :param project: the project object
     :param movies_df: a df with the information about the filepaths and "existance" of the movies
     """
+
     # Select only movies that are a good deployment
-    if project.Project_name in ["Spyfish_Aotearoa", "Spyfish_BOPRC"]:
-        movies_df = movies_df.loc[~movies_df.IsBadDeployment]
+    if project.Project_name in ["Spyfish_Aotearoa"]:
+        # Check for missing values in IsBadDeployment column
+        if movies_df["IsBadDeployment"].isnull().any():
+            raise ValueError(
+                "The 'IsBadDeployment' column contains missing values. Please handle missing values before proceeding."
+            )
+
+        else:
+            movies_df = movies_df.loc[~movies_df.IsBadDeployment]
 
     return movies_df

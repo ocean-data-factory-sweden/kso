@@ -43,7 +43,7 @@ def test_select_movie():
     widget = kso_widgets.select_movie(
         available_movies_df=pd.DataFrame(columns=["filename"])
     )
-    assert widget.value is None
+    assert widget.value == ()
 
 
 def test_choose_species():

@@ -7,7 +7,6 @@ tr = TestRequirements()
 
 
 def get_yolo_inferer(yolo_model):
-
     if "yolox" in str(yolo_model):
         try:
             import yolox  # for linear_assignment

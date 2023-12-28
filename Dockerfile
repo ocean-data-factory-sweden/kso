@@ -90,11 +90,16 @@ RUN apt-get update && \
     python3 -m pip --no-cache-dir install numpy && \
     python3 -m pip --no-cache-dir install \
         -r /usr/src/app/kso/requirements.txt && \
+    # Copy over custom autobackend file to enable use of older YOLO models
+    cp \
+        /usr/src/app/kso/src/autobackend.py \
+        /usr/local/lib/python3.8/dist-packages/ultralytics/nn/autobackend.py && \
     apt-get remove --autoremove -y python3-dev build-essential
 
 # Set environment variables
 ENV WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
     WANDB_CACHE_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
+    WANDB_DATA_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
     PYTHONPATH=$PYTHONPATH:/usr/src/app/kso
 
 # Set everything up to work with the jupyter notebooks
