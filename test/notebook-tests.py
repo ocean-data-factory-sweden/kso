@@ -21,6 +21,11 @@ import sys
 import subprocess
 from pathlib import Path
 
+# Set environment variables
+os.environ["WANDB_DIR"] = "/tmp"
+os.environ["WANDB_CACHE_DIR"] = "/tmp"
+os.environ["WANDB_DATA_DIR"] = "/tmp"
+
 if "kso_utils" not in sys.modules:
     # for when we are running it on git, the yaml file will install the docker image. then we do need to go to the correct directory
     os.chdir("tutorials")
