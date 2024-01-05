@@ -2099,7 +2099,7 @@ class MLProjectProcessor(ProjectProcessor):
             logging.info("Downloading model checkpoint...")
             artifact_dir = artifact.download(root=download_path)
             logging.info("Checkpoint downloaded.")
-            return Path(artifact_dir).resolve()
+            return str(Path(artifact_dir).resolve())
         else:
             return
 
