@@ -1727,7 +1727,7 @@ class MLProjectProcessor(ProjectProcessor):
         project = Path(save_dir)
         self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
         if latest:
-            model.predict(
+            results = model.predict(
                 project=project,
                 name=name,
                 source=source,
@@ -1736,7 +1736,10 @@ class MLProjectProcessor(ProjectProcessor):
                 save_conf=True,
                 save=save_output,
                 imgsz=img_size,
+                stream=True
             )
+            for i in results:
+                print(i)
         else:
             self.modules["detect"].run(
                 weights=best_model,
