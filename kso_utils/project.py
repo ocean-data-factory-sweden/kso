@@ -1588,9 +1588,8 @@ class MLProjectProcessor(ProjectProcessor):
                 Path(self.data_path).parent, artifact_path="input_datasets"
             )
         try:
-            #if "yolov5" in weights:
-            #    weights = Path(weights).name
-            weights = "yolov8m.pt"
+            if "yolov5" in weights:
+                weights = Path(weights).name
 
             model = self.modules["ultralytics"].YOLO(weights)
             model.train(
