@@ -1737,7 +1737,6 @@ class MLProjectProcessor(ProjectProcessor):
                 save_conf=True,
                 save=save_output,
                 imgsz=img_size,
-                stream=True,
             )
         else:
             self.modules["detect"].run(
