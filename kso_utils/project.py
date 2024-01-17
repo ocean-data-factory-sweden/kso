@@ -1736,7 +1736,7 @@ class MLProjectProcessor(ProjectProcessor):
                 save_conf=True,
                 save=save_output,
                 imgsz=img_size,
-                stream=True
+                stream=True,
             )
             for i in results:
                 print(i)
