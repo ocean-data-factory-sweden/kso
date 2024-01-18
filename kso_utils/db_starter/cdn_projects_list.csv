@@ -1,0 +1,11 @@
+Project_name,Zooniverse_number,db_path,server,bucket,key,csv_folder,movie_folder,photo_folder,ml_folder
+Template project,9754,template_project.db,TEMPLATE,None,None,db_csv_info,None,None,ml-template-data
+Koster_Seafloor_Obs,9747,/tmp/db/koster_lab.db,SNIC,None,None,/buckets/kso/csv_Koster_Seafloor_Obs/,/buckets/kso/output/,None,None
+Spyfish_Aotearoa,14054,spyfish_aot.db,AWS,marine-buv,init_db_doc_buv,db_spyfish_csv,None,None,None
+SGU,9747,/tmp/db/sgu.db,SNIC,None,None,/buckets/sgu/csv_SGU/,None,/buckets/sgu/output/,None
+Medins,9747,/tmp/db/medins.db,SNIC,None,None,/buckets/medins/csv_Medins/,/buckets/medins/output/,None,None
+GU,9747,/tmp/db/gu.db,SNIC,None,None,/buckets/gotu/csv_GU/,/buckets/gotu/output/,None,None
+Sharklife,9747,/tmp/db/sharklife.db,SNIC,None,None,/buckets/sharklife/csv_Sharklife/,/buckets/sharklife/output/,None,None
+CMPA_TEX,19165,cmpa_tex.db,AWS,thriving-earth-exchange,None,db_cmpa_csv,None,None,None
+Spyfish_BOPRC,14054,Spyfish_BOPRC.db,LOCAL,None,None,E:/SpyFish/BOPRC sites,Y:/,None,None
+model-registry,0,None,None,None,None,None,None,None,None
