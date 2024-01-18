@@ -1619,7 +1619,56 @@ def format_to_gbif(
 
     # If classifications have been created by ml algorithms
     if classified_by == "ml_algorithms":
-        logging.info("This sections is currently under development")
+        # Rename columns to match Darwin Data Core Standards
+        df = df.rename(
+            columns={
+                "created_on": "eventDate",
+                "max_n": "individualCount",
+                "commonName": "vernacularName",
+            }
+        )
+
+        # Create relevant columns for GBIF
+        df["occurrenceID"] = (
+            project.Project_name
+            + "_"
+            + df["siteName"]
+            + "_"
+            + df["eventDate"].astype(str)
+            + "_"
+            + df["second_in_movie"].astype(str)
+            + "_"
+            + df["vernacularName"].astype(str)
+        )
+
+        # Set the basis of record as machine observation
+        df["basisOfRecord"] = "MachineObservation"
+
+        # If coord uncertainity doesn't exist set to 30 metres
+        df["coordinateUncertaintyInMeters"] = df.get(
+            "coordinateUncertaintyInMeters", 30
+        )
+
+        # Select columns relevant for GBIF occurrences
+        df = df[
+            [
+                "occurrenceID",
+                "basisOfRecord",
+                "vernacularName",
+                "scientificName",
+                "eventDate",
+                "countryCode",
+                "taxonRank",
+                "kingdom",
+                "decimalLatitude",
+                "decimalLongitude",
+                "geodeticDatum",
+                "coordinateUncertaintyInMeters",
+                "individualCount",
+            ]
+        ]
+
+        return df
     else:
         raise ValueError(
             "Specify who classified the species of interest (citizen_scientists, biologists or ml_algorithms)"
@@ -1645,347 +1694,198 @@ def get_species_mapping(model, project_name, team_name="koster"):
     return species_mapping
 
 
-def sort_by_last_digit(column_name):
-    return int(column_name[-1])
-
-
-def agg_template_project(
+def aggregate_detections(
+    project: Project,
+    db_connection,
+    csv_paths: dict,
     annotations_csv_path: str,
-    fps: float = 29.97,
+    model_registry: str,
+    movies_selected_id: dict = None,
+    model: str = None,
+    project_name: str = None,
+    team_name: str = None,
     thres: int = 5,  # number of seconds for thresholding in interval
-    int_length: int = 10,  # length in seconds of interval for filtering
+    int_length: int = 10,
     plot: bool = False,
-):
-    """
-    The `agg_template_project` function takes in an annotations CSV file, performs various aggregations
-    and calculations on the data, and outputs a result dataframe and additional visualizations if
-    specified.
-
-    :param annotations_csv_path: The path to the CSV file containing the annotations data
-    :type annotations_csv_path: str
-    :param fps: The `fps` parameter represents the frames per second of the video. It is set to a
-    default value of 29.97, but you can change it to the actual frames per second of your video if it is
-    different
-    :type fps: float
-    :param thres: The `thres` parameter is used to filter out columns in the `result_df`
-    DataFrame where the corresponding `frame_count` column has a value less than `thres`. This
-    means that only columns with a minimum number of frames per interval greater than or equal to
-    `thres, defaults to 5
-    :type thres: int (optional)
-    :param plot: A boolean parameter that determines whether to plot the results or not. If set to True,
-    the function will generate plots showing the number of maximum detections per minute and the number
-    of species frame detections per minute, defaults to False
-    :type plot: bool (optional)
-    :return: a DataFrame called max_df, which contains information about the maximum value, filename,
-    and frame number at which the maximum value occurred for each column in the class_df DataFrame.
-    """
-    try:
-        assert int_length > thres
-    except AssertionError:
-        logging.error("Cannot have threshold below interval length.")
-        return
-
-    annot_df = pd.read_csv(annotations_csv_path)
-    # Remove frame number and txt extension from filename to represent individual movies
-    annot_df["filename"] = annot_df["filename"].apply(lambda x: x[: x.rfind("_")])
-
-    # Get max_n per class detected in each movie per frame
-    class_df = (
-        annot_df.groupby(["filename", "frame_no"])["class_id"]
-        .value_counts()
-        .unstack(fill_value=0)
-    )
-    class_df.columns = "max_n_" + class_df.columns.astype(str)
-
-    # Get the confidence range of each detection per frame
-    conf_df = (
-        annot_df.groupby(["filename", "frame_no", "class_id"])["conf"]
-        .agg(["min", "mean", "max"])
-        .unstack()
-    )
-
-    # Combine this information
-    result = pd.concat([class_df, conf_df], axis=1)
-    # Add conf to column names to distinguish from max_n
-    result.columns = [
-        c if isinstance(c, str) else "_conf_".join([str(x) for x in c])
-        for c in result.columns
-    ]
-    # Sort columns into the expected order as specified by Leon
-    result = result[sorted(result.columns, key=sort_by_last_digit)]
-
-    # Export result dataframe to folder
-    result.to_csv(Path(Path(annotations_csv_path).parent, "max_n_report.csv"))
-
-    ### Additional outputs ####
-
-    # Find the frame at which the maximum value occurred for each column
-    max_values = class_df.max()
-    max_frames = class_df.idxmax()
-
-    # Create a new DataFrame with both max values and corresponding frames
-    max_df = pd.DataFrame(
-        {
-            "max_value": max_values,
-            "filename": max_frames.apply(lambda x: x[0]),
-            "max_frame": max_frames.apply(lambda x: x[1]),
-        }
-    )
-
-    # Get minute by minute max_information
-    frame_nos = pd.Series(class_df.index.get_level_values(1).values)
-    frame_nos.index = class_df.index
-
-    # Create interval column
-    class_df["interval_no"] = (frame_nos / (fps * int_length)).astype(int)
-
-    frame_count_per_interval = (
-        class_df.groupby(["filename", "interval_no"])
-        .apply(lambda group: group.iloc[:, :-1].ge(1).sum())
-        .reset_index(drop=False)
-    )
-
-    frame_count_per_interval["minutes_no"] = (
-        frame_count_per_interval["interval_no"] / (60 / int_length)
-    ).astype(
-        int
-    ) + 1  # Add one to make minutes more interpretable
-
-    frame_count_per_interval.rename(
-        columns=lambda col: "t_" + col if "max" in col else col, inplace=True
-    )
-
-    # Perform the original operations (reset_index, groupby, max, drop columns)
-    result_df = (
-        class_df.reset_index()
-        .groupby(["filename", "interval_no"])
-        .max()
-        .drop(columns=["frame_no"], axis=1)
-    )
-
-    # Merge the frame_count_per_minute DataFrame with the result_df on the common columns
-    result_df = pd.merge(
-        result_df, frame_count_per_interval, on=["filename", "interval_no"], how="left"
-    )
-
-    # If there are NaN values in the new column, replace them with 0
-    # result_df["frame_count"] = result_df["frame_count"].fillna(0)
-
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-
-    # Set the ggplot style
-    plt.style.use("ggplot")
-
-    def adjust_max_values(df, thres=0):
-        for col in df.columns:
-            if "max" in col and "t_" not in col:
-                mask = df["t_" + col] >= thres * fps
-                df[col] = df[col].where(mask, 0)
-
-    def plot_bars(df, x_column):
-        plt.figure(figsize=(15, 5))
-        for col in df.columns:
-            if "max" in col and "t_" not in col:
-                bars = plt.bar(df[x_column], df[col], label=col)
-        plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-        plt.xlabel(x_column)
-        plt.ylabel("Count")
-        plt.title(f"n_max per minute. frame threshold: {thres*fps} ")
-
-    def plot_lines(df, x_column):
-        plt.figure(figsize=(15, 5))
-        for col in df.columns:
-            if "t_" in col:
-                line = plt.plot(df[x_column], df[col], label=col)
-        # Add a horizontal line at y=3 (example)
-        plt.axhline(y=thres * fps, color="r", linestyle="--", label="Threshold")
-        plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-        plt.xlabel(x_column)
-        plt.ylabel("Count")
-        plt.title(
-            f"No. of species frame detections per interval, interval length: {int_length}"
-        )
-
-    # Specify the columns for x and y axes
-    x_column = "minutes_no"
-
-    # Plotting
-    if plot:
-        adjust_max_values(result_df, thres=thres)
-        plot_bars(result_df, x_column)
-        plot_lines(result_df, x_column)
-
-        # Customize the plot
-        plt.tight_layout()
-        plt.show()
-
-    return max_df
-
-
-def detection_statistics(
-    eval_dir: str,
-    metrics: list,
-    model: str,
-    project_name: str,
-    team_name: str = "koster",
-    species: list = None,
-    save: bool = True,
-    save_folder: str = None,
-    print_results: bool = True,
 ):
     """
     > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
     and saves the results in different csv files.
 
-    :param eval_dir: the path to the folder containing the annotations.csv file
-    :param metrics: a list of the statistics to compute
+    :param project: the project object
+    :param db_connection: SQL connection object
+    :param csv_paths: a dictionary with the paths of the csvs used to initiate the db
+    :param annotations_csv_path: the path to the folder containing the annotations.csv file or the annotations.csv
+    :param movies_selected_id: the ids of the movies selected in earlier steps (note if the selection changes b, mlflow)
+    :param model_registry: the name of the model register (e.g wandb, mlflow)
     :param model: the name of the model in wandb used to obtain the detections
     :param project_name: name of the project in wandb
-    :param team_name: name of the team. By default, it is set to the "koster" team.
-    :param species: a list of the species of interest. If None, all the species are considered (it is the default option)
-    :param save: True if you want to save the results in csv files, False otherwise
-    :param save_folder: the path to the folder where you want to save the csv files. If None, the results are saved in the same folder as the annotations.csv file
-    :param print_results: True if you want to print the results (in a tabular format), False otherwise
+    :param team_name: name of the team in wandb.
+    :param thres: The `thres` parameter is used to filter out columns in the `result_df`
+    DataFrame where the corresponding `frame_count` column has a value less than `thres`. This
+    means that only columns with a minimum number of frames per interval greater than or equal to
+    `thres, defaults to 5
+    :param int_length: An integer value specifying the length in seconds of interval for filtering
+    :param plot: A boolean parameter that determines whether to plot the results or not. If set to True,
+    the function will generate plots showing the number of maximum detections per minute and the number
+    of species frame detections per minute, defaults to False
 
     """
 
-    if save:
-        if save_folder is None:
-            # By default, save the results in the same folder as the annotations.csv file
-            save_folder = eval_dir
-        elif not os.path.exists(save_folder):
-            # Create the folder if it doesn't exist
-            os.makedirs(save_folder)
-
     # Read the annotations.csv file
-    df = pd.read_csv(os.path.join(eval_dir, "annotations.csv"))
+    df = pd.read_csv(Path(annotations_csv_path, "annotations.csv"))
 
-    # if species is not None:
-    # Filter the dataframe to consider only the species of interest
-    #    df_filtered = df[df["species_name"].isin(species)]
+    # Check if the DataFrame is not empty
+    if df.empty:
+        raise ValueError(
+            "There are no labels to aggregate, run the model again with a lower threshold or try a different model."
+        )
 
-    # else:
-    # Consider all the available species
-    df_filtered = df
+    # Remove frame number and txt extension from filename to represent individual movies
+    df["movie_filename"] = (
+        df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
+    )
 
-    # Add a column with the footage name
-    df_filtered["footage"] = df_filtered["filename"].apply(lambda x: x[: x.rfind("_")])
+    # Add movie ids info from the movies selected in choose_footage
+    if movies_selected_id:
+        # Create a new column with the mapped values
+        df["movie_id"] = df["movie_filename"].apply(
+            lambda x: dict(movies_selected_id).get(x, None)
+        )
 
-    # If the user wants to compute statistics over the detections of the same species
-    if metrics is not None:
-        metrics = metrics.value
+        # Define the movie col of interest
+        movie_group_col = "movie_id"
 
-        if any("same" in sub for sub in metrics):
-            df_grouped = df_filtered.copy()
-            # Create an additional column to compute the number of detections of the same species in each frame
-            df_grouped["class_count"] = df_grouped["class_id"]
-            # Count the number of detections of the same species in each frame
-            df_grouped = df_grouped.groupby(
-                ["footage", "filename", "species_name", "class_count"],
-                as_index=False,
-                sort=True,
-            )["class_count"].aggregate("count")
-
-            # Compute the mean, min and max number of detections of each species over the frames of each footage
-            df_grouped = (
-                df_grouped.groupby(["footage", "species_name"])["class_count"]
-                .agg(["mean", "min", "max"])
-                .reset_index()
-            )
-            # print(df_grouped)
-            statistics_same = pd.DataFrame()
-
-            # Save the results in a dataframe
-            statistics_same[["footage", "species"]] = df_grouped[
-                ["footage", "species_name"]
-            ]
-            if "Mean same species per frame" in metrics:
-                statistics_same["Mean same species per frame"] = df_grouped["mean"]
-            if "Max same species per frame" in metrics:
-                statistics_same["Max same species per frame"] = df_grouped["max"]
-            if "Min same species per frame" in metrics:
-                statistics_same["Min same species per frame"] = df_grouped["min"]
-
-            if save:
-                logging.info(
-                    "Saving statistics of same species per frame into {}".format(
-                        os.path.join(save_folder, "statistics_same_species.csv")
-                    )
-                )
-                statistics_same.to_csv(
-                    os.path.join(save_folder, "statistics_same_species_prueba.csv"),
-                    index=False,
-                )
-            if print_results:
-                print(
-                    "-------------------- Statistics of same species per frame ---------------------"
-                )
-                print(
-                    tb(
-                        statistics_same,
-                        headers="keys",
-                        tablefmt="psql",
-                        showindex=False,
-                        floatfmt=".3f",
-                    )
-                )
-
-        # If the user wants to compute statistics over the detections of different species
-        if any("different" in sub for sub in metrics):
-            # Count the number of different species in each frame
-            df_grouped = df_filtered.groupby(
-                ["footage", "filename"], as_index=False, sort=True
-            )["class_id"].aggregate(lambda x: len(np.unique(x)))
-            # print(df_grouped)
-            # df_grouped.to_csv(os.path.join(save_folder, 'group_different.csv'),index=False)
-
-            # Compute the mean, min and max number of different species over the frames of each footage
-            df_grouped = (
-                df_grouped.groupby(["footage"])["class_id"]
-                .agg(["mean", "min", "max"])
-                .reset_index()
-            )
-            # print(df_grouped)
-
-            # Save the results in a dataframe
-            statistics_different = pd.DataFrame()
-            statistics_different["footage"] = df_grouped["footage"]
-            if "Mean different species per frame" in metrics:
-                statistics_different["Mean different species per frame"] = df_grouped[
-                    "mean"
-                ]
-            if "Max different species per frame" in metrics:
-                statistics_different["Max different species per frame"] = df_grouped[
-                    "max"
-                ]
-            if "Min different species per frame" in metrics:
-                statistics_different["Min different species per frame"] = df_grouped[
-                    "min"
-                ]
-            if save:
-                logging.info(
-                    "Saving statistics of different species per frame into {}".format(
-                        os.path.join(save_folder, "statistics_different_species.csv")
-                    )
-                )
-                statistics_different.to_csv(
-                    os.path.join(save_folder, "statistics_different_species.csv"),
-                    index=False,
-                )
-            if print_results:
-                print(
-                    "-------------------- Statistics of different species per frame ---------------------"
-                )
-                print(
-                    tb(
-                        statistics_different,
-                        headers="keys",
-                        tablefmt="psql",
-                        showindex=False,
-                        floatfmt=".3f",
-                    )
-                )
     else:
-        pass
-        # self.agg_fn()
+        # Define the movie col of interest
+        movie_group_col = "movie_filename"
+
+    # Map the class id to species labels
+    if model_registry == "wandb":
+        # Set the name of the template project
+        if project_name == "template_project":
+            project_name = "spyfish_aotearoa"
+
+        # Obtain a dictionary with the mapping between the class ids and the species names
+        species_mapping = get_species_mapping(model, project_name, team_name)
+
+        # Add a column with the species name corresponding to each class id
+        df["commonName"] = df["class_id"].astype(str).map(species_mapping)
+
+        # Define the movie col of interest
+        sp_group_col = "commonName"
+
+    else:
+        # Define the movie col of interest
+        sp_group_col = "class_id"
+
+    # Get max_n per class detected in each movie per frame
+    df["max_n"] = df.groupby([movie_group_col, "frame_no"])[sp_group_col].transform(
+        "count"
+    )
+
+    # Specify the columns for which we want unique confidence values
+    columns_conf = [movie_group_col, "frame_no", sp_group_col]
+
+    # Get the confidence range of each detection per frame and add three columns
+    df["min_conf"] = df.groupby(columns_conf)["conf"].transform("min")
+    df["mean_conf"] = df.groupby(columns_conf)["conf"].transform("mean")
+    df["max_conf"] = df.groupby(columns_conf)["conf"].transform("max")
+
+    # Create a boolean mask for duplicated rows based on the specified columns
+    mask_duplicates = df.duplicated(subset=columns_conf, keep=False)
+
+    # Keep only unique rows based on grouped columns
+    df = df[~mask_duplicates]
+
+    # Retrieve the max counts and conf.levels of uploaded footage
+    if all(column_name in df.columns for column_name in ["movie_id", "commonName"]):
+        from kso_utils.db_utils import add_db_info_to_df
+
+        # Combine the movie info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="movies",
+        )
+
+        # Combine the site info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="sites",
+        )
+
+        # Combine the species info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="species",
+        )
+
+        # Calculate the corresponding second of the frame in the movie
+        df["second_in_movie"] = (df["frame_no"] / df["fps"]).astype(int)
+
+    return df
+
+
+def plot_aggregate_detections(
+    df,
+    thres: int = 5,  # number of seconds for thresholding in interval
+    int_length: int = 10,
+):
+    """
+    > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+    and saves the results in different csv files.
+    :param df: df of the aggregated detections
+    :param thres: The `thres` parameter is used to filter out columns in the `result_df`
+    DataFrame where the corresponding `frame_count` column has a value less than `thres`. This
+    means that only columns with a minimum number of frames per interval greater than or equal to
+    `thres, defaults to 5
+    :param int_length: An integer value specifying the length in seconds of interval for filtering
+
+    """
+
+    # Convert 'second_in_movie' to datetime format
+    df["second_in_movie"] = pd.to_datetime(df["second_in_movie"], unit="s")
+
+    # Group by 10-second intervals
+    interval = pd.Grouper(key="second_in_movie", freq=str(int_length) + "S")
+
+    # Group by species and minute, calculate the count
+    max_count_per_species = (
+        df.groupby(["movie_id", "commonName", interval])["max_n"].max().reset_index()
+    )
+
+    import matplotlib.pyplot as plt
+
+    # Plot each movie separately
+    movies = max_count_per_species["movie_id"].unique()
+
+    for movie_id in movies:
+        movie_data = max_count_per_species[
+            max_count_per_species["movie_id"] == movie_id
+        ]
+
+        # Create a separate line plot for each species
+        species_list = movie_data["commonName"].unique()
+
+        plt.figure(figsize=(10, 6))
+
+        for species in species_list:
+            species_data = movie_data[movie_data["commonName"] == species]
+            plt.plot(
+                species_data["second_in_movie"], species_data["max_n"], label=species
+            )
+
+            plt.xlabel("Timestamp (seconds)")
+        plt.ylabel("Max Individuals Recorded in a Minute")
+        plt.title(f"Max Individuals Recorded Every Minute for Movie {movie_id}")
+        plt.legend()
+        plt.show()

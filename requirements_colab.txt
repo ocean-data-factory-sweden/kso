@@ -5,12 +5,13 @@ csv_diff==1.1
 dataclass_csv==1.4.0
 ffmpeg==1.4
 fiftyone==0.22.3
+gdown==4.7.3
 ipysheet==0.7.0
 jupyter_bbox_widget==0.5.0
 lida==0.0.10
 mlflow==2.8.0
 pims==0.6.1
-torch==2.1.1
+torch==2.1.0
 typing-extensions==4.5.0
 ultralytics==8.0.200
 wandb==0.16.0
