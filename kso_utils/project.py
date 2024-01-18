@@ -1758,29 +1758,19 @@ class MLProjectProcessor(ProjectProcessor):
         project = Path(save_dir)
         self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
         if latest:
-            if isinstance(source, list):
-                for src in source:
-                    model.predict(
-                        project=project,
-                        name=name,
-                        source=src,
-                        conf=conf_thres,
-                        save_txt=True,
-                        save_conf=True,
-                        save=save_output,
-                        imgsz=img_size,
-                    )
-            else:
-                model.predict(
-                    project=project,
-                    name=name,
-                    source=source,
-                    conf=conf_thres,
-                    save_txt=True,
-                    save_conf=True,
-                    save=save_output,
-                    imgsz=img_size,
-                )
+            results = model.predict(
+                project=project,
+                name=name,
+                source=source,
+                conf=conf_thres,
+                save_txt=True,
+                save_conf=True,
+                save=save_output,
+                imgsz=img_size,
+                stream=True,
+            )
+            for i in results:
+                print(i)
         else:
             if isinstance(source, list):
                 for src in source:
@@ -2159,7 +2149,7 @@ class MLProjectProcessor(ProjectProcessor):
             logging.info("Downloading model checkpoint...")
             artifact_dir = artifact.download(root=download_path)
             logging.info("Checkpoint downloaded.")
-            return Path(artifact_dir).resolve()
+            return str(Path(artifact_dir).resolve())
         else:
             return
 

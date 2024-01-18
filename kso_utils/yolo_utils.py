@@ -1024,7 +1024,7 @@ def generate_csv_report(
             for line in lines:
                 parts = line.split()
                 class_id, x, y, w, h, conf = parts[:6]
-                data_dict[label_file] = data_dict.get(label_file, []) + [
+                data_dict[str(label_file)] = data_dict.get(label_file, []) + [
                     [class_id, frame_no, x, y, w, h, float(conf)]
                 ]
 
