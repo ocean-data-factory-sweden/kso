@@ -2041,7 +2041,6 @@ class MLProjectProcessor(ProjectProcessor):
             imgsz=img_size,
         )
 
-
         if wandb.run is not None:
             self.modules["wandb"].finish()
 
