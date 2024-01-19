@@ -29,7 +29,9 @@ class Project:
     ml_folder: str = None
 
 
-def find_project(project_name: str = ""):
+def find_project(
+    project_name: str = "", project_csv: str = "db_starter/projects_list.csv"
+):
     """Find project information using
     project csv path and project name"""
     # Specify the path to the list of projects
@@ -37,19 +39,18 @@ def find_project(project_name: str = ""):
     abspath = os.path.abspath(__file__)
     dname = os.path.dirname(abspath)
     os.chdir(dname)
-    project_path = "db_starter/projects_list.csv"
 
     # Check path to the list of projects is a csv
-    if os.path.exists(project_path) and not project_path.endswith(".csv"):
+    if os.path.exists(project_csv) and not project_csv.endswith(".csv"):
         logging.error("A csv file was not selected. Please try again.")
 
     # If list of projects doesn't exist retrieve it from github
-    elif not os.path.exists(project_path):
+    elif not os.path.exists(project_csv):
         github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/projects_list.csv?raw=true"
         read_file = pd.read_csv(github_path)
-        read_file.to_csv(project_path, index=None)
+        read_file.to_csv(project_csv, index=None)
 
-    with open(project_path) as csv:
+    with open(project_csv) as csv:
         reader = DataclassReader(csv, Project)
         try:
             for row in reader:
