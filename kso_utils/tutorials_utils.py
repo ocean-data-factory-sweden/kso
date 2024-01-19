@@ -1852,6 +1852,9 @@ def plot_aggregate_detections(
 
     """
 
+    if not "second_in_movie" in df.columns:
+        logging.error("Aggregation plot not currently supported on this film.")
+
     # Convert 'second_in_movie' to datetime format
     df["second_in_movie"] = pd.to_datetime(df["second_in_movie"], unit="s")
 
