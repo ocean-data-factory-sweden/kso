@@ -48,7 +48,7 @@ class ProjectProcessor:
         self.classifications = pd.DataFrame()
         self.generated_clips = pd.DataFrame()
         self.species_of_interest = []
-        self.movies_selected_id = None
+        self.movies_selected_id = {}
 
         # Import modules
         self.modules = g_utils.import_modules([])
