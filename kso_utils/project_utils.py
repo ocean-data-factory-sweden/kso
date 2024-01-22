@@ -40,6 +40,10 @@ def find_project(
     dname = os.path.dirname(abspath)
     os.chdir(dname)
 
+    # Switch to cdn project list (temporary fix)
+    if os.path.exists("/buckets"):
+        project_csv = "db_starter/cdn_projects_list.csv"
+
     # Check path to the list of projects is a csv
     if os.path.exists(project_csv) and not project_csv.endswith(".csv"):
         logging.error("A csv file was not selected. Please try again.")
