@@ -378,6 +378,7 @@ def frame_aggregation(
         return
 
     # Create output folder
+
     if Path(out_path).is_dir():
         shutil.rmtree(out_path)
     Path(out_path).mkdir()
@@ -465,11 +466,19 @@ def frame_aggregation(
             species_df["clean_label"] = species_df.commonName.apply(clean_species_name)
             species_df["zoo_label"] = species_df.commonName.apply(clean_label)
         except IndexError:
+
+            def get_species_id(row):
+                if row == "empty":
+                    return "empty"
+                else:
+                    out = species_df[species_df.scientificName == row].id.values
+                    if len(out) == 1:
+                        return out[0]
+                    else:
+                        return None
+
             train_rows["species_id"] = train_rows["label"].apply(
-                lambda x: species_df[species_df.scientificName == x].id.values[0]
-                if x != "empty"
-                else "empty",
-                1,
+                lambda x: get_species_id(x), 1
             )
             species_df["clean_label"] = species_df.scientificName.apply(
                 clean_species_name
@@ -478,15 +487,21 @@ def frame_aggregation(
 
         train_rows.drop(columns=["label"], axis=1, inplace=True)
 
-    sp_id2mod_id = {
-        species_df[species_df.clean_label == species_list[i]].id.values[0]: i
-        for i in range(len(species_list))
-    }
+    # Keep only species that can be matched to species_list
+    species_df = species_df[species_df.clean_label.isin(species_list)]
+
+    sp_id2mod_id = {}
+    m_id = 0
+    for ix, item in enumerate(species_list):
+        match = species_df[species_df.clean_label == species_list[ix]].id.values
+        if len(match) == 1:
+            sp_id2mod_id[match[0]] = m_id
+            m_id += 1
 
     # Get movie info from server
     from kso_utils.movie_utils import retrieve_movie_info_from_server
 
-    movie_df, _, _ = retrieve_movie_info_from_server(
+    movie_df = retrieve_movie_info_from_server(
         project=project,
         server_connection=server_connection,
         db_connection=db_connection,
@@ -521,8 +536,9 @@ def frame_aggregation(
         return None
 
     if link_bool and movie_bool:
-        # If both movies and subject urls exist, use subject urls to speed up extraction
-        movie_bool = False
+        # If both movies and subject urls exist, use movie urls since Zooniverse is rate
+        # limited
+        link_bool = False
 
     if movie_bool:
         # Get movie path on the server
@@ -693,6 +709,7 @@ def frame_aggregation(
             )
 
             for box in bboxes[named_tuple]:
+                print(filename)
                 new_rows.append(
                     (
                         grouped_fields[-1],  # species_id
