@@ -513,7 +513,14 @@ def add_db_info_to_df(
 
     # Ensure id columns that are going to be used to merge are int
     if "id" in left_on_col:
-        df[left_on_col] = df[left_on_col].astype(float).astype(int)
+        # Ensure there are no NaN values found in the column id column
+        if df[left_on_col].isna().any() or (df[left_on_col] == "None").any():
+            logging.error(
+                f"Error: NaN values found in the {left_on_col} column of {table_name}."
+            )
+
+        else:
+            df[left_on_col] = df[left_on_col].astype(float).astype(int)
 
     # Combine the original and sqldf dfs
     comb_df = pd.merge(

@@ -1694,7 +1694,7 @@ def get_species_mapping(model, project_name, team_name="koster"):
     return species_mapping
 
 
-def aggregate_detections(
+def process_detections(
     project: Project,
     db_connection,
     csv_paths: dict,
@@ -1742,9 +1742,13 @@ def aggregate_detections(
         )
 
     # Remove frame number and txt extension from filename to represent individual movies
-    df["movie_filename"] = (
-        df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
-    )
+    if project_name == "template_project":
+        # Extract unique movie names using regular expression
+        df["movie_filename"] = df["filename"].str.extract(r"\\([a-zA-Z]+_\d+)")
+    else:
+        df["movie_filename"] = (
+            df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
+        )
 
     # Add movie ids info from the movies selected in choose_footage
     if movies_selected_id:
@@ -1835,7 +1839,7 @@ def aggregate_detections(
     return df
 
 
-def plot_aggregate_detections(
+def plot_processed_detections(
     df,
     thres: int = 5,  # number of seconds for thresholding in interval
     int_length: int = 10,
