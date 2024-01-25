@@ -455,48 +455,65 @@ def frame_aggregation(
 
     # Add species_id to train_rows
     if "species_id" not in train_rows.columns:
-        # Allow for both cases where commonName or scientificName was used for annotation
-        try:
-            train_rows["species_id"] = train_rows["label"].apply(
-                lambda x: species_df[species_df.commonName == x].id.values[0]
-                if x != "empty"
-                else "empty",
-                1,
-            )
-            species_df["clean_label"] = species_df.commonName.apply(clean_species_name)
-            species_df["zoo_label"] = species_df.commonName.apply(clean_label)
-        except IndexError:
+        if "ZooClassification" in train_rows.columns:
+            train_rows["species_id"] = train_rows.ZooClassification
+            # species_df["clean_label"] = species_df.ZooClassification.apply(clean_species_name)
+            # species_df["zoo_label"] = species_df.ZooClassification.apply(clean_label)
+            sp_id2mod_id = {}
+            m_id = 0
+            for ix, item in enumerate(species_list):
+                # match = species_df[species_df.clean_label == species_list[ix]].id.values
+                # if len(match) == 1:
+                sp_id2mod_id[ix] = m_id
+                m_id += 1
 
-            def get_species_id(row):
-                if row == "empty":
-                    return "empty"
-                else:
-                    out = species_df[species_df.scientificName == row].id.values
-                    if len(out) == 1:
-                        return out[0]
+        else:
+            # Allow for both cases where commonName or scientificName was used for annotation
+            try:
+                train_rows["species_id"] = train_rows["label"].apply(
+                    lambda x: species_df[species_df.commonName == x].id.values[0]
+                    if x != "empty"
+                    else "empty",
+                    1,
+                )
+                species_df["clean_label"] = species_df.commonName.apply(
+                    clean_species_name
+                )
+                species_df["zoo_label"] = species_df.commonName.apply(clean_label)
+            except IndexError:
+
+                def get_species_id(row):
+                    if row == "empty":
+                        return "empty"
                     else:
-                        return None
+                        out = species_df[species_df.scientificName == row].id.values
+                        if len(out) == 1:
+                            return out[0]
+                        else:
+                            return None
 
-            train_rows["species_id"] = train_rows["label"].apply(
-                lambda x: get_species_id(x), 1
-            )
-            species_df["clean_label"] = species_df.scientificName.apply(
-                clean_species_name
-            )
-            species_df["zoo_label"] = species_df.scientificName.apply(clean_label)
+                train_rows["species_id"] = train_rows["label"].apply(
+                    lambda x: get_species_id(x), 1
+                )
+                species_df["clean_label"] = species_df.scientificName.apply(
+                    clean_species_name
+                )
+                species_df["zoo_label"] = species_df.scientificName.apply(clean_label)
 
-        train_rows.drop(columns=["label"], axis=1, inplace=True)
+                train_rows.drop(columns=["label"], axis=1, inplace=True)
 
-    # Keep only species that can be matched to species_list
-    species_df = species_df[species_df.clean_label.isin(species_list)]
+                # Keep only species that can be matched to species_list
+                species_df = species_df[species_df.clean_label.isin(species_list)]
 
-    sp_id2mod_id = {}
-    m_id = 0
-    for ix, item in enumerate(species_list):
-        match = species_df[species_df.clean_label == species_list[ix]].id.values
-        if len(match) == 1:
-            sp_id2mod_id[match[0]] = m_id
-            m_id += 1
+                sp_id2mod_id = {}
+                m_id = 0
+                for ix, item in enumerate(species_list):
+                    match = species_df[
+                        species_df.clean_label == species_list[ix]
+                    ].id.values
+                    if len(match) == 1:
+                        sp_id2mod_id[match[0]] = m_id
+                        m_id += 1
 
     # Get movie info from server
     from kso_utils.movie_utils import retrieve_movie_info_from_server
@@ -538,7 +555,7 @@ def frame_aggregation(
     if link_bool and movie_bool:
         # If both movies and subject urls exist, use movie urls since Zooniverse is rate
         # limited
-        link_bool = False
+        movie_bool = False
 
     if movie_bool:
         # Get movie path on the server
@@ -616,6 +633,8 @@ def frame_aggregation(
     # Get relevant fields from dataframe (before groupby)
     train_rows = train_rows[key_fields]
 
+    print(train_rows)
+
     link_bool = "subject_ids" in key_fields
 
     group_fields = (
@@ -627,6 +646,8 @@ def frame_aggregation(
             else ["filename", "species_id"]
         )
     )
+
+    print(group_fields)
 
     new_rows = []
     bboxes = {}
