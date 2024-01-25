@@ -157,18 +157,25 @@ def gpu_select():
                     logging.info(
                         "Installing the GPU requirements. PLEASE WAIT 10-20 SECONDS"
                     )  # Install ffmpeg with GPU version
-                    subprocess.check_call(
-                        "git clone https://github.com/fritolays/colab-ffmpeg-cuda.git",
-                        shell=True,
+
+                    # Use subprocess for shell commands
+                    subprocess.run(
+                        [
+                            "git",
+                            "clone",
+                            "https://github.com/XniceCraft/ffmpeg-colab.git",
+                        ]
                     )
-                    subprocess.check_call(
-                        "cp -r ./colab-ffmpeg-cuda/bin/. /usr/bin/", shell=True
-                    )
+                    subprocess.run(["chmod", "755", "./ffmpeg-colab/install"])
+                    subprocess.run(["./ffmpeg-colab/install"])
+                    print("Installation finished!")
+                    subprocess.run(["rm", "-fr", "/content/ffmpeg-colab"])
+
                     logging.info("GPU Requirements installed!")
 
                 except subprocess.CalledProcessError as e:
                     logging.error(
-                        f"There was an issues trying to install the GPU requirements, {e}"
+                        f"There was an issue trying to install the GPU requirements: {e}"
                     )
 
             # Set GPU argument
