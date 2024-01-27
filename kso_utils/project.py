@@ -1798,51 +1798,6 @@ class MLProjectProcessor(ProjectProcessor):
                 )
         self.save_detections(conf_thres, model.ckpt_path, self.eval_dir)
 
-    def detect_yolov5(
-        self,
-        exp_name: str,
-        movies_paths: list,
-        movies_selected: list,
-        save_dir: str,
-        conf_thres: float,
-        artifact_dir: str,
-        img_size: int = 640,
-        save_output: bool = True,
-    ):
-        from yolov5.utils.general import increment_path
-
-        self.run = self.modules["wandb"].init(
-            entity=self.team_name,
-            project="model-evaluations",
-            name="predict",
-            settings=self.modules["wandb"].Settings(start_method="thread"),
-        )
-        eval_dir = increment_path(Path(save_dir) / exp_name, exist_ok=False)
-        weights_path = [
-            f
-            for f in Path(artifact_dir).iterdir()
-            if f.is_file()
-            and str(f).endswith((".pt", ".model"))
-            and "osnet" not in str(f)
-            and "best" in str(f)
-        ][0]
-
-        for movie_path in movies_paths:
-            self.modules["detect"].run(
-                weights=weights_path,
-                source=movie_path,
-                conf_thres=conf_thres,
-                save_txt=True,
-                save_conf=True,
-                project=save_dir,
-                name=exp_name,
-                nosave=not save_output,
-            )
-            self.save_detections_wandb(conf_thres, weights_path, eval_dir)
-            if wandb.run is not None:
-                self.modules["wandb"].finish()
-        return str(eval_dir)
-
     def save_detections(self, conf_thres: float, model: str, eval_dir: str):
         if self.registry == "wandb":
             import yaml
