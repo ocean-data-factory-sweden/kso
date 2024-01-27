@@ -1420,6 +1420,183 @@ class MLProjectProcessor(ProjectProcessor):
             else:
                 return t_utils.choose_entity()
 
+    def setup_paths(self, test: bool = False):
+        if not isinstance(self.output_path, str) and self.output_path is not None:
+            self.output_path = self.output_path.selected
+        if test:
+            self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
+                Path(self.output_path, "ml-template-data"), self.model_type
+            )
+        else:
+            self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
+                self.output_path, self.model_type
+            )
+
+    def choose_train_params(self):
+        return t_utils.choose_train_params(self.model_type)
+
+    def train_yolo(
+        self,
+        exp_name: str,
+        weights: str,
+        project: str,
+        epochs: int = 1,
+        batch_size: int = 16,
+        img_size: int = 128,
+    ):
+        # Disable wandb (not necessary yet)
+        self.modules["ultralytics"].settings.update({"wandb": True})
+
+        if self.registry == "mlflow":
+            active_run = mlflow.active_run()
+
+            from mlflow.data.pandas_dataset import PandasDataset
+
+            parent_dir = Path(self.data_path).parent
+            train_df = pd.read_csv(Path(parent_dir, "train.txt"), delimiter="\t")
+            val_df = pd.read_csv(Path(parent_dir, "valid.txt"), delimiter="\t")
+            train_dataset: PandasDataset = mlflow.data.from_pandas(
+                train_df, source=Path(parent_dir, "train.txt")
+            )
+            val_dataset: PandasDataset = mlflow.data.from_pandas(
+                val_df, source=Path(parent_dir, "valid.txt")
+            )
+            if active_run:
+                mlflow.end_run()
+
+            try:
+                experiment_id = mlflow.create_experiment(
+                    self.project_name,
+                )
+            except:
+                current_experiment = dict(
+                    mlflow.get_experiment_by_name(self.project_name)
+                )
+                experiment_id = current_experiment["experiment_id"]
+
+            mlflow.start_run(experiment_id=experiment_id, run_name=exp_name)
+            mlflow.log_input(train_dataset, context="training")
+            mlflow.log_input(val_dataset, context="validation")
+            mlflow.log_artifacts(
+                Path(self.data_path).parent, artifact_path="input_datasets"
+            )
+        try:
+            if "yolov5" in weights:
+                weights = Path(weights).name
+
+            model = self.modules["ultralytics"].YOLO(weights)
+            model.train(
+                data=self.data_path,
+                project=project,
+                name=exp_name,
+                epochs=int(epochs),
+                batch=int(batch_size),
+                imgsz=img_size,
+            )
+        except Exception as e:
+            logging.info(f"Training failed due to: {e}")
+        # Close down run
+        if self.registry == "wandb":
+            self.modules["wandb"].finish()
+
+    def train_yolov5(
+        self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
+    ):
+        if self.project.server == "SNIC":
+            project = f"/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/{project}"
+
+        if self.model_type == 1:
+            self.modules["train"].run(
+                entity=self.team_name,
+                data=self.data_path,
+                hyp=self.hyp_path,
+                weights=weights,
+                project=project,
+                name=exp_name,
+                imgsz=img_size,
+                batch_size=int(batch_size),
+                epochs=epochs,
+                single_cls=False,
+                cache_images=True,
+                upload_dataset=True,
+                rect=True,
+            )
+        elif self.model_type == 2:
+            self.modules["train"].run(
+                entity=self.team_name,
+                data=self.data_path,
+                model=weights,
+                project=self.project_name,
+                name=exp_name,
+                img_size=img_size,
+                batch_size=int(batch_size),
+                epochs=epochs,
+            )
+        else:
+            logging.error("Segmentation model training not yet supported.")
+
+    def enhance_yolo(
+        self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
+    ):
+        from datetime import datetime
+
+        run_name = f"enhance_run_{datetime.now()}"
+        self.run_path = Path(project_path, run_name)
+        logging.info("Enhancement running...")
+        model = self.modules["ultralytics"].YOLO(self.tuned_weights)
+        model.predict(
+            source=str(Path(in_path, "images")),
+            conf=conf_thres,
+            save_txt=True,
+            save_conf=True,
+            save=True,
+            imgsz=img_size,
+        )
+
+        if wandb.run is not None:
+            self.modules["wandb"].finish()
+
+    def enhance_yolov5(
+        self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
+    ):
+        from datetime import datetime
+
+        run_name = f"enhance_run_{datetime.now()}"
+        self.run_path = Path(project_path, run_name)
+        if self.model_type == 1:
+            logging.info("Enhancement running...")
+            self.modules["detect"].run(
+                weights=self.tuned_weights,
+                source=str(Path(in_path, "images")),
+                project=project_path,
+                name=run_name,
+                imgsz=img_size,
+                conf_thres=conf_thres,
+                save_txt=True,
+            )
+            self.modules["wandb"].finish()
+        elif self.model_type == 2:
+            logging.info(
+                "Enhancements not supported for image classification models at this time."
+            )
+        else:
+            logging.info(
+                "Enhancements not supported for segmentation models at this time."
+            )
+
+    def enhance_replace(self, data_path: str):
+        if self.model_type == 1:
+            # Rename the 'labels' directory to 'labels_org'
+            data_path = Path(data_path)
+            data_path.joinpath("labels").rename(data_path.joinpath("labels_org"))
+            # Rename the 'labels' directory inside 'self.run_path' to 'labels'
+            self.run_path.joinpath("labels").rename(data_path.joinpath("labels"))
+        else:
+            logging.error("This option is not supported for other model types.")
+
+    #############
+    # t6
+    #############
     # Function to choose a model to evaluate
     def choose_model(self):
         """
@@ -1558,121 +1735,6 @@ class MLProjectProcessor(ProjectProcessor):
         else:
             logging.error("The chosen registry is not available at the moment.")
             return
-
-    def setup_paths(self, test: bool = False):
-        if not isinstance(self.output_path, str) and self.output_path is not None:
-            self.output_path = self.output_path.selected
-        if test:
-            self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
-                Path(self.output_path, "ml-template-data"), self.model_type
-            )
-        else:
-            self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
-                self.output_path, self.model_type
-            )
-
-    def choose_train_params(self):
-        return t_utils.choose_train_params(self.model_type)
-
-    def train_yolo(
-        self,
-        exp_name: str,
-        weights: str,
-        project: str,
-        epochs: int = 1,
-        batch_size: int = 16,
-        img_size: int = 128,
-    ):
-        # Disable wandb (not necessary yet)
-        self.modules["ultralytics"].settings.update({"wandb": True})
-
-        if self.registry == "mlflow":
-            active_run = mlflow.active_run()
-
-            from mlflow.data.pandas_dataset import PandasDataset
-
-            parent_dir = Path(self.data_path).parent
-            train_df = pd.read_csv(Path(parent_dir, "train.txt"), delimiter="\t")
-            val_df = pd.read_csv(Path(parent_dir, "valid.txt"), delimiter="\t")
-            train_dataset: PandasDataset = mlflow.data.from_pandas(
-                train_df, source=Path(parent_dir, "train.txt")
-            )
-            val_dataset: PandasDataset = mlflow.data.from_pandas(
-                val_df, source=Path(parent_dir, "valid.txt")
-            )
-            if active_run:
-                mlflow.end_run()
-
-            try:
-                experiment_id = mlflow.create_experiment(
-                    self.project_name,
-                )
-            except:
-                current_experiment = dict(
-                    mlflow.get_experiment_by_name(self.project_name)
-                )
-                experiment_id = current_experiment["experiment_id"]
-
-            mlflow.start_run(experiment_id=experiment_id, run_name=exp_name)
-            mlflow.log_input(train_dataset, context="training")
-            mlflow.log_input(val_dataset, context="validation")
-            mlflow.log_artifacts(
-                Path(self.data_path).parent, artifact_path="input_datasets"
-            )
-        try:
-            if "yolov5" in weights:
-                weights = Path(weights).name
-
-            model = self.modules["ultralytics"].YOLO(weights)
-            model.train(
-                data=self.data_path,
-                project=project,
-                name=exp_name,
-                epochs=int(epochs),
-                batch=int(batch_size),
-                imgsz=img_size,
-            )
-        except Exception as e:
-            logging.info(f"Training failed due to: {e}")
-        # Close down run
-        if self.registry == "wandb":
-            self.modules["wandb"].finish()
-
-    def train_yolov5(
-        self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
-    ):
-        if self.project.server == "SNIC":
-            project = f"/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/{project}"
-
-        if self.model_type == 1:
-            self.modules["train"].run(
-                entity=self.team_name,
-                data=self.data_path,
-                hyp=self.hyp_path,
-                weights=weights,
-                project=project,
-                name=exp_name,
-                imgsz=img_size,
-                batch_size=int(batch_size),
-                epochs=epochs,
-                single_cls=False,
-                cache_images=True,
-                upload_dataset=True,
-                rect=True,
-            )
-        elif self.model_type == 2:
-            self.modules["train"].run(
-                entity=self.team_name,
-                data=self.data_path,
-                model=weights,
-                project=self.project_name,
-                name=exp_name,
-                img_size=img_size,
-                batch_size=int(batch_size),
-                epochs=epochs,
-            )
-        else:
-            logging.error("Segmentation model training not yet supported.")
 
     def eval_yolo(self, exp_name: str, conf_thres: float):
         # Find trained model weights
@@ -1978,65 +2040,6 @@ class MLProjectProcessor(ProjectProcessor):
             self.modules["wandb"].finish()
         elif self.registry == "mlflow":
             mlflow.end_run()
-
-    def enhance_yolo(
-        self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
-    ):
-        from datetime import datetime
-
-        run_name = f"enhance_run_{datetime.now()}"
-        self.run_path = Path(project_path, run_name)
-        logging.info("Enhancement running...")
-        model = self.modules["ultralytics"].YOLO(self.tuned_weights)
-        model.predict(
-            source=str(Path(in_path, "images")),
-            conf=conf_thres,
-            save_txt=True,
-            save_conf=True,
-            save=True,
-            imgsz=img_size,
-        )
-
-        if wandb.run is not None:
-            self.modules["wandb"].finish()
-
-    def enhance_yolov5(
-        self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
-    ):
-        from datetime import datetime
-
-        run_name = f"enhance_run_{datetime.now()}"
-        self.run_path = Path(project_path, run_name)
-        if self.model_type == 1:
-            logging.info("Enhancement running...")
-            self.modules["detect"].run(
-                weights=self.tuned_weights,
-                source=str(Path(in_path, "images")),
-                project=project_path,
-                name=run_name,
-                imgsz=img_size,
-                conf_thres=conf_thres,
-                save_txt=True,
-            )
-            self.modules["wandb"].finish()
-        elif self.model_type == 2:
-            logging.info(
-                "Enhancements not supported for image classification models at this time."
-            )
-        else:
-            logging.info(
-                "Enhancements not supported for segmentation models at this time."
-            )
-
-    def enhance_replace(self, data_path: str):
-        if self.model_type == 1:
-            # Rename the 'labels' directory to 'labels_org'
-            data_path = Path(data_path)
-            data_path.joinpath("labels").rename(data_path.joinpath("labels_org"))
-            # Rename the 'labels' directory inside 'self.run_path' to 'labels'
-            self.run_path.joinpath("labels").rename(data_path.joinpath("labels"))
-        else:
-            logging.error("This option is not supported for other model types.")
 
     def download_project_runs(self):
         # Download all the runs from the given project ID using Weights and Biases API,
