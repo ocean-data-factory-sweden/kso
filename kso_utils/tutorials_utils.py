@@ -1,5 +1,6 @@
 # base imports
 import os
+import sys
 import time
 import json
 import math
@@ -83,27 +84,6 @@ def log_meta_changes(
         return
 
 
-def process_source(source):
-    """
-    If the source is a string, write the string to a file and return the file name. If the source is a
-    list, return the list. If the source is neither, return None
-
-    :param source: The source of the data. This can be a URL, a file, or a list of URLs or files
-    :return: the value of the source variable.
-    """
-    try:
-        source.value
-        if source.value is None:
-            raise AttributeError("Value is None")
-        return write_urls_to_file(source.value)
-    except AttributeError:
-        try:
-            source.selected
-            return source.selected
-        except AttributeError:
-            return None
-
-
 def write_urls_to_file(movie_list: list, filepath: str = "/tmp/temp.txt"):
     """
     > This function takes a list of movie urls and writes them to a file
@@ -158,40 +138,13 @@ def is_url(url):
         return False
 
 
-# Function to extract the videos
-def extract_example_clips(
-    output_clip_path: str, start_time_i: int, clip_length: int, movie_path: str
-):
-    """
-    > Extracts a clip from a movie file, and saves it to a new file
-
-    :param output_clip_path: The path to the output clip
-    :param start_time_i: The start time of the clip in seconds
-    :param clip_length: The length of the clip in seconds
-    :param movie_path: the path to the movie file
-    """
-
-    # Extract the clip
-    if not os.path.exists(output_clip_path):
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-ss",
-                str(start_time_i),
-                "-t",
-                str(clip_length),
-                "-i",
-                str(movie_path),
-                "-c",
-                "copy",
-                "-an",  # removes the audio
-                "-force_key_frames",
-                "1",
-                str(output_clip_path),
-            ]
-        )
-
-        os.chmod(output_clip_path, 0o777)
+# Function to check if ffmpeg is available in the system's PATH.
+def check_ffmpeg_availability():
+    try:
+        subprocess.run(["ffmpeg", "-version"], check=True, capture_output=True)
+        return True
+    except FileNotFoundError:
+        return False
 
 
 def check_clip_size(clips_list: list):
@@ -378,6 +331,12 @@ def extract_clips(
            modifications, and the values are dictionaries containing the details of the modification.
     :param gpu_available: If you have a GPU, set this to True. If you don't, set it to False
     """
+    # Check if ffmpeg is installed
+    if not check_ffmpeg_availability():
+        raise FileNotFoundError(
+            "ffmpeg is not found in your system's PATH. Please install or add its path to the PATH environment variable."
+        )
+
     if not modification_details and gpu_available:
         # Create clips without any modification
         subprocess.call(
@@ -403,7 +362,6 @@ def extract_clips(
                 str(output_clip_path),
             ]
         )
-        os.chmod(str(output_clip_path), 0o777)
 
     elif modification_details and gpu_available:
         # Unnest the modification detail dict
@@ -436,7 +394,7 @@ def extract_clips(
                 str(output_clip_path),
             ]
         )
-        os.chmod(str(output_clip_path), 0o777)
+
     else:
         # Set up input prompt
         init_prompt = f"ffmpeg_python.input('{movie_path}')"
@@ -465,7 +423,6 @@ def extract_clips(
             else:
                 full_prompt += def_output_prompt
             eval(full_prompt).run(capture_stdout=True, capture_stderr=True)
-            os.chmod(str(output_clip_path), 0o777)
         except ffmpeg_python.Error as e:
             logging.info(
                 f"stdout: {e.stdout.decode('utf8')}",
@@ -475,7 +432,13 @@ def extract_clips(
             )
             raise e
 
-        logging.info("Clips extracted successfully")
+    # Extract the clip
+    if not os.path.exists(output_clip_path):
+        raise FileNotFoundError("The clip wasn't extracted")
+
+    else:
+        os.chmod(output_clip_path, 0o777)
+        logging.info("Clip extracted successfully")
 
 
 def check_frame_size(frame_paths: list):
@@ -1741,10 +1704,13 @@ def process_detections(
             "There are no labels to aggregate, run the model again with a lower threshold or try a different model."
         )
 
+    # Extract the actual filenames using pathlib
+    df["filename"] = df["filename"].apply(lambda path: Path(path).name)
+
     # Remove frame number and txt extension from filename to represent individual movies
     if project_name == "template_project":
         # Extract unique movie names using regular expression
-        df["movie_filename"] = df["filename"].str.extract(r"\\([a-zA-Z]+_\d+)")
+        df["movie_filename"] = df["filename"].str.rsplit("_", n=1).str[0]
     else:
         df["movie_filename"] = (
             df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
@@ -1869,6 +1835,14 @@ def plot_processed_detections(
     max_count_per_species = (
         df.groupby(["movie_id", "commonName", interval])["max_n"].max().reset_index()
     )
+
+    # Check if notebook is running in colab
+    IN_COLAB = "google.colab" in sys.modules
+    if IN_COLAB:
+        try:
+            get_ipython().magic("matplotlib inline")
+        except:
+            pass
 
     import matplotlib.pyplot as plt
 
