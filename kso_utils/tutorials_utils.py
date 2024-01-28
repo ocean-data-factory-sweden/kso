@@ -1716,6 +1716,9 @@ def process_detections(
             df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
         )
 
+    # Drop the filename column to avoid confusion
+    df = df.drop("filename", axis=1)
+
     # Add movie ids info from the movies selected in choose_footage
     if movies_selected_id:
         # Create a new column with the mapped values
@@ -1802,6 +1805,11 @@ def process_detections(
         # Calculate the corresponding second of the frame in the movie
         df["second_in_movie"] = (df["frame_no"] / df["fps"]).astype(int)
 
+        # Report the function ran without issues.
+        logging.info(
+            f"Detections processed. The dataframe has a total of {df.shape[0]} rows and {df.shape[1]} columns",
+        )
+
     return df
 
 
@@ -1825,24 +1833,31 @@ def plot_processed_detections(
     if not "second_in_movie" in df.columns:
         logging.error("Aggregation plot not currently supported on this film.")
 
-    # Convert 'second_in_movie' to datetime format
-    df["second_in_movie"] = pd.to_datetime(df["second_in_movie"], unit="s")
+    # Convert 'second_in_movie' to seconds since 0 (e.g. the start of the movie)
+    reference_time = pd.to_datetime("1970-01-01 00:00:00", format="%Y-%m-%d %H:%M:%S")
 
-    # Group by 10-second intervals
-    interval = pd.Grouper(key="second_in_movie", freq=str(int_length) + "S")
+    df["seconds_since_reference"] = (
+        pd.to_datetime(df["second_in_movie"], unit="s") - reference_time
+    ).dt.total_seconds()
+
+    # Ensure 'seconds_since_reference' is in datetime format
+    df["seconds_since_reference"] = pd.to_datetime(
+        df["seconds_since_reference"], unit="s"
+    )
+
+    # Group by n-second intervals
+    interval = pd.Grouper(key="seconds_since_reference", freq=str(int_length) + "S")
 
     # Group by species and minute, calculate the count
     max_count_per_species = (
         df.groupby(["movie_id", "commonName", interval])["max_n"].max().reset_index()
     )
 
-    # Check if notebook is running in colab
-    IN_COLAB = "google.colab" in sys.modules
-    if IN_COLAB:
-        try:
-            get_ipython().magic("matplotlib inline")
-        except:
-            pass
+    # Enable plotting of matplotlib
+    try:
+        get_ipython().magic("matplotlib inline")
+    except:
+        pass
 
     import matplotlib.pyplot as plt
 
@@ -1856,13 +1871,14 @@ def plot_processed_detections(
 
         # Create a separate line plot for each species
         species_list = movie_data["commonName"].unique()
-
         plt.figure(figsize=(10, 6))
 
         for species in species_list:
             species_data = movie_data[movie_data["commonName"] == species]
             plt.plot(
-                species_data["second_in_movie"], species_data["max_n"], label=species
+                species_data["seconds_since_reference"],
+                species_data["max_n"],
+                label=species,
             )
 
             plt.xlabel("Timestamp (seconds)")

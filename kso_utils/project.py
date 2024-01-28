@@ -1,6 +1,7 @@
 # base imports
 import os
 import sys
+import re
 import logging
 import yaml
 import wandb
@@ -300,7 +301,7 @@ class ProjectProcessor:
                 if selected_option == "Uploaded Footage":
                     clear_output()
                     # Code for "Uploaded Footage" option
-                    print("Uploaded Footage selected")
+                    logging.info("Uploaded Footage selected")
                     select_movie_widg = kso_widgets.select_movie(
                         self.available_movies_df
                     )
@@ -375,7 +376,7 @@ class ProjectProcessor:
                 elif selected_option == "Custom Footage":
                     clear_output()
                     # Code for "Custom Footage" option
-                    print("Custom Footage selected")
+                    logging.info("Custom Footage selected")
 
                     # Define a callback function for folder selection
                     def on_folder_selected(change):
@@ -384,11 +385,11 @@ class ProjectProcessor:
                         # Check if a folder is selected
                         if selected_folder is not None:
                             self.movies_paths = selected_folder
-                            print(f"Selected folder: {selected_folder}")
+                            logging.info(f"Selected folder: {selected_folder}")
                             self.movies_selected = selected_folder
                             # Add your code here to use the selected folder
                         else:
-                            print("No folder selected")
+                            logging.info("No folder selected")
 
                     # Create a folder selection widget (replace this with your folder selection widget)
                     select_movie_widg = kso_widgets.choose_footage(
@@ -1125,7 +1126,7 @@ class ProjectProcessor:
     #############
     # t9
     #############
-    def download_detections_csv(self, agg_df):
+    def download_detections_csv(self, df):
         # Download the processed detections as a csv file
         csv_filename = (
             self.project.csv_folder
@@ -1134,9 +1135,95 @@ class ProjectProcessor:
             + "detections.csv"
         )
 
-        agg_df.to_csv(csv_filename, index=False)
+        df.to_csv(csv_filename, index=False)
 
         logging.info(f"The detections have been downloaded to {csv_filename}")
+
+    def download_detections_species_cols_csv(self, df):
+        # Specify the species labels
+        if "commonName" in df.columns:
+            # Define the movie col of interest
+            sp_group_col = "commonName"
+        else:
+            # Define the movie col of interest
+            sp_group_col = "class_id"
+
+        # Transpose the rows/cols to have species as cols
+        transposed_df = df.pivot_table(
+            index=["movie_id", "second_in_movie"],
+            columns=sp_group_col,
+            values=["min_conf", "mean_conf", "max_n", "max_conf"],
+            aggfunc="first",
+        )
+
+        # Flatten the MultiIndex columns
+        transposed_df.columns = [
+            f"{species}_{column}" for column, species in transposed_df.columns
+        ]
+
+        # Reset index to get a regular DataFrame
+        transposed_df.reset_index(inplace=True)
+
+        # Specify columns to drop from original df to avoid large df and confussions
+        df_col_drop = [
+            "class_id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "conf",
+            "frame_no",
+            "min_conf",
+            "mean_conf",
+            "max_n",
+            "max_conf",
+            "scientificName",
+            "taxonRank",
+            "kingdom",
+            "commonName",
+        ]
+        df_to_merge = df.drop(df_col_drop, axis=1).drop_duplicates()
+
+        # Merge with the original DataFrame based on common columns
+        merged_df = pd.merge(
+            transposed_df, df_to_merge, on=["movie_id", "second_in_movie"]
+        )
+
+        ###### Sort columns into the expected order as specified by Leon
+        sp_list = df[sp_group_col].unique()
+
+        # Separate columns with species_info and the rest
+        columns_sp_group = [
+            col for col in merged_df.columns if any(sp in col for sp in sp_list)
+        ]
+
+        # Corrected syntax: use "not in" before "for sp in sp_list"
+        columns_no_sp_group = [
+            col for col in merged_df.columns if all(sp not in col for sp in sp_list)
+        ]
+
+        # Sort columns with species_info
+        columns_sp_group = sorted(columns_sp_group)
+
+        # Concatenate columns with and without species_info
+        sorted_columns = columns_no_sp_group + columns_sp_group
+
+        # Select the cols based on the sorted list
+        merged_df = merged_df[sorted_columns]
+
+        # Download the processed detections as a csv file
+        csv_filename = (
+            self.project.csv_folder
+            + self.project.Project_name
+            + str(datetime.date.today())
+            + "detections.csv"
+        )
+
+        merged_df.to_csv(csv_filename, index=False)
+
+        logging.info(
+            f"The detections organised by species cols have been downloaded to {csv_filename}"
+        )
 
 
 class MLProjectProcessor(ProjectProcessor):
