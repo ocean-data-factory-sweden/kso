@@ -727,17 +727,17 @@ def frame_aggregation(
                 tuple(i[len(grouped_fields) :]) for i in group.values
             )
 
+            if link_bool:
+                try:
+                    s1, s2 = PIL.Image.open(
+                        requests.get(filename, stream=True).raw
+                    ).size
+                except:
+                    s1, s2 = img_size
+            else:
+                s1, s2 = PIL.Image.open(filename).size
+
             for box in bboxes[named_tuple]:
-                print(filename)
-                if link_bool:
-                    try:
-                        s1, s2 = PIL.Image.open(
-                            requests.get(filename, stream=True).raw
-                        ).size
-                    except:
-                        s1, s2 = img_size
-                else:
-                    s1, s2 = PIL.Image.open(filename).size
                 new_rows.append(
                     (
                         grouped_fields[-1],  # species_id
