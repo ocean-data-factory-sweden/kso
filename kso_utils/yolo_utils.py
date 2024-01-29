@@ -505,15 +505,13 @@ def frame_aggregation(
                 # Keep only species that can be matched to species_list
                 species_df = species_df[species_df.clean_label.isin(species_list)]
 
-                sp_id2mod_id = {}
-                m_id = 0
-                for ix, item in enumerate(species_list):
-                    match = species_df[
-                        species_df.clean_label == species_list[ix]
-                    ].id.values
-                    if len(match) == 1:
-                        sp_id2mod_id[match[0]] = m_id
-                        m_id += 1
+            sp_id2mod_id = {}
+            m_id = 0
+            for ix, item in enumerate(species_list):
+                match = species_df[species_df.clean_label == species_list[ix]].id.values
+                if len(match) == 1:
+                    sp_id2mod_id[match[0]] = m_id
+                    m_id += 1
 
     # Get movie info from server
     from kso_utils.movie_utils import retrieve_movie_info_from_server
