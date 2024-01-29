@@ -464,7 +464,7 @@ def frame_aggregation(
             for ix, item in enumerate(species_list):
                 # match = species_df[species_df.clean_label == species_list[ix]].id.values
                 # if len(match) == 1:
-                sp_id2mod_id[ix] = m_id
+                sp_id2mod_id[item.capitalize().replace("_", " ")] = m_id
                 m_id += 1
 
         else:
@@ -633,8 +633,6 @@ def frame_aggregation(
     # Get relevant fields from dataframe (before groupby)
     train_rows = train_rows[key_fields]
 
-    print(train_rows)
-
     link_bool = "subject_ids" in key_fields
 
     group_fields = (
@@ -731,16 +729,21 @@ def frame_aggregation(
 
             for box in bboxes[named_tuple]:
                 print(filename)
+                if link_bool:
+                    try:
+                        s1, s2 = PIL.Image.open(
+                            requests.get(filename, stream=True).raw
+                        ).size
+                    except:
+                        s1, s2 = img_size
+                else:
+                    s1, s2 = PIL.Image.open(filename).size
                 new_rows.append(
                     (
                         grouped_fields[-1],  # species_id
                         filename,
-                        PIL.Image.open(requests.get(filename, stream=True).raw).size[0]
-                        if link_bool
-                        else PIL.Image.open(filename).size[0],
-                        PIL.Image.open(requests.get(filename, stream=True).raw).size[1]
-                        if link_bool
-                        else PIL.Image.open(filename).size[1],
+                        s1,
+                        s2,
                     )
                     + box
                 )
