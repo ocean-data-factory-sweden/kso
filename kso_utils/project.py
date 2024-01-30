@@ -1764,7 +1764,7 @@ class MLProjectProcessor(ProjectProcessor):
                     results = model.predict(
                         project=project,
                         name=name,
-                        source=source,
+                        source=src,
                         conf=conf_thres,
                         save_txt=True,
                         save_conf=True,
