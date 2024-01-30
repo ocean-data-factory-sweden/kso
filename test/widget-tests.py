@@ -113,8 +113,4 @@ def test_select_clip_length():
 
 def test_select_modification():
     widget = kso_widgets.select_modification()
-
-    assert (
-        str(widget.value["filter"]).replace(" ", "")
-        == '.drawbox(0, 0, "iw", "ih*(15/100)", color="black",thickness="fill").drawbox(0, "ih*(95/100)","iw", "ih*(15/100)", color="black", thickness="fill")'
-    )
+    assert widget.value["crf"] == "25"
