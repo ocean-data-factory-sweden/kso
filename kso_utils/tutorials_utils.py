@@ -137,6 +137,7 @@ def is_url(url):
     except ValueError:
         return False
 
+
 def check_clip_size(clips_list: list):
     """
     > This function takes a list of file paths and returns a dataframe with the file path and size of
