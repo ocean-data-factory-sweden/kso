@@ -1,6 +1,7 @@
 # base imports
 import os
 import sys
+import re
 import logging
 import yaml
 import wandb
@@ -300,7 +301,7 @@ class ProjectProcessor:
                 if selected_option == "Uploaded Footage":
                     clear_output()
                     # Code for "Uploaded Footage" option
-                    print("Uploaded Footage selected")
+                    logging.info("Uploaded Footage selected")
                     select_movie_widg = kso_widgets.select_movie(
                         self.available_movies_df
                     )
@@ -375,7 +376,7 @@ class ProjectProcessor:
                 elif selected_option == "Custom Footage":
                     clear_output()
                     # Code for "Custom Footage" option
-                    print("Custom Footage selected")
+                    logging.info("Custom Footage selected")
 
                     # Define a callback function for folder selection
                     def on_folder_selected(change):
@@ -384,11 +385,11 @@ class ProjectProcessor:
                         # Check if a folder is selected
                         if selected_folder is not None:
                             self.movies_paths = selected_folder
-                            print(f"Selected folder: {selected_folder}")
+                            logging.info(f"Selected folder: {selected_folder}")
                             self.movies_selected = selected_folder
                             # Add your code here to use the selected folder
                         else:
-                            print("No folder selected")
+                            logging.info("No folder selected")
 
                     # Create a folder selection widget (replace this with your folder selection widget)
                     select_movie_widg = kso_widgets.choose_footage(
@@ -1116,7 +1117,7 @@ class ProjectProcessor:
     #############
     # t9
     #############
-    def download_detections_csv(self, agg_df):
+    def download_detections_csv(self, df):
         # Download the processed detections as a csv file
         csv_filename = (
             self.project.csv_folder
@@ -1125,9 +1126,95 @@ class ProjectProcessor:
             + "detections.csv"
         )
 
-        agg_df.to_csv(csv_filename, index=False)
+        df.to_csv(csv_filename, index=False)
 
         logging.info(f"The detections have been downloaded to {csv_filename}")
+
+    def download_detections_species_cols_csv(self, df):
+        # Specify the species labels
+        if "commonName" in df.columns:
+            # Define the movie col of interest
+            sp_group_col = "commonName"
+        else:
+            # Define the movie col of interest
+            sp_group_col = "class_id"
+
+        # Transpose the rows/cols to have species as cols
+        transposed_df = df.pivot_table(
+            index=["movie_id", "second_in_movie"],
+            columns=sp_group_col,
+            values=["min_conf", "mean_conf", "max_n", "max_conf"],
+            aggfunc="first",
+        )
+
+        # Flatten the MultiIndex columns
+        transposed_df.columns = [
+            f"{species}_{column}" for column, species in transposed_df.columns
+        ]
+
+        # Reset index to get a regular DataFrame
+        transposed_df.reset_index(inplace=True)
+
+        # Specify columns to drop from original df to avoid large df and confussions
+        df_col_drop = [
+            "class_id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "conf",
+            "frame_no",
+            "min_conf",
+            "mean_conf",
+            "max_n",
+            "max_conf",
+            "scientificName",
+            "taxonRank",
+            "kingdom",
+            "commonName",
+        ]
+        df_to_merge = df.drop(df_col_drop, axis=1).drop_duplicates()
+
+        # Merge with the original DataFrame based on common columns
+        merged_df = pd.merge(
+            transposed_df, df_to_merge, on=["movie_id", "second_in_movie"]
+        )
+
+        ###### Sort columns into the expected order as specified by Leon
+        sp_list = df[sp_group_col].unique()
+
+        # Separate columns with species_info and the rest
+        columns_sp_group = [
+            col for col in merged_df.columns if any(sp in col for sp in sp_list)
+        ]
+
+        # Corrected syntax: use "not in" before "for sp in sp_list"
+        columns_no_sp_group = [
+            col for col in merged_df.columns if all(sp not in col for sp in sp_list)
+        ]
+
+        # Sort columns with species_info
+        columns_sp_group = sorted(columns_sp_group)
+
+        # Concatenate columns with and without species_info
+        sorted_columns = columns_no_sp_group + columns_sp_group
+
+        # Select the cols based on the sorted list
+        merged_df = merged_df[sorted_columns]
+
+        # Download the processed detections as a csv file
+        csv_filename = (
+            self.project.csv_folder
+            + self.project.Project_name
+            + str(datetime.date.today())
+            + "detections.csv"
+        )
+
+        merged_df.to_csv(csv_filename, index=False)
+
+        logging.info(
+            f"The detections organised by species cols have been downloaded to {csv_filename}"
+        )
 
 
 class MLProjectProcessor(ProjectProcessor):
@@ -1411,6 +1498,183 @@ class MLProjectProcessor(ProjectProcessor):
             else:
                 return t_utils.choose_entity()
 
+    def setup_paths(self, test: bool = False):
+        if not isinstance(self.output_path, str) and self.output_path is not None:
+            self.output_path = self.output_path.selected
+        if test:
+            self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
+                Path(self.output_path, "ml-template-data"), self.model_type
+            )
+        else:
+            self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
+                self.output_path, self.model_type
+            )
+
+    def choose_train_params(self):
+        return t_utils.choose_train_params(self.model_type)
+
+    def train_yolo(
+        self,
+        exp_name: str,
+        weights: str,
+        project: str,
+        epochs: int = 1,
+        batch_size: int = 16,
+        img_size: int = 128,
+    ):
+        # Disable wandb (not necessary yet)
+        self.modules["ultralytics"].settings.update({"wandb": True})
+
+        if self.registry == "mlflow":
+            active_run = mlflow.active_run()
+
+            from mlflow.data.pandas_dataset import PandasDataset
+
+            parent_dir = Path(self.data_path).parent
+            train_df = pd.read_csv(Path(parent_dir, "train.txt"), delimiter="\t")
+            val_df = pd.read_csv(Path(parent_dir, "valid.txt"), delimiter="\t")
+            train_dataset: PandasDataset = mlflow.data.from_pandas(
+                train_df, source=Path(parent_dir, "train.txt")
+            )
+            val_dataset: PandasDataset = mlflow.data.from_pandas(
+                val_df, source=Path(parent_dir, "valid.txt")
+            )
+            if active_run:
+                mlflow.end_run()
+
+            try:
+                experiment_id = mlflow.create_experiment(
+                    self.project_name,
+                )
+            except:
+                current_experiment = dict(
+                    mlflow.get_experiment_by_name(self.project_name)
+                )
+                experiment_id = current_experiment["experiment_id"]
+
+            mlflow.start_run(experiment_id=experiment_id, run_name=exp_name)
+            mlflow.log_input(train_dataset, context="training")
+            mlflow.log_input(val_dataset, context="validation")
+            mlflow.log_artifacts(
+                Path(self.data_path).parent, artifact_path="input_datasets"
+            )
+        try:
+            if "yolov5" in weights:
+                weights = Path(weights).name
+
+            model = self.modules["ultralytics"].YOLO(weights)
+            model.train(
+                data=self.data_path,
+                project=project,
+                name=exp_name,
+                epochs=int(epochs),
+                batch=int(batch_size),
+                imgsz=img_size,
+            )
+        except Exception as e:
+            logging.info(f"Training failed due to: {e}")
+        # Close down run
+        if self.registry == "wandb":
+            self.modules["wandb"].finish()
+
+    def train_yolov5(
+        self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
+    ):
+        if self.project.server == "SNIC":
+            project = f"/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/{project}"
+
+        if self.model_type == 1:
+            self.modules["train"].run(
+                entity=self.team_name,
+                data=self.data_path,
+                hyp=self.hyp_path,
+                weights=weights,
+                project=project,
+                name=exp_name,
+                imgsz=img_size,
+                batch_size=int(batch_size),
+                epochs=epochs,
+                single_cls=False,
+                cache_images=True,
+                upload_dataset=True,
+                rect=True,
+            )
+        elif self.model_type == 2:
+            self.modules["train"].run(
+                entity=self.team_name,
+                data=self.data_path,
+                model=weights,
+                project=self.project_name,
+                name=exp_name,
+                img_size=img_size,
+                batch_size=int(batch_size),
+                epochs=epochs,
+            )
+        else:
+            logging.error("Segmentation model training not yet supported.")
+
+    def enhance_yolo(
+        self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
+    ):
+        from datetime import datetime
+
+        run_name = f"enhance_run_{datetime.now()}"
+        self.run_path = Path(project_path, run_name)
+        logging.info("Enhancement running...")
+        model = self.modules["ultralytics"].YOLO(self.tuned_weights)
+        model.predict(
+            source=str(Path(in_path, "images")),
+            conf=conf_thres,
+            save_txt=True,
+            save_conf=True,
+            save=True,
+            imgsz=img_size,
+        )
+
+        if wandb.run is not None:
+            self.modules["wandb"].finish()
+
+    def enhance_yolov5(
+        self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
+    ):
+        from datetime import datetime
+
+        run_name = f"enhance_run_{datetime.now()}"
+        self.run_path = Path(project_path, run_name)
+        if self.model_type == 1:
+            logging.info("Enhancement running...")
+            self.modules["detect"].run(
+                weights=self.tuned_weights,
+                source=str(Path(in_path, "images")),
+                project=project_path,
+                name=run_name,
+                imgsz=img_size,
+                conf_thres=conf_thres,
+                save_txt=True,
+            )
+            self.modules["wandb"].finish()
+        elif self.model_type == 2:
+            logging.info(
+                "Enhancements not supported for image classification models at this time."
+            )
+        else:
+            logging.info(
+                "Enhancements not supported for segmentation models at this time."
+            )
+
+    def enhance_replace(self, data_path: str):
+        if self.model_type == 1:
+            # Rename the 'labels' directory to 'labels_org'
+            data_path = Path(data_path)
+            data_path.joinpath("labels").rename(data_path.joinpath("labels_org"))
+            # Rename the 'labels' directory inside 'self.run_path' to 'labels'
+            self.run_path.joinpath("labels").rename(data_path.joinpath("labels"))
+        else:
+            logging.error("This option is not supported for other model types.")
+
+    #############
+    # t6
+    #############
     # Function to choose a model to evaluate
     def choose_model(self):
         """
@@ -1550,121 +1814,6 @@ class MLProjectProcessor(ProjectProcessor):
             logging.error("The chosen registry is not available at the moment.")
             return
 
-    def setup_paths(self, test: bool = False):
-        if not isinstance(self.output_path, str) and self.output_path is not None:
-            self.output_path = self.output_path.selected
-        if test:
-            self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
-                Path(self.output_path, "ml-template-data"), self.model_type
-            )
-        else:
-            self.data_path, self.hyp_path = self.modules["yolo_utils"].setup_paths(
-                self.output_path, self.model_type
-            )
-
-    def choose_train_params(self):
-        return t_utils.choose_train_params(self.model_type)
-
-    def train_yolo(
-        self,
-        exp_name: str,
-        weights: str,
-        project: str,
-        epochs: int = 1,
-        batch_size: int = 16,
-        img_size: int = 128,
-    ):
-        # Disable wandb (not necessary yet)
-        self.modules["ultralytics"].settings.update({"wandb": True})
-
-        if self.registry == "mlflow":
-            active_run = mlflow.active_run()
-
-            from mlflow.data.pandas_dataset import PandasDataset
-
-            parent_dir = Path(self.data_path).parent
-            train_df = pd.read_csv(Path(parent_dir, "train.txt"), delimiter="\t")
-            val_df = pd.read_csv(Path(parent_dir, "valid.txt"), delimiter="\t")
-            train_dataset: PandasDataset = mlflow.data.from_pandas(
-                train_df, source=Path(parent_dir, "train.txt")
-            )
-            val_dataset: PandasDataset = mlflow.data.from_pandas(
-                val_df, source=Path(parent_dir, "valid.txt")
-            )
-            if active_run:
-                mlflow.end_run()
-
-            try:
-                experiment_id = mlflow.create_experiment(
-                    self.project_name,
-                )
-            except:
-                current_experiment = dict(
-                    mlflow.get_experiment_by_name(self.project_name)
-                )
-                experiment_id = current_experiment["experiment_id"]
-
-            mlflow.start_run(experiment_id=experiment_id, run_name=exp_name)
-            mlflow.log_input(train_dataset, context="training")
-            mlflow.log_input(val_dataset, context="validation")
-            mlflow.log_artifacts(
-                Path(self.data_path).parent, artifact_path="input_datasets"
-            )
-        try:
-            if "yolov5" in weights:
-                weights = Path(weights).name
-
-            model = self.modules["ultralytics"].YOLO(weights)
-            model.train(
-                data=self.data_path,
-                project=project,
-                name=exp_name,
-                epochs=int(epochs),
-                batch=int(batch_size),
-                imgsz=img_size,
-            )
-        except Exception as e:
-            logging.info(f"Training failed due to: {e}")
-        # Close down run
-        if self.registry == "wandb":
-            self.modules["wandb"].finish()
-
-    def train_yolov5(
-        self, exp_name, weights, project, epochs=50, batch_size=16, img_size=[640, 640]
-    ):
-        if self.project.server == "SNIC":
-            project = f"/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir/{project}"
-
-        if self.model_type == 1:
-            self.modules["train"].run(
-                entity=self.team_name,
-                data=self.data_path,
-                hyp=self.hyp_path,
-                weights=weights,
-                project=project,
-                name=exp_name,
-                imgsz=img_size,
-                batch_size=int(batch_size),
-                epochs=epochs,
-                single_cls=False,
-                cache_images=True,
-                upload_dataset=True,
-                rect=True,
-            )
-        elif self.model_type == 2:
-            self.modules["train"].run(
-                entity=self.team_name,
-                data=self.data_path,
-                model=weights,
-                project=self.project_name,
-                name=exp_name,
-                img_size=img_size,
-                batch_size=int(batch_size),
-                epochs=epochs,
-            )
-        else:
-            logging.error("Segmentation model training not yet supported.")
-
     def eval_yolo(self, exp_name: str, conf_thres: float):
         # Find trained model weights
         project_path = Path(self.project_name, exp_name)
@@ -1788,51 +1937,6 @@ class MLProjectProcessor(ProjectProcessor):
                     nosave=not save_output,
                 )
         self.save_detections(conf_thres, model.ckpt_path, self.eval_dir)
-
-    def detect_yolov5(
-        self,
-        exp_name: str,
-        movies_paths: list,
-        movies_selected: list,
-        save_dir: str,
-        conf_thres: float,
-        artifact_dir: str,
-        img_size: int = 640,
-        save_output: bool = True,
-    ):
-        from yolov5.utils.general import increment_path
-
-        self.run = self.modules["wandb"].init(
-            entity=self.team_name,
-            project="model-evaluations",
-            name="predict",
-            settings=self.modules["wandb"].Settings(start_method="thread"),
-        )
-        eval_dir = increment_path(Path(save_dir) / exp_name, exist_ok=False)
-        weights_path = [
-            f
-            for f in Path(artifact_dir).iterdir()
-            if f.is_file()
-            and str(f).endswith((".pt", ".model"))
-            and "osnet" not in str(f)
-            and "best" in str(f)
-        ][0]
-
-        for movie_path in movies_paths:
-            self.modules["detect"].run(
-                weights=weights_path,
-                source=movie_path,
-                conf_thres=conf_thres,
-                save_txt=True,
-                save_conf=True,
-                project=save_dir,
-                name=exp_name,
-                nosave=not save_output,
-            )
-            self.save_detections_wandb(conf_thres, weights_path, eval_dir)
-            if wandb.run is not None:
-                self.modules["wandb"].finish()
-        return str(eval_dir)
 
     def save_detections(self, conf_thres: float, model: str, eval_dir: str):
         if self.registry == "wandb":
@@ -2014,65 +2118,6 @@ class MLProjectProcessor(ProjectProcessor):
             self.modules["wandb"].finish()
         elif self.registry == "mlflow":
             mlflow.end_run()
-
-    def enhance_yolo(
-        self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
-    ):
-        from datetime import datetime
-
-        run_name = f"enhance_run_{datetime.now()}"
-        self.run_path = Path(project_path, run_name)
-        logging.info("Enhancement running...")
-        model = self.modules["ultralytics"].YOLO(self.tuned_weights)
-        model.predict(
-            source=str(Path(in_path, "images")),
-            conf=conf_thres,
-            save_txt=True,
-            save_conf=True,
-            save=True,
-            imgsz=img_size,
-        )
-
-        if wandb.run is not None:
-            self.modules["wandb"].finish()
-
-    def enhance_yolov5(
-        self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
-    ):
-        from datetime import datetime
-
-        run_name = f"enhance_run_{datetime.now()}"
-        self.run_path = Path(project_path, run_name)
-        if self.model_type == 1:
-            logging.info("Enhancement running...")
-            self.modules["detect"].run(
-                weights=self.tuned_weights,
-                source=str(Path(in_path, "images")),
-                project=project_path,
-                name=run_name,
-                imgsz=img_size,
-                conf_thres=conf_thres,
-                save_txt=True,
-            )
-            self.modules["wandb"].finish()
-        elif self.model_type == 2:
-            logging.info(
-                "Enhancements not supported for image classification models at this time."
-            )
-        else:
-            logging.info(
-                "Enhancements not supported for segmentation models at this time."
-            )
-
-    def enhance_replace(self, data_path: str):
-        if self.model_type == 1:
-            # Rename the 'labels' directory to 'labels_org'
-            data_path = Path(data_path)
-            data_path.joinpath("labels").rename(data_path.joinpath("labels_org"))
-            # Rename the 'labels' directory inside 'self.run_path' to 'labels'
-            self.run_path.joinpath("labels").rename(data_path.joinpath("labels"))
-        else:
-            logging.error("This option is not supported for other model types.")
 
     def download_project_runs(self):
         # Download all the runs from the given project ID using Weights and Biases API,
