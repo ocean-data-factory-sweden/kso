@@ -25,6 +25,7 @@ from PIL import Image as PILImage, ImageDraw
 # widget imports
 from tqdm import tqdm
 from jupyter_bbox_widget import BBoxWidget
+from IPython import get_ipython
 from IPython.display import HTML, display, clear_output
 import ipywidgets as widgets
 
