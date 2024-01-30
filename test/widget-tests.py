@@ -113,7 +113,4 @@ def test_select_clip_length():
 
 def test_select_modification():
     widget = kso_widgets.select_modification()
-    assert (
-        str(widget.value["filter"]).replace(" ", "")
-        == ".filter('curves','0/00.396/0.671/1','0/00.525/0.4511/1','0/00.459/0.5171/1')"
-    )
+    assert widget.value["crf"] == "25"
