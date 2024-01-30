@@ -1759,19 +1759,35 @@ class MLProjectProcessor(ProjectProcessor):
         project = Path(save_dir)
         self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
         if latest:
-            results = model.predict(
-                project=project,
-                name=name,
-                source=source,
-                conf=conf_thres,
-                save_txt=True,
-                save_conf=True,
-                save=save_output,
-                imgsz=img_size,
-                stream=True,
-            )
-            for i in results:
-                print(i)
+            if isinstance(source, list):
+                for src in source:
+                    results = model.predict(
+                        project=project,
+                        name=name,
+                        source=source,
+                        conf=conf_thres,
+                        save_txt=True,
+                        save_conf=True,
+                        save=save_output,
+                        imgsz=img_size,
+                        stream=True,
+                    )
+                    for i in results:
+                        print(i)
+            else:
+                results = model.predict(
+                    project=project,
+                    name=name,
+                    source=source,
+                    conf=conf_thres,
+                    save_txt=True,
+                    save_conf=True,
+                    save=save_output,
+                    imgsz=img_size,
+                    stream=True,
+                )
+                for i in results:
+                    print(i)
         else:
             if isinstance(source, list):
                 for src in source:
