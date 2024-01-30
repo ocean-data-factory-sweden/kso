@@ -721,22 +721,12 @@ class ProjectProcessor:
                     movies_paths=movies_paths,
                     clip_selection=clip_selection,
                     project=self.project,
-                    modification_details={},
+                    modification_details=clip_modification,
                     gpu_available=use_gpu,
                     pool_size=pool_size,
+                    is_example=is_example,
                 )
 
-                mod_clips = t_utils.create_modified_clips(
-                    project=self.project,
-                    clips_list=self.generated_clips.clip_path,
-                    movies_selected=movies_selected,
-                    modification_details=clip_modification.checks,
-                    gpu_available=use_gpu,
-                    pool_size=pool_size,
-                )
-
-                # Temporary workaround to get both clip paths
-                self.generated_clips["modif_clip_path"] = mod_clips
                 # Temporary workaround to ensure site_id is an integer
                 self.generated_clips["site_id"] = (
                     self.generated_clips["site_id"].astype(float).astype(np.int64)
@@ -755,9 +745,10 @@ class ProjectProcessor:
                 movies_paths=movies_paths,
                 clip_selection=clip_selection,
                 project=self.project,
-                modification_details={},
+                modification_details=clip_modification,
                 gpu_available=use_gpu,
                 pool_size=pool_size,
+                is_example=False,
             )
 
     def upload_zoo_subjects(self, subject_type: str):
