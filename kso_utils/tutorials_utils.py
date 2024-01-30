@@ -234,7 +234,7 @@ def extract_clips(
 
     if output_clip_path_check.exists():
         logging.info(
-            f"The clip {file_path} already exists, please remove it and run the code again."
+            f"The clip {output_clip_path} already exists, please remove it and run the code again."
         )
         pass
 
