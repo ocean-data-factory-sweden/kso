@@ -3,6 +3,7 @@ import sys
 import os
 import cv2
 import logging
+import ffmpeg
 import subprocess
 import urllib
 import unicodedata
