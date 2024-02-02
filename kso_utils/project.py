@@ -1474,7 +1474,7 @@ class MLProjectProcessor(ProjectProcessor):
                             model_widget.artifact_path = artifact_file
                     except Exception as e:
                         logging.error(
-                            f"Failed to download the baseline model. Please ensure you are logged in to WANDB. {e}"
+                            f"Failed to download the baseline model from MLFlow. The default baseline model will be used. {e}"
                         )
 
             model_widget.observe(on_change, names="value")
