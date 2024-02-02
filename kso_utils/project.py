@@ -1480,7 +1480,7 @@ class MLProjectProcessor(ProjectProcessor):
             model_widget.observe(on_change, names="value")
 
             # Use default yolov8 model when no other baseline model is available
-            if len(model_names) == 1 and "No Model" in model_names:
+            if len(model_names) == 1 and "Yolov8 Baseline Model" in model_names:
                 model_widget.artifact_path = "yolov8m.pt"
 
             # Display the dropdown widget
