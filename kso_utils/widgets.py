@@ -157,18 +157,25 @@ def gpu_select():
                     logging.info(
                         "Installing the GPU requirements. PLEASE WAIT 10-20 SECONDS"
                     )  # Install ffmpeg with GPU version
-                    subprocess.check_call(
-                        "git clone https://github.com/fritolays/colab-ffmpeg-cuda.git",
-                        shell=True,
+
+                    # Use subprocess for shell commands
+                    subprocess.run(
+                        [
+                            "git",
+                            "clone",
+                            "https://github.com/XniceCraft/ffmpeg-colab.git",
+                        ]
                     )
-                    subprocess.check_call(
-                        "cp -r ./colab-ffmpeg-cuda/bin/. /usr/bin/", shell=True
-                    )
+                    subprocess.run(["chmod", "755", "./ffmpeg-colab/install"])
+                    subprocess.run(["./ffmpeg-colab/install"])
+                    print("Installation finished!")
+                    subprocess.run(["rm", "-fr", "/content/ffmpeg-colab"])
+
                     logging.info("GPU Requirements installed!")
 
                 except subprocess.CalledProcessError as e:
                     logging.error(
-                        f"There was an issues trying to install the GPU requirements, {e}"
+                        f"There was an issue trying to install the GPU requirements: {e}"
                     )
 
             # Set GPU argument
@@ -904,13 +911,15 @@ def choose_new_videos_to_upload():
 
 # Display the number of clips to generate based on the user's selection
 def to_clips(clip_length, clips_range, is_example: bool):
-    # Calculate the number of clips
-    if is_example:
-        clips = 3
-    else:
-        clips = int((clips_range[1] - clips_range[0]) / clip_length)
+    # Calculate the number of clips to generate
+    clips = int((clips_range[1] - clips_range[0]) / clip_length)
 
-    logging.info(f"Number of clips to generate: {clips}")
+    if is_example and clips > 5:
+        logging.info(
+            f"Number of clips to generate: {clips}. We recommend to create less than 5 examples"
+        )
+    else:
+        logging.info(f"Number of clips to generate: {clips}")
 
     return clips
 
@@ -1022,13 +1031,6 @@ def select_modification():
     # Widget to select the frame modification
 
     frame_modifications = {
-        "Color_correction": {
-            "filter": ".filter('curves', '0/0 0.396/0.67 1/1', \
-                                        '0/0 0.525/0.451 1/1', \
-                                        '0/0 0.459/0.517 1/1')"
-        }
-        # borrowed from https://www.element84.com/blog/color-correction-in-space-and-at-sea
-        ,
         "Zoo_low_compression": {
             "crf": "25",
         },
@@ -1039,9 +1041,7 @@ def select_modification():
             "crf": "30",
         },
         "Blur_sensitive_info": {
-            "filter": ".drawbox(0, 0, 'iw', 'ih*(15/100)', color='black' \
-                            ,thickness='fill').drawbox(0, 'ih*(95/100)', \
-                            'iw', 'ih*(15/100)', color='black', thickness='fill')",
+            "filter": '.drawbox(0, 0, "iw", "ih*(15/100)", color="black",thickness="fill").drawbox(0, "ih*(95/100)","iw", "ih*(15/100)", color="black", thickness="fill")',
             "None": {},
         },
     }
@@ -1069,7 +1069,9 @@ def view_clips(example_clips: list, modified_clip_path: str):
     """
 
     # Get the path of the modified clip selected
-    example_clip_name = os.path.basename(modified_clip_path).replace("modified_", "")
+    example_clip_name = os.path.basename(modified_clip_path).replace(
+        "_example_original", ""
+    )
     example_clip_path = next(
         filter(lambda x: os.path.basename(x) == example_clip_name, example_clips), None
     )

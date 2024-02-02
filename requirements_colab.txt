@@ -3,8 +3,8 @@ av==10.0.0
 boto3==1.28.80
 csv_diff==1.1
 dataclass_csv==1.4.0
-ffmpeg==1.4
 fiftyone==0.22.3
+ffmpeg_python==0.2.0
 gdown==4.7.3
 ipysheet==0.7.0
 jupyter_bbox_widget==0.5.0

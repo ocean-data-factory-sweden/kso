@@ -3,6 +3,7 @@ import sys
 import os
 import cv2
 import logging
+import ffmpeg
 import subprocess
 import urllib
 import unicodedata
@@ -439,81 +440,49 @@ def convert_video(
         conv_fpath = os.path.join(conv_filename)
 
     else:
-        logging.error(f"The path to {movie_path} is invalid")
+        logging.error(f"The path to {conv_fpath} is invalid")
 
-    if gpu_available and compression:
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-hwaccel",
-                "cuda",
-                "-hwaccel_output_format",
-                "cuda",
-                "-i",
-                str(movie_path),
-                "-filter:v",
-                fps_output,
-                "-c:v",
-                "copy",  # ensures correct codec
-                "-crf",
-                "22",  # compresses the video
-                str(conv_fpath),
-            ]
-        )
+    # Set up input and output default prompts
+    input_path = movie_path
+    output_path = str(conv_fpath)
 
-    elif gpu_available and not compression:
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-hwaccel",
-                "cuda",
-                "-hwaccel_output_format",
-                "cuda",
-                "-i",
-                str(movie_path),
-                "-filter:v",
-                fps_output,
-                "-c:v",
-                "copy",  # ensures correct codec
-                str(conv_fpath),
-            ]
-        )
+    input_options = {}
+    output_options = {}
 
-    elif not gpu_available and compression:
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-i",
-                str(movie_path),
-                "-filter:v",
-                fps_output,
-                "-c:v",
-                "copy",  # ensures correct codec
-                "-crf",
-                "22",  # compresses the video
-                str(conv_fpath),
-            ]
-        )
+    # Add GPU-related options if available
+    if gpu_available:
+        input_options["hwaccel"] = "cuda"
 
-    elif not gpu_available and not compression:
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-i",
-                str(movie_path),
-                "-filter:v",
-                fps_output,
-                "-c:v",
-                "copy",  # ensures correct codec
-                str(conv_fpath),
-            ]
-        )
+    output_options["filter:v"] = fps_output
+    output_options["pix_fmt"] = "yuv420p"
+
+    if compression:
+        output_options["crf"] = "22"
+
+    # Run the ffmpeg movie convertion code
+    try:
+        ffmpeg.input(input_path, **input_options).output(
+            output_path, **output_options
+        ).run(overwrite_output=True)
+
+    except ffmpeg.Error as e:
+        logging.error("ffmpeg error occurred.")
+        logging.error(f"stderr: {e}")
+        if e.stdout is not None:
+            logging.error(f"stdout: {e.stdout.decode('utf8')}")
+        if e.stderr is not None:
+            logging.error(f"stderr: {e.stderr.decode('utf8')}")
+        raise e
+
+    # Ensure the movie was extracted
+    if not os.path.exists(conv_fpath):
+        raise FileNotFoundError(f"{conv_fpath} was not converted and stored locally.")
+
     else:
-        raise ValueError(f"{movie_path} not modified")
+        # Ensure open permissions on file
+        os.chmod(conv_fpath, 0o777)
+        logging.info(f"{conv_fpath} successfully converted and stored locally.")
 
-    # Ensure open permissions on file (for now)
-    os.chmod(conv_fpath, 0o777)
-    logging.info("Movie file successfully converted and stored locally.")
     return conv_fpath
 
 
