@@ -849,7 +849,6 @@ def frame_aggregation(
             else:
                 image_output = np.asarray(PIL.Image.open(name))
             img_array = np.asarray(image_output)
-            img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
             PIL.Image.fromarray(img_array).save(img_out)
 
     logging.info("Frames extracted successfully")
