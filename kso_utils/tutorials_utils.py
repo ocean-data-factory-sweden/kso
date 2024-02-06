@@ -1492,8 +1492,20 @@ def get_species_mapping(model, project_name, team_name="koster"):
         if r.id == model.split("_")[1]:
             run = api.run(project_name + "/" + r.id)
 
-    data_dict = run.rawconfig["data_dict"]
-    species_mapping = data_dict["names"]
+    import yaml
+
+    def read_yaml_file(file_path):
+        with open(file_path, "r") as file:
+            yaml_data = yaml.safe_load(file)
+        return yaml_data
+
+    # Read species mapping into data dictionary
+    try:
+        data_dict = run.rawconfig["data_dict"]
+        species_mapping = data_dict["names"]
+    except:
+        data_dict = read_yaml_file(run.rawconfig["data"])
+        species_mapping = data_dict
 
     return species_mapping
 
