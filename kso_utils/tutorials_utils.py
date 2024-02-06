@@ -1505,7 +1505,8 @@ def get_species_mapping(model, project_name, team_name="koster"):
         species_mapping = data_dict["names"]
     except:
         data_dict = read_yaml_file(run.rawconfig["data"])
-        species_mapping = data_dict
+        species_mapping = data_dict["names"]
+        species_mapping = {i: sp for i, sp in enumerate(species_mapping)}
 
     return species_mapping
 
