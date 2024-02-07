@@ -1700,45 +1700,41 @@ class MLProjectProcessor(ProjectProcessor):
                 runs = mlflow.search_runs(
                     experiment_ids=experiment_id, output_format="list"
                 )
-                run_ids = [run.info.run_id for run in runs]
-                # Choose only the project directory
-                try:
-                    artifacts = [
-                        (
-                            list(
-                                filter(
-                                    lambda x: x.is_dir
-                                    and "input_datasets" not in x.path,
-                                    client.list_artifacts(i),
-                                )
-                            ),
-                            i,
-                        )
-                        for i in run_ids
-                    ]
-                    model_names = [
-                        str(
-                            Path(
-                                "runs:/",
-                                run_id,
-                                artifact[0].path,
-                                "best.pt",
+
+                for run in runs:
+                    # Choose only the project directory
+                    try:
+                        artifacts = [
+                            (
+                                list(
+                                    filter(
+                                        lambda x: x.is_dir
+                                        and "input_datasets" not in x.path,
+                                        client.list_artifacts(run),
+                                    ),
+                                ),
+                                run,
                             )
-                        )
-                        if len(artifact) > 0
-                        else None
-                        for artifact, run_id in artifacts
-                    ]
-                    model_names = list(filter(None, model_names))
-                except IndexError:
-                    model_names = []
-            else:
-                model_names = []
-            model_names.append("No Model")
+                        ]
+
+                        if len(artifacts) > 0:
+                            model_dict[run.info.run_name] = str(
+                                Path(
+                                    "runs:/",
+                                    run.info.run_id,
+                                    artifacts[0].path,
+                                    "best.pt",
+                                )
+                            )
+
+                    except IndexError:
+                        model_dict = {"No model": "yolov8m.pt"}
+                else:
+                    model_dict = {"No model": "yolov8m.pt"}
 
             # Create the dropdown widget
             model_widget = widgets.Dropdown(
-                options=model_names,
+                options=[(name, model) for name, model in model_dict.items()],
                 description="Select model: ",
             )
 
