@@ -1700,7 +1700,7 @@ class MLProjectProcessor(ProjectProcessor):
                 runs = mlflow.search_runs(
                     experiment_ids=experiment_id, output_format="list"
                 )
-                run_ids = [run.info.run_id for run in runs][-1:]
+                run_ids = [run.info.run_id for run in runs]
                 # Choose only the project directory
                 try:
                     artifacts = [
@@ -1711,7 +1711,7 @@ class MLProjectProcessor(ProjectProcessor):
                                     and "input_datasets" not in x.path,
                                     client.list_artifacts(i),
                                 )
-                            )[0],
+                            ),
                             i,
                         )
                         for i in run_ids
@@ -1721,12 +1721,15 @@ class MLProjectProcessor(ProjectProcessor):
                             Path(
                                 "runs:/",
                                 run_id,
-                                artifact.path,
+                                artifact[0].path,
                                 "best.pt",
                             )
                         )
+                        if len(artifact) > 0
+                        else None
                         for artifact, run_id in artifacts
                     ]
+                    model_names = list(filter(None, model_names))
                 except IndexError:
                     model_names = []
             else:
