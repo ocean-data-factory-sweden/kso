@@ -1727,8 +1727,8 @@ class MLProjectProcessor(ProjectProcessor):
 
                     except IndexError:
                         model_dict = {"No model": "yolov8m.pt"}
-                else:
-                    model_dict = {"No model": "yolov8m.pt"}
+            else:
+                model_dict = {"No model": "yolov8m.pt"}
 
             # Create the dropdown widget
             model_widget = widgets.Dropdown(
