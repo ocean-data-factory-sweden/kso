@@ -1694,6 +1694,7 @@ class MLProjectProcessor(ProjectProcessor):
 
             experiment = mlflow.get_experiment_by_name(self.project_name)
             client = MlflowClient()
+            model_dict = {}
 
             if experiment is not None:
                 experiment_id = experiment.experiment_id if experiment else None
