@@ -1722,7 +1722,7 @@ class MLProjectProcessor(ProjectProcessor):
                                 Path(
                                     "runs:/",
                                     run.info.run_id,
-                                    artifacts[0].path,
+                                    artifacts[0][0].path,
                                     "best.pt",
                                 )
                             )
