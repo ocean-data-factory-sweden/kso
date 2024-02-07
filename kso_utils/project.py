@@ -1710,10 +1710,10 @@ class MLProjectProcessor(ProjectProcessor):
                                     filter(
                                         lambda x: x.is_dir
                                         and "input_datasets" not in x.path,
-                                        client.list_artifacts(run),
+                                        client.list_artifacts(run.info.run_id),
                                     ),
                                 ),
-                                run,
+                                run.info.run_id,
                             )
                         ]
 
