@@ -1712,8 +1712,7 @@ class MLProjectProcessor(ProjectProcessor):
                                         and "input_datasets" not in x.path,
                                         client.list_artifacts(run.info.run_id),
                                     ),
-                                ),
-                                run.info.run_id,
+                                )
                             )
                         ]
 
