@@ -1705,7 +1705,6 @@ class MLProjectProcessor(ProjectProcessor):
                     # Choose only the project directory
                     try:
                         artifacts = [
-                            (
                                 list(
                                     filter(
                                         lambda x: x.is_dir
@@ -1713,7 +1712,6 @@ class MLProjectProcessor(ProjectProcessor):
                                         client.list_artifacts(run.info.run_id),
                                     ),
                                 )
-                            )
                         ]
 
                         if len(artifacts) > 0:
