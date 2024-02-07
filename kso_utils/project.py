@@ -293,6 +293,8 @@ class ProjectProcessor:
         output = widgets.Output()
         movie_output = widgets.Output()
 
+        display(output, movie_output)
+
         def on_radio_button_change(change):
             if change["type"] == "change" and change["name"] == "value":
                 selected_option = change["new"]
@@ -301,10 +303,13 @@ class ProjectProcessor:
                 if selected_option == "Uploaded Footage":
                     clear_output()
                     # Code for "Uploaded Footage" option
-                    logging.info("Uploaded Footage selected")
+                    print("Uploaded Footage selected")
                     select_movie_widg = kso_widgets.select_movie(
                         self.available_movies_df
                     )
+                    output.append_display_data(select_movie_widg)
+                    # with output:
+                    #    display(select_movie_widg)
 
                     def update_movie(change):
                         movie_output.clear_output(wait=True)
@@ -376,7 +381,7 @@ class ProjectProcessor:
                 elif selected_option == "Custom Footage":
                     clear_output()
                     # Code for "Custom Footage" option
-                    logging.info("Custom Footage selected")
+                    print("Custom Footage selected")
 
                     # Define a callback function for folder selection
                     def on_folder_selected(change):
@@ -385,11 +390,11 @@ class ProjectProcessor:
                         # Check if a folder is selected
                         if selected_folder is not None:
                             self.movies_paths = selected_folder
-                            logging.info(f"Selected folder: {selected_folder}")
+                            print(f"Selected folder: {selected_folder}")
                             self.movies_selected = selected_folder
                             # Add your code here to use the selected folder
                         else:
-                            logging.info("No folder selected")
+                            print("No folder selected")
 
                     # Create a folder selection widget (replace this with your folder selection widget)
                     select_movie_widg = kso_widgets.choose_footage(
@@ -404,6 +409,7 @@ class ProjectProcessor:
 
                     # Register the callback function
                     select_movie_widg.register_callback(on_folder_selected)
+                    output.append_display_data(select_movie_widg)
 
         # Create radio buttons
         radio_buttons = widgets.RadioButtons(
@@ -1706,13 +1712,13 @@ class MLProjectProcessor(ProjectProcessor):
                     # Choose only the project directory
                     try:
                         artifacts = [
-                                list(
-                                    filter(
-                                        lambda x: x.is_dir
-                                        and "input_datasets" not in x.path,
-                                        client.list_artifacts(run.info.run_id),
-                                    ),
-                                )
+                            list(
+                                filter(
+                                    lambda x: x.is_dir
+                                    and "input_datasets" not in x.path,
+                                    client.list_artifacts(run.info.run_id),
+                                ),
+                            )
                         ]
 
                         if len(artifacts) > 0:
