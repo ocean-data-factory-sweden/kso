@@ -647,7 +647,9 @@ def aggregate_classifications(
     # We take the processed_classifications and aggregate them.
     if subject_type == "frame":
         # Get the aggregation parameters
-        agg_users, min_users, agg_obj, agg_iou, agg_iua = [i.value for i in agg_params]
+        agg_users, min_users, agg_obj, agg_iou, agg_iua = [
+            i.value for i in agg_params if not isinstance(i, float)
+        ] + [i for i in agg_params if isinstance(i, float)]
 
         # Report selected parameters
         logging.info(
@@ -781,7 +783,9 @@ def aggregate_classifications(
     else:
         # Get the aggregation parameters
         if not isinstance(agg_params, list):
-            agg_users, min_users = [i.value for i in agg_params]
+            agg_users, min_users = [
+                i.value for i in agg_params if not isinstance(i, float)
+            ] + [i for i in agg_params if isinstance(i, float)]
         else:
             agg_users, min_users = agg_params
 

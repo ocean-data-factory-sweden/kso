@@ -859,7 +859,9 @@ class ProjectProcessor:
             selected_zoo_workflows=selected_zoo_workflows,
         )
 
-    def aggregate_zoo_classifications(self, agg_params, test: bool = False):
+    def aggregate_zoo_classifications(
+        self, agg_params, agg_type: str = None, test: bool = False
+    ):
         if test:
             workflow_checks = {
                 "Workflow name: #0": "Development workflow",
@@ -868,11 +870,23 @@ class ProjectProcessor:
             }
         else:
             workflow_checks = self.workflow_widget.checks
+
+        if agg_type is not None and "users" in agg_type:
+            # Obtain classifications only from the selected users
+            users = agg_params[0].value
+            classifications_filtered = self.processed_zoo_classifications[
+                self.processed_zoo_classifications["user_name"].isin(users)
+            ]
+            parameters = agg_params[1:]
+        else:
+            classifications_filtered = self.processed_zoo_classifications
+            parameters = agg_params
+
         self.aggregated_zoo_classifications = zoo_utils.aggregate_classifications(
             self.project,
-            self.processed_zoo_classifications,
+            classifications_filtered,
             workflow_checks["Subject type: #0"],
-            agg_params,
+            parameters,
         )
 
     def extract_zoo_frames(
