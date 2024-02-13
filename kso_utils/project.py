@@ -1903,6 +1903,12 @@ class MLProjectProcessor(ProjectProcessor):
             logging.info("No trained model found, using yolov8 base model...")
             best_model = "yolov8s.pt"
         model = self.modules["ultralytics"].YOLO(best_model)
+
+        # Set backend to MACOS to enable mp4 output
+        import ultralytics
+
+        ultralytics.utils.MACOS = True
+
         project = Path(save_dir)
         self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
         if latest:
@@ -1920,7 +1926,7 @@ class MLProjectProcessor(ProjectProcessor):
                         stream=True,
                     )
                     for i in results:
-                        print(i)
+                        print(i.speed)
             else:
                 results = model.predict(
                     project=project,
@@ -1934,7 +1940,7 @@ class MLProjectProcessor(ProjectProcessor):
                     stream=True,
                 )
                 for i in results:
-                    print(i)
+                    print(i.speed)
         else:
             if isinstance(source, list):
                 for src in source:
