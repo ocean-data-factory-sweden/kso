@@ -1724,21 +1724,21 @@ def modify_frames(
         else:
             logging.error("No suitable writable path found.")
             return
-        mod_frames_folder = str(
-            Path(folder_name, "modified_" + "_".join(species_i) + "_frames/")
+        mod_frames_folder = Path(
+            folder_name, "modified_" + "_".join(species_i) + "_frames"
         )
     else:
-        mod_frames_folder = "modified_" + "_".join(species_i) + "_frames/"
+        mod_frames_folder = Path("modified_" + "_".join(species_i) + "_frames")
         if hasattr(project, "output_path"):
-            mod_frames_folder = project.output_path + mod_frames_folder
+            mod_frames_folder = project.output_path / mod_frames_folder
 
     # Specify the path of the modified frames
     frames_to_upload_df["modif_frame_path"] = frames_to_upload_df["frame_path"].apply(
-        lambda x: str(Path(mod_frames_folder, Path(x).name)), 1
+        lambda x: mod_frames_folder / Path(x).name
     )
 
     # Remove existing modified clips
-    if os.path.exists(mod_frames_folder):
+    if mod_frames_folder.exists():
         shutil.rmtree(mod_frames_folder)
 
     if len(modification_details.values()) > 0:
@@ -1746,17 +1746,17 @@ def modify_frames(
         frames_to_upload_df["frame_modification_details"] = str(modification_details)
 
         # Create the folder to store the videos if not exist
-        if not os.path.exists(mod_frames_folder):
-            Path(mod_frames_folder).mkdir(parents=True, exist_ok=True)
+        if not mod_frames_folder.exists():
+            mod_frames_folder.mkdir(parents=True, exist_ok=True)
             # Recursively add permissions to folders created
-            [os.chmod(root, 0o777) for root, dirs, files in os.walk(mod_frames_folder)]
+            [root.chmod(0o777) for root, _, _ in os.walk(mod_frames_folder)]
 
         #### Modify the clips###
         # Read each clip and modify them (showing a progress bar)
         for index, row in tqdm(
             frames_to_upload_df.iterrows(), total=frames_to_upload_df.shape[0]
         ):
-            if not os.path.exists(row["modif_frame_path"]):
+            if not row["modif_frame_path"].exists():
                 # Set up input prompt
                 init_prompt = f'ffmpeg.input("{row["frame_path"]}")'
                 full_prompt = init_prompt
@@ -1784,7 +1784,7 @@ def modify_frames(
                 try:
                     logging.info(full_prompt)
                     eval(full_prompt).run(capture_stdout=True, capture_stderr=True)
-                    os.chmod(row["modif_frame_path"], 0o777)
+                    row["modif_frame_path"].chmod(0o777)
                 except ffmpeg.Error as e:
                     logging.info("stdout: {}", e.stdout.decode("utf8"))
                     logging.info("stderr: {}", e.stderr.decode("utf8"))
@@ -1914,9 +1914,7 @@ def upload_frames_to_zooniverse(
     elif project_name == "SGU":
         surveys_df = pd.read_csv(project.csv_paths["local_surveys_csv"])
         created_on = surveys_df["SurveyDate"].unique()[0]
-        folder_name = os.path.split(
-            os.path.dirname(upload_to_zoo["frame_path"].iloc[0])
-        )[1]
+        folder_name = Path(upload_to_zoo["frame_path"].iloc[0]).parent.name
         sitename = folder_name
 
         # Name the subject set

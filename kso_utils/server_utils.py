@@ -156,11 +156,9 @@ def get_ml_data(project: Project, test: bool = False):
 
             # Download template training files from Gdrive
             if test:
-                download_gdrive(
-                    gdrive_id, os.path.join("../test/test_output", ml_folder)
-                )
+                download_gdrive(gdrive_id, Path("../test/test_output") / ml_folder)
             else:
-                download_gdrive(gdrive_id, ml_folder)
+                download_gdrive(gdrive_id, Path(ml_folder))
             logging.info("Template data downloaded successfully")
         else:
             logging.info("No download method implemented for this data")
@@ -469,22 +467,21 @@ def fix_text_encoding(folder_name):
     koster_utils, but this is not implemented yet.
     """
     dirpaths = []
-    for dirpath, dirnames, filenames in os.walk(folder_name):
+    for dirpath, dirnames, filenames in Path(folder_name).iterdir():
         for filename in filenames:
-            os.rename(
-                os.path.join(dirpath, filename),
-                os.path.join(dirpath, ftfy.fix_text(filename)),
-            )
-        dirpaths.append(dirpath)
+            old_path = Path(dirpath) / filename
+            new_path = Path(dirpath) / ftfy.fix_text(filename)
+            old_path.rename(new_path)
+        dirpaths.append(Path(dirpath))
 
     for dirpath in dirpaths:
         if sys.platform.startswith("win"):  # windows has different file-path formatting
-            index = dirpath.rfind("\\")
+            index = str(dirpath).rfind("\\")
         else:  # mac and linux have the same file-path formatting
-            index = dirpath.rfind("/")
-        old_dir = ftfy.fix_text(dirpath[:index]) + dirpath[index:]
-        new_dir = ftfy.fix_text(dirpath)
-        os.rename(old_dir, new_dir)
+            index = str(dirpath).rfind("/")
+        old_dir = Path(ftfy.fix_text(str(dirpath)[:index])) / str(dirpath)[index:]
+        new_dir = Path(ftfy.fix_text(str(dirpath)))
+        old_dir.rename(new_dir)
 
 
 ###################################
@@ -506,10 +503,10 @@ def download_gdrive(gdrive_id: str, folder_name: str):
 
     # Unzip the folder with the files
     with zipfile.ZipFile(zip_file, "r") as zip_ref:
-        zip_ref.extractall(os.path.dirname(folder_name))
+        zip_ref.extractall(Path(folder_name).parent)
 
     # Remove the zipped file
-    os.remove(zip_file)
+    Path(zip_file).unlink()
 
     # Correct the file names by using correct encoding
     fix_text_encoding(folder_name)

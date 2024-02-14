@@ -2070,10 +2070,9 @@ class MLProjectProcessor(ProjectProcessor):
 
             # Method 1
             for n in range(2, 9999):
-                p = f"{path}{sep}{n}{suffix}"  # increment path
-                if not os.path.exists(p):  #
+                p = path.with_name(f"{path.stem}{sep}{n}{suffix}")  # increment path
+                if not p.exists():
                     break
-            path = Path(p)
 
             # Method 2 (deprecated)
             # dirs = glob.glob(f"{path}{sep}*")  # similar paths
@@ -2083,9 +2082,9 @@ class MLProjectProcessor(ProjectProcessor):
             # path = Path(f"{path}{sep}{n}{suffix}")  # increment path
 
         if mkdir:
-            path.mkdir(parents=True, exist_ok=True)  # make directory
+            p.mkdir(parents=True, exist_ok=True)  # make directory
 
-        return path
+        return p
 
     def track_individuals(
         self,

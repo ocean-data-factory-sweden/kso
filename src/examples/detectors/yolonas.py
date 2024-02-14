@@ -146,7 +146,6 @@ class YoloNASStrategy(YoloInterface):
     def postprocess(self, path, preds, im, im0s):
         results = []
         for i, pred in enumerate(preds):
-
             if pred is None:
                 pred = torch.empty((0, 6))
                 r = Results(path=path, boxes=pred, orig_img=im0s[i], names=self.names)

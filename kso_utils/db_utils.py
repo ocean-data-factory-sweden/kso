@@ -1,5 +1,5 @@
 # base imports
-import os
+from pathlib import Path
 import sqlite3
 import logging
 import pandas as pd
@@ -23,14 +23,15 @@ def create_connection(db_file: str):
     :return: Connection object or None
     """
     conn = None
+    db_path = Path(db_file)
     try:
-        if not os.path.exists(os.path.dirname(db_file)):
-            if not os.path.dirname(db_file) == "":
-                os.mkdir(os.path.dirname(db_file))
-                os.chmod(os.path.dirname(db_file), 0o777)
+        if not db_path.parent.exists():
+            if not db_path.parent == Path(""):
+                db_path.parent.mkdir(parents=True)
+                db_path.parent.chmod(0o777)
         conn = sqlite3.connect(db_file)
         conn.execute("PRAGMA foreign_keys = 1")
-        os.chmod(db_file, 0o777)
+        db_path.chmod(0o777)
         return conn
     except sqlite3.Error as e:
         logging.error(e)
@@ -282,16 +283,17 @@ def create_db(db_path: str):
     :param db_path: path of the database file
     :return:
     """
+    db_file = Path(db_path)
 
     # Delete previous database versions if exists
-    if os.path.exists(db_path):
-        os.remove(db_path)
+    if db_file.exists():
+        db_file.unlink()
 
     # Get sql command for db setup
     sql_setup = schema.sql
 
     # create a database connection
-    conn = create_connection(r"{:s}".format(db_path))
+    conn = create_connection(str(db_file))
 
     # create tables
     if conn is not None:
