@@ -7,7 +7,6 @@ import zipfile
 import boto3
 import logging
 import sys
-import ftfy
 from tqdm import tqdm
 from pathlib import Path
 
@@ -449,36 +448,9 @@ def delete_file_from_s3(client: boto3.client, *, bucket: str, key: str):
     """
     client.delete_object(Bucket=bucket, Key=key)
 
-
-##############################
-# #######SNIC functions########
-# #############################
-
-
-def fix_text_encoding(folder_name):
-    """
-    This function corrects for text encoding errors, which occur when there is
-    for example an ä,å,ö present. It runs through all the file and folder names
-    of the directory you give it. It uses the package ftfy, which recognizes
-    which encoding the text has based on the text itself, and it encodes/decodes
-    it to utf8.
-    This function was tested on a Linux and Windows device with package version
-    6.1.1. With package version 5.8 it did not work.
-
-    This function can replace the unswedify and reswedify functions from
-    koster_utils, but this is not implemented yet.
-    """
-    for item in Path(folder_name).iterdir():
-        if item.is_dir():
-            for sub_item in item.iterdir():
-                old_path = sub_item
-                new_path = sub_item.parent / ftfy.fix_text(sub_item.name)
-                old_path.rename(new_path)
-
-
 ###################################
-# #######Google Drive functions#####
-# ##################################
+########Google Drive functions#####
+###################################
 
 
 def download_gdrive(gdrive_id: str, folder_name: str, fix_encoding: bool = True):
@@ -501,5 +473,7 @@ def download_gdrive(gdrive_id: str, folder_name: str, fix_encoding: bool = True)
     Path(zip_file).unlink()
 
     if fix_encoding:
+        from kso_utils.koster_utils import fix_text_encoding_folder
+
         # Correct the file names by using correct encoding
-        fix_text_encoding(folder_name)
+        fix_text_encoding_folder(folder_name)

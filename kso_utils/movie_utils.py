@@ -34,30 +34,6 @@ def is_url(url):
     except ValueError:
         return False
 
-
-# Function to prevent issues with Swedish characters
-# Converting the Swedish characters ä and ö to utf-8.
-def unswedify(string: str):
-    """Convert ä and ö to utf-8"""
-    return (
-        string.encode("utf-8")
-        .replace(b"\xc3\xa4", b"a\xcc\x88")
-        .replace(b"\xc3\xb6", b"o\xcc\x88")
-        .decode("utf-8")
-    )
-
-
-# Function to prevent issues with Swedish characters
-def reswedify(string: str):
-    """Convert ä and ö to utf-8"""
-    return (
-        string.encode("utf-8")
-        .replace(b"a\xcc\x88", b"\xc3\xa4")
-        .replace(b"o\xcc\x88", b"\xc3\xb6")
-        .decode("utf-8")
-    )
-
-
 def get_fps_duration(movie_path: str):
     """
     This function takes the path (or url) of a movie and returns its fps and duration information

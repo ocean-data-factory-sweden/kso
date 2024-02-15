@@ -17,7 +17,7 @@ from PIL import Image
 
 # utils imports
 from kso_utils.db_utils import create_connection
-from kso_utils.koster_utils import unswedify
+from kso_utils.koster_utils import fix_text_encoding
 from kso_utils.server_utils import retrieve_movie_info_from_server, get_movie_url
 from kso_utils.t4_utils import get_species_ids
 import kso_utils.project_utils as project_utils
@@ -254,7 +254,9 @@ def frame_aggregation(
             movie_path, frame_number, species_id = name[:3]
             named_tuple = tuple([species_id, frame_number, movie_path])
 
-            final_name = name[0] if name[0] in video_dict else unswedify(name[0])
+            final_name = (
+                name[0] if name[0] in video_dict else fix_text_encoding(name[0])
+            )
             if frame_number > len(video_dict[final_name]):
                 logging.warning(
                     f"Frame out of range for video of length {len(video_dict[final_name])}"
@@ -334,7 +336,7 @@ def frame_aggregation(
                     )
                 )
             Image.fromarray(
-                video_dict[unswedify(name[1])][name[0]][:, :, [2, 1, 0]]
+                video_dict[fix_text_encoding(name[1])][name[0]][:, :, [2, 1, 0]]
             ).save(f"{out_path}/images/{file_base}_frame_{name[0]}.jpg")
     else:
         train_rows = train_rows[
