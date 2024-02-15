@@ -92,7 +92,9 @@ def download_init_csv(project: Project, init_keys: list, server_connection: dict
 
     if project.server == ServerType.TEMPLATE:
         gdrive_id = "1PZGRoSY_UpyLfMhRphMUMwDXw4yx1_Fn"
-        download_gdrive(gdrive_id, project.csv_folder)
+        download_gdrive(
+            gdrive_id=gdrive_id, folder_name=project.csv_folder, fix_encoding=False
+        )
 
     elif project.server in [ServerType.LOCAL, ServerType.SNIC]:
         logging.info("Running locally so no csv files were downloaded from the server.")
@@ -489,7 +491,7 @@ def fix_text_encoding(folder_name):
 # ##################################
 
 
-def download_gdrive(gdrive_id: str, folder_name: str):
+def download_gdrive(gdrive_id: str, folder_name: str, fix_encoding: bool = True):
     # Specify the url of the file to download
     url_input = f"https://drive.google.com/uc?&confirm=s5vl&id={gdrive_id}"
 
@@ -508,5 +510,6 @@ def download_gdrive(gdrive_id: str, folder_name: str):
     # Remove the zipped file
     Path(zip_file).unlink()
 
-    # Correct the file names by using correct encoding
-    fix_text_encoding(folder_name)
+    if fix_encoding:
+        # Correct the file names by using correct encoding
+        fix_text_encoding(folder_name)
