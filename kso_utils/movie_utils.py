@@ -11,6 +11,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 from urllib.request import pathname2url
+from urllib.parse import urlparse
 from IPython.display import HTML
 
 # util imports
@@ -19,12 +20,19 @@ from kso_utils.project_utils import Project
 # server imports
 from kso_utils.server_utils import ServerType, get_matching_s3_keys, upload_file_server
 
-# tutorial imports
-from kso_utils.tutorials_utils import is_url
 
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
+
+
+# Function to check if an url is valid or not
+def is_url(url):
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except ValueError:
+        return False
 
 
 # Function to prevent issues with Swedish characters
