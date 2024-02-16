@@ -1054,7 +1054,11 @@ def add_data(path: str, name: str, registry: str, run):
 
 
 def generate_csv_report(
-    evaluation_path: str, run, log: bool = False, registry: str = "wandb"
+    evaluation_path: str,
+    movie_csv_df: pd.DataFrame,
+    run,
+    log: bool = False,
+    registry: str = "wandb",
 ):
     """
     Generate a CSV report from labels in the evaluation folder.
@@ -1066,7 +1070,7 @@ def generate_csv_report(
     labels_path = Path(evaluation_path, "labels")
     data_dict = {}
 
-    for label_file in labels_path.iterdir():
+    for label_file in labels_path.glob("*.txt"):
         try:
             frame_no = int(label_file.stem.split("_")[-1])
         except ValueError:
@@ -1080,30 +1084,53 @@ def generate_csv_report(
             for line in lines:
                 parts = line.split()
                 class_id, x, y, w, h, conf = parts[:6]
-                data_dict[str(label_file)] = data_dict.get(str(label_file), []) + [
+                data_dict.setdefault(str(label_file), []).append(
                     [class_id, frame_no, x, y, w, h, float(conf)]
-                ]
+                )
 
     dlist = [[key, *i] for key, values in data_dict.items() for i in values]
 
     # Convert list of lists to output dataframe
-    detect_df = pd.DataFrame.from_records(
+    detect_df = pd.DataFrame(
         dlist, columns=["filename", "class_id", "frame_no", "x", "y", "w", "h", "conf"]
+    )
+
+    # Filter by survey_start and survey_end if applicable
+    if all(col in movie_csv_df for col in ["sampling_start", "sampling_end"]):
+        detect_df["movie_filename"] = (
+            detect_df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
+        )
+        # Rename movie_filename to avoid filename confusion
+        movie_csv_df.rename(
+            columns={"filename": "movie_filename"},
+            inplace=True,
+        )
+
+        # Add sampling data
+        detect_df = pd.merge(detect_df, movie_csv_df, on="movie_filename")
+        detect_df = detect_df[
+            (detect_df.frame_no >= detect_df.sampling_start)
+            & (detect_df.frame_no <= detect_df.sampling_end)
+        ]
+        # Keep only useful columns
+        detect_df = detect_df[
+            ["filename", "class_id", "frame_no", "x", "y", "w", "h", "conf"]
+        ]
+
+    # Sort dataframe by frame_no and filename
+    detect_df = detect_df.sort_values(
+        by=["frame_no", "filename"],
+        key=lambda x: np.argsort(index_natsorted(detect_df["filename"])),
     )
 
     # Export to CSV
     csv_out = Path(evaluation_path, "annotations.csv")
-    detect_df.sort_values(
-        by="frame_no", key=lambda x: np.argsort(index_natsorted(detect_df["filename"]))
-    ).to_csv(csv_out, index=False)
+    detect_df.to_csv(csv_out, index=False)
 
     logging.info(f"Report created at {csv_out}")
 
-    if log:
-        if registry == "wandb":
-            wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
-        elif registry == "mlflow":
-            pass
+    if log and registry == "wandb":
+        wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
 
     return detect_df
 
