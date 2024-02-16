@@ -17,7 +17,10 @@ from IPython.display import HTML
 from kso_utils.project_utils import Project
 
 # server imports
-from kso_utils.server_utils import ServerType, get_matching_s3_keys
+from kso_utils.server_utils import ServerType, get_matching_s3_keys, upload_file_server
+
+# tutorial imports
+from kso_utils.tutorials_utils import is_url
 
 # Logging
 logging.basicConfig()

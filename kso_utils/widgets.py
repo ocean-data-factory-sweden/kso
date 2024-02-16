@@ -883,15 +883,15 @@ def choose_new_videos_to_upload():
 
     fc.register_callback(change_dir)
 
-    sel = SelectMultiple(options=[])
+    sel = widgets.SelectMultiple(options=[])
 
     display(fc)
     display(sel)
 
     sel.layout.visibility = "hidden"
 
-    button_add = Button(description="Add selected file")
-    output_add = Output()
+    button_add = widgets.Button(description="Add selected file")
+    output_add = widgets.Output()
 
     print("Showing paths to the selected movies:\nRerun cell to reset\n--------------")
 
@@ -1087,14 +1087,14 @@ def view_clips(example_clips: list, modified_clip_path: str):
 
     # Open original video
     vid1 = open(example_clip_path, "rb").read()
-    wi1 = Video(value=vid1, format=extension, width=400, height=500)
+    wi1 = widgets.Video(value=vid1, format=extension, width=400, height=500)
 
     # Open modified video
     vid2 = open(modified_clip_path, "rb").read()
-    wi2 = Video(value=vid2, format=extension, width=400, height=500)
+    wi2 = widgets.Video(value=vid2, format=extension, width=400, height=500)
 
     # Display videos side-by-side
-    wid = HBox([wi1, wi2])
+    wid = widgets.HBox([wi1, wi2])
 
     return wid
 
