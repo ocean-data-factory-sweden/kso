@@ -469,12 +469,13 @@ def fix_text_encoding(folder_name):
     koster_utils, but this is not implemented yet.
     """
     dirpaths = []
-    for dirpath, dirnames, filenames in Path(folder_name).iterdir():
-        for filename in filenames:
-            old_path = Path(dirpath) / filename
-            new_path = Path(dirpath) / ftfy.fix_text(filename)
-            old_path.rename(new_path)
-        dirpaths.append(Path(dirpath))
+    for item in Path(folder_name).iterdir():
+        if item.is_dir():
+            for sub_item in item.iterdir():
+                old_path = sub_item
+                new_path = sub_item.parent / ftfy.fix_text(sub_item.name)
+                old_path.rename(new_path)
+            dirpaths.append(item)
 
     for dirpath in dirpaths:
         if sys.platform.startswith("win"):  # windows has different file-path formatting
