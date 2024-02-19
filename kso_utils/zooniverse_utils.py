@@ -461,7 +461,8 @@ def process_zoo_classifications(
         elif subject_type == "frame":
             # Select the information from all the labelled animals (e.g. task = T0)
             for ann_i in annotations:
-                if ann_i["task"] == "T0":
+                # Temporary fix (find out what T2 is and if it is always relevant)
+                if ann_i["task"] in ["T0", "T2"]:
                     if ann_i["value"] == []:
                         # Specify the frame was classified as empty
                         choice_i = {
