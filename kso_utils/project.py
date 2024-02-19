@@ -1541,13 +1541,15 @@ class MLProjectProcessor(ProjectProcessor):
             from mlflow.data.pandas_dataset import PandasDataset
 
             parent_dir = Path(self.data_path).parent
-            train_df = pd.read_csv(Path(parent_dir, "train.txt"), delimiter="\t")
-            val_df = pd.read_csv(Path(parent_dir, "valid.txt"), delimiter="\t")
+            train_path = str(Path(parent_dir, "train.txt"))
+            valid_path = str(Path(parent_dir, "valid.txt"))
+            train_df = pd.read_csv(train_path, delimiter="\t")
+            val_df = pd.read_csv(valid_path, delimiter="\t")
             train_dataset: PandasDataset = mlflow.data.from_pandas(
-                train_df, source=Path(parent_dir, "train.txt")
+                train_df, source=train_path
             )
             val_dataset: PandasDataset = mlflow.data.from_pandas(
-                val_df, source=Path(parent_dir, "valid.txt")
+                val_df, source=valid_path
             )
             if active_run:
                 mlflow.end_run()
@@ -1566,11 +1568,11 @@ class MLProjectProcessor(ProjectProcessor):
             mlflow.log_input(train_dataset, context="training")
             mlflow.log_input(val_dataset, context="validation")
             mlflow.log_artifacts(
-                Path(self.data_path).parent, artifact_path="input_datasets"
+                str(Path(self.data_path).parent), artifact_path="input_datasets"
             )
         try:
             if "yolov5" in weights:
-                weights = Path(weights).name
+                weights = str(Path(weights).name)
 
             model = self.modules["ultralytics"].YOLO(weights)
             model.train(
@@ -1890,7 +1892,7 @@ class MLProjectProcessor(ProjectProcessor):
                 settings=self.modules["wandb"].Settings(start_method="thread"),
             )
         models = [
-            f
+            str(f)
             for f in Path(artifact_dir).iterdir()
             if f.is_file()
             and str(f).endswith((".pt", ".model"))
@@ -1909,8 +1911,8 @@ class MLProjectProcessor(ProjectProcessor):
 
         ultralytics.utils.MACOS = True
 
-        project = Path(save_dir)
-        self.eval_dir = increment_path(Path(project) / name, exist_ok=False)
+        project = str(Path(save_dir))
+        self.eval_dir = str(increment_path(Path(project) / name, exist_ok=False))
         if latest:
             if isinstance(source, list):
                 for src in source:
@@ -1926,7 +1928,7 @@ class MLProjectProcessor(ProjectProcessor):
                         stream=True,
                     )
                     for i in results:
-                        print(i.speed)
+                        logging.info(i.speed)
             else:
                 results = model.predict(
                     project=project,
@@ -1940,7 +1942,7 @@ class MLProjectProcessor(ProjectProcessor):
                     stream=True,
                 )
                 for i in results:
-                    print(i.speed)
+                    logging.info(i.speed)
         else:
             if isinstance(source, list):
                 for src in source:
@@ -2044,7 +2046,7 @@ class MLProjectProcessor(ProjectProcessor):
     ):
         model = self.modules["ultralytics"].YOLO(
             [
-                f
+                str(f)
                 for f in Path(artifact_dir).iterdir()
                 if f.is_file()
                 and str(f).endswith((".pt", ".model"))
@@ -2096,8 +2098,8 @@ class MLProjectProcessor(ProjectProcessor):
         test: bool = False,
     ):
         if not hasattr(self, "eval_dir"):
-            self.eval_dir = self.increment_path(
-                path=Path(self.save_dir) / "detect", exist_ok=False
+            self.eval_dir = str(
+                self.increment_path(path=Path(self.save_dir) / "detect", exist_ok=False)
             )
 
         latest_tracker = self.modules["yolo_utils"].track_objects(
@@ -2137,7 +2139,7 @@ class MLProjectProcessor(ProjectProcessor):
             registry=self.registry,
         )
         self.modules["yolo_utils"].add_data(
-            Path(latest_tracker).parent.absolute(),
+            str(Path(latest_tracker).parent.absolute()),
             "tracker_output",
             self.registry,
             self.run,
