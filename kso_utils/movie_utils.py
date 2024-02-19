@@ -341,8 +341,10 @@ def extract_frames(
 
     # Set the filename of the frames
     df["frame_path"] = df.apply(
-        lambda row: Path(frames_folder)
-        / f"{row['filename']}_{row['frame_number']}_{row['label']}.jpg",
+        lambda row: str(
+            Path(frames_folder)
+            / f"{row['filename']}_{row['frame_number']}_{row['label']}.jpg"
+        ),
         axis=1,
     )
 

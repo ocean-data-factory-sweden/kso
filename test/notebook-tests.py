@@ -201,7 +201,7 @@ def test_t5():
     mlp.train_yolo(
         exp_name=exp_name,
         weights="yolov8s.pt",  # weights.artifact_path,
-        project=project_path,
+        project=str(project_path),
         epochs=epochs.value,
         batch_size=batch_size.value,
         img_size=img_h.value,  # this requires an int
