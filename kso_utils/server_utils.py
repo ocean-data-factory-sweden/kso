@@ -468,23 +468,12 @@ def fix_text_encoding(folder_name):
     This function can replace the unswedify and reswedify functions from
     koster_utils, but this is not implemented yet.
     """
-    dirpaths = []
     for item in Path(folder_name).iterdir():
         if item.is_dir():
             for sub_item in item.iterdir():
                 old_path = sub_item
                 new_path = sub_item.parent / ftfy.fix_text(sub_item.name)
                 old_path.rename(new_path)
-            dirpaths.append(item)
-
-    for dirpath in dirpaths:
-        if sys.platform.startswith("win"):  # windows has different file-path formatting
-            index = str(dirpath).rfind("\\")
-        else:  # mac and linux have the same file-path formatting
-            index = str(dirpath).rfind("/")
-        old_dir = Path(ftfy.fix_text(str(dirpath)[:index])) / str(dirpath)[index:]
-        new_dir = Path(ftfy.fix_text(str(dirpath)))
-        old_dir.rename(new_dir)
 
 
 ###################################
