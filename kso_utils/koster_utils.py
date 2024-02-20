@@ -22,7 +22,7 @@ def fix_text_encoding(string: str):
     return ftfy.fix_text(string)
 
 
-def fix_text_encoding_folder(folder_name):
+def fix_text_encoding(folder_name):
     """
     This function corrects for text encoding errors, which occur when there is
     for example an ä,å,ö present. It runs through all the file and folder names
@@ -31,23 +31,16 @@ def fix_text_encoding_folder(folder_name):
     it to utf8.
     This function was tested on a Linux and Windows device with package version
     6.1.1. With package version 5.8 it did not work.
-    """
-    dirpaths = []
-    for dirpath, dirnames, filenames in Path(folder_name).iterdir():
-        for filename in filenames:
-            old_path = Path(dirpath) / filename
-            new_path = Path(dirpath) / fix_text_encoding(filename)
-            old_path.rename(new_path)
-        dirpaths.append(Path(dirpath))
 
-    for dirpath in dirpaths:
-        if sys.platform.startswith("win"):  # windows has different file-path formatting
-            index = str(dirpath).rfind("\\")
-        else:  # mac and linux have the same file-path formatting
-            index = str(dirpath).rfind("/")
-        old_dir = Path(fix_text_encoding(str(dirpath)[:index])) / str(dirpath)[index:]
-        new_dir = Path(fix_text_encoding(str(dirpath)))
-        old_dir.rename(new_dir)
+    This function can replace the unswedify and reswedify functions from
+    koster_utils, but this is not implemented yet.
+    """
+    for item in Path(folder_name).iterdir():
+        if item.is_dir():
+            for sub_item in item.iterdir():
+                old_path = sub_item
+                new_path = sub_item.parent / ftfy.fix_text(sub_item.name)
+                old_path.rename(new_path)
 
 
 def get_koster_col_names(table_name: str):

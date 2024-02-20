@@ -34,6 +34,7 @@ def is_url(url):
     except ValueError:
         return False
 
+
 def get_fps_duration(movie_path: str):
     """
     This function takes the path (or url) of a movie and returns its fps and duration information
