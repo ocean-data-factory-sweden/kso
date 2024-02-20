@@ -1443,6 +1443,7 @@ class MLProjectProcessor(ProjectProcessor):
                         )
                         for artifact, run_id in artifacts
                     ]
+                    model_names = [m for m in model_names if "detection" not in m]
                 except IndexError:
                     model_names = []
             else:
