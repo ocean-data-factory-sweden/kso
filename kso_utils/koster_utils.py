@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # base imports
+import sys
 import logging
 import sqlite3
+import ftfy
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -9,10 +11,36 @@ from pathlib import Path
 # util imports
 from kso_utils.project_utils import Project
 
-
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
+
+
+def fix_text_encoding(string: str):
+    """This function corrects for text encoding errors, which occur when there is
+    for example an ä,å,ö present."""
+    return ftfy.fix_text(string)
+
+
+def fix_text_encoding_folder(folder_name):
+    """
+    This function corrects for text encoding errors, which occur when there is
+    for example an ä,å,ö present. It runs through all the file and folder names
+    of the directory you give it. It uses the package ftfy, which recognizes
+    which encoding the text has based on the text itself, and it encodes/decodes
+    it to utf8.
+    This function was tested on a Linux and Windows device with package version
+    6.1.1. With package version 5.8 it did not work.
+
+    This function can replace the unswedify and reswedify functions from
+    koster_utils, but this is not implemented yet.
+    """
+    for item in Path(folder_name).iterdir():
+        if item.is_dir():
+            for sub_item in item.iterdir():
+                old_path = sub_item
+                new_path = sub_item.parent / ftfy.fix_text(sub_item.name)
+                old_path.rename(new_path)
 
 
 def get_koster_col_names(table_name: str):
@@ -416,10 +444,8 @@ def process_koster_movies_csv(movies_df: pd.DataFrame):
     # Standarise the filename
     movies_df["filename"] = movies_df["filename"].str.normalize("NFD")
 
-    # Unswedify the filename
-    from kso_utils.movie_utils import unswedify
-
-    movies_df["filename"] = movies_df["filename"].apply(lambda x: unswedify(x))
+    # Ensure the filename has standard characters
+    movies_df["filename"] = movies_df["filename"].apply(lambda x: fix_text_encoding(x))
 
     # TO DO Include server's path to the movie files
     movies_df["fpath"] = movies_df["filename"]

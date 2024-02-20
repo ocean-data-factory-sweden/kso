@@ -131,10 +131,10 @@ def ProcFrames(proc_frame_func: Callable, frames_path: str):
                 new_frame = proc_frame_func(cv2.imread(str(Path(frames_path, f))))
                 cv2.imwrite(str(Path(frames_path, f)), new_frame)
             else:
-                from kso_utils.movie_utils import unswedify
+                from kso_utils.koster_utils import fix_text_encoding
 
                 new_frame = proc_frame_func(
-                    cv2.imread(unswedify(str(Path(frames_path, f))))
+                    cv2.imread(fix_text_encoding(str(Path(frames_path, f))))
                 )
                 cv2.imwrite(str(Path(frames_path, f)), new_frame)
     end = time.time()
@@ -585,9 +585,11 @@ def frame_aggregation(
                     logging.info(
                         f"Could not use moviepy, switching to regular pims... {e}"
                     )
-                    from kso_utils.movie_utils import unswedify
+                    from kso_utils.koster_utils import fix_text_encoding
 
-                    video_dict[unswedify(str(i))] = pims.Video(unswedify(str(i)))
+                    video_dict[fix_text_encoding(str(i))] = pims.Video(
+                        fix_text_encoding(str(i))
+                    )
                 except KeyError:
                     logging.warning("Missing file" + f"{i}")
 
@@ -667,9 +669,11 @@ def frame_aggregation(
             named_tuple = tuple([rev_fields])
 
         if movie_bool:
-            from kso_utils.movie_utils import unswedify
+            from kso_utils.koster_utils import fix_text_encoding
 
-            final_name = name[2] if name[2] in video_dict else unswedify(name[2])
+            final_name = (
+                name[2] if name[2] in video_dict else fix_text_encoding(name[2])
+            )
 
             if grouped_fields[1] > len(video_dict[final_name]):
                 logging.warning(
@@ -836,9 +840,9 @@ def frame_aggregation(
 
         # Save frames to image files
         if movie_bool:
-            from kso_utils.movie_utils import unswedify
+            from kso_utils.koster_utils import fix_text_encoding
 
-            save_name = name[1] if name[1] in video_dict else unswedify(name[1])
+            save_name = name[1] if name[1] in video_dict else fix_text_encoding(name[1])
             if save_name in video_dict:
                 img_array = video_dict[save_name][name[0]][:, :, [2, 1, 0]]
                 img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
