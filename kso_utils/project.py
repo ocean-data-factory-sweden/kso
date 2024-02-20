@@ -1492,7 +1492,6 @@ class MLProjectProcessor(ProjectProcessor):
                 model_widget.artifact_path = "yolov8m.pt"
 
             # Display the dropdown widget
-            display(model_widget)
             return model_widget
         else:
             logging.error("Registry not supported.")
