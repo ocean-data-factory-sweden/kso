@@ -1734,6 +1734,11 @@ class MLProjectProcessor(ProjectProcessor):
                                     "best.pt",
                                 )
                             )
+                            model_dict = {
+                                m_name: m_path
+                                for m_name, m_path in model_dict.items()
+                                if "detection" not in m_name
+                            }
 
                     except IndexError:
                         pass
