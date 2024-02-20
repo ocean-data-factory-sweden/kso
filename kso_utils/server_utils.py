@@ -448,6 +448,7 @@ def delete_file_from_s3(client: boto3.client, *, bucket: str, key: str):
     """
     client.delete_object(Bucket=bucket, Key=key)
 
+
 ###################################
 ########Google Drive functions#####
 ###################################

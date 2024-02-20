@@ -22,7 +22,7 @@ def fix_text_encoding(string: str):
     return ftfy.fix_text(string)
 
 
-def fix_text_encoding(folder_name):
+def fix_text_encoding_folder(folder_name):
     """
     This function corrects for text encoding errors, which occur when there is
     for example an ä,å,ö present. It runs through all the file and folder names
