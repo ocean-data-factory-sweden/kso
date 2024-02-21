@@ -3,7 +3,7 @@ import sqlite3
 import logging
 import pandas as pd
 from pathlib import Path
-from server_utils import download_object_from_s3
+
 
 
 # Logging
@@ -86,6 +86,7 @@ def process_spyfish_subjects(
     local_csv_path = Path.cwd() / csv_filename
     server_csv_key = f"{project.key}/{csv_filename}"
 
+    from kso_utils.server_utils import download_object_from_s3
     if not local_csv_path.exists():
         download_object_from_s3(
             client=server_connection["client"],
