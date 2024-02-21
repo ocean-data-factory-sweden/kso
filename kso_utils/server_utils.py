@@ -425,6 +425,7 @@ def upload_file_to_s3(client: boto3.client, *, bucket: str, key: str, filename: 
                 Filename=filename,
                 Bucket=bucket,
                 Key=key,
+                Config=boto3.s3.transfer.TransferConfig(use_threads=False),
                 Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
             )
     else:
