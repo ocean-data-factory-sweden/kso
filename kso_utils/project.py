@@ -1935,7 +1935,7 @@ class MLProjectProcessor(ProjectProcessor):
                         stream=True,
                     )
                     for i in results:
-                        logging.info(i.speed)
+                        print(i.speed)
             else:
                 results = model.predict(
                     project=project,
@@ -1949,7 +1949,7 @@ class MLProjectProcessor(ProjectProcessor):
                     stream=True,
                 )
                 for i in results:
-                    logging.info(i.speed)
+                    print(i.speed)
         else:
             if isinstance(source, list):
                 for src in source:
