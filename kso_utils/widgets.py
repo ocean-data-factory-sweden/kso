@@ -302,28 +302,43 @@ def request_latest_zoo_info():
     return latest_info
 
 
-def choose_aggregation_option():
+def choose_aggregation_users(info_dict: dict):
     """
-    Displays a widget for selecting annotation aggregation methods. Options include:
-    - Aggregating annotations based on customizable thresholds (determined by the choose_agg_parameters function).
-    - Utilizing all annotations from specific users (selected using the choose_annot_user function)."
+    > This function shows a widget for selecting the users to keep the annotations from. The options include:
+    - Keep the annotations made by all users. This is the default option.
+    - Select specific users to keep their annotations and discard the rest.
+
+    :param info_dict: a dictionary with the citizen scientits classifications
     """
-    w = widgets.RadioButtons(
-        options=[
-            "Aggregate annotations by certain threshold parameters",
-            "Keep annotations of only certain users",
-        ],
-        layout={"width": "max-content"},
-        description="Choose an option for selecting the final annotations",
-        disabled=False,
-        style={"description_width": "initial"},
+
+    def get_users_list(info_dict: dict, option: str):
+        if "specific" in option:
+            users = select_users(info_dict)
+            return users
+        else:
+            clear_output()
+            return []
+
+    users = interactive(
+        get_users_list,
+        info_dict=widgets.fixed(info_dict),
+        option=widgets.RadioButtons(
+            options=[
+                "Keep annotations of all users",
+                "Select specific users",
+            ],
+            layout={"width": "max-content"},
+            default="Keep annotations of all users",
+            description="Which annotations would you like to keep?",
+            disabled=False,
+            style={"description_width": "initial"},
+        ),
     )
+    display(users)
+    return users
 
-    display(w)
-    return w
 
-
-def choose_annot_user(info_dict: dict):
+def select_users(info_dict: dict):
     """
     Returns a widget showing all the citizen scientits that made classifications in the project,
     sorted in descending order according to the number of classifications they have made.
@@ -356,16 +371,11 @@ def choose_annot_user(info_dict: dict):
     return w
 
 
-def choose_agg_parameters(
-    agg_type: str = None, info_dict: dict = None, subject_type: str = "clip"
-):
+def choose_agg_parameters(subject_type: str = "clip"):
     """
     > This function creates a set of sliders that allow you to set the parameters for the aggregation
     algorithm
 
-    :param agg_type: a string with the type of aggregation to be performed.
-    It is the value selected in the choose_aggregation_option function.
-    :param info_dict: a dictionary with the citizen scientits classifications
     :param subject_type: The type of subject you are aggregating. This can be either "frame" or "video"
     :type subject_type: str
     :return: the values of the sliders.
@@ -374,31 +384,60 @@ def choose_agg_parameters(
         Object threshold (0-1): Minimum proportion of citizen scientists that agree that there is at least one object in the frame.
         IOU Epsilon (0-1): Minimum area of overlap among the classifications provided by the citizen scientists so that they will be considered to be in the same cluster.
         Inter user agreement (0-1): The minimum proportion of users inside a given cluster that must agree on the frame annotation for it to be accepted.
-
-    When the aggregation type is set to keep all annotations of certain users, the function returns the selected users
-    and sets the slider values to include all their annotations.
     """
-
-    if agg_type is not None and "users" in agg_type:
-        users = choose_annot_user(info_dict)
-        if subject_type == "frame":
-            return (
-                users,
-                0.0,
-                1.0,
-                0.0,
-                0.0,
-                0.0,
-            )  # Set aggregation parameters in such a way that all the annotations are kept
-        else:
-            return users, 0.0, 1.0
-    else:
-        agg_users = widgets.FloatSlider(
+    agg_users = widgets.FloatSlider(
+        value=0.8,
+        min=0,
+        max=1.0,
+        step=0.1,
+        description="Aggregation threshold:",
+        disabled=False,
+        continuous_update=False,
+        orientation="horizontal",
+        readout=True,
+        readout_format=".1f",
+        display="flex",
+        flex_flow="column",
+        align_items="stretch",
+        style={"description_width": "initial"},
+    )
+    # Create HTML widget for description
+    description_widget = HTML(
+        f"<p>Minimum proportion of citizen scientists that agree in their classification of the {subject_type}.</p>"
+    )
+    # Display both widgets in a VBox
+    display(agg_users)
+    display(description_widget)
+    min_users = widgets.IntSlider(
+        value=3,
+        min=1,
+        max=15,
+        step=1,
+        description="Min numbers of users:",
+        disabled=False,
+        continuous_update=False,
+        orientation="horizontal",
+        readout=True,
+        readout_format="d",
+        display="flex",
+        flex_flow="column",
+        align_items="stretch",
+        style={"description_width": "initial"},
+    )
+    # Create HTML widget for description
+    description_widget = HTML(
+        f"<p>Minimum number of citizen scientists that need to classify the {subject_type}.</p>"
+    )
+    # Display both widgets in a VBox
+    display(min_users)
+    display(description_widget)
+    if subject_type == "frame":
+        agg_obj = widgets.FloatSlider(
             value=0.8,
             min=0,
             max=1.0,
             step=0.1,
-            description="Aggregation threshold:",
+            description="Object threshold:",
             disabled=False,
             continuous_update=False,
             orientation="horizontal",
@@ -411,22 +450,22 @@ def choose_agg_parameters(
         )
         # Create HTML widget for description
         description_widget = HTML(
-            f"<p>Minimum proportion of citizen scientists that agree in their classification of the {subject_type}.</p>"
+            "<p>Minimum proportion of citizen scientists that agree that there is at least one object in the frame.</p>"
         )
         # Display both widgets in a VBox
-        display(agg_users)
+        display(agg_obj)
         display(description_widget)
-        min_users = widgets.IntSlider(
-            value=3,
-            min=1,
-            max=15,
-            step=1,
-            description="Min numbers of users:",
+        agg_iou = widgets.FloatSlider(
+            value=0.5,
+            min=0,
+            max=1.0,
+            step=0.1,
+            description="IOU Epsilon:",
             disabled=False,
             continuous_update=False,
             orientation="horizontal",
             readout=True,
-            readout_format="d",
+            readout_format=".1f",
             display="flex",
             flex_flow="column",
             align_items="stretch",
@@ -434,85 +473,38 @@ def choose_agg_parameters(
         )
         # Create HTML widget for description
         description_widget = HTML(
-            f"<p>Minimum number of citizen scientists that need to classify the {subject_type}.</p>"
+            "<p>Minimum area of overlap among the citizen science classifications to be considered as being in the same cluster.</p>"
         )
         # Display both widgets in a VBox
-        display(min_users)
+        display(agg_iou)
         display(description_widget)
-        if subject_type == "frame":
-            agg_obj = widgets.FloatSlider(
-                value=0.8,
-                min=0,
-                max=1.0,
-                step=0.1,
-                description="Object threshold:",
-                disabled=False,
-                continuous_update=False,
-                orientation="horizontal",
-                readout=True,
-                readout_format=".1f",
-                display="flex",
-                flex_flow="column",
-                align_items="stretch",
-                style={"description_width": "initial"},
-            )
-            # Create HTML widget for description
-            description_widget = HTML(
-                "<p>Minimum proportion of citizen scientists that agree that there is at least one object in the frame.</p>"
-            )
-            # Display both widgets in a VBox
-            display(agg_obj)
-            display(description_widget)
-            agg_iou = widgets.FloatSlider(
-                value=0.5,
-                min=0,
-                max=1.0,
-                step=0.1,
-                description="IOU Epsilon:",
-                disabled=False,
-                continuous_update=False,
-                orientation="horizontal",
-                readout=True,
-                readout_format=".1f",
-                display="flex",
-                flex_flow="column",
-                align_items="stretch",
-                style={"description_width": "initial"},
-            )
-            # Create HTML widget for description
-            description_widget = HTML(
-                "<p>Minimum area of overlap among the citizen science classifications to be considered as being in the same cluster.</p>"
-            )
-            # Display both widgets in a VBox
-            display(agg_iou)
-            display(description_widget)
-            agg_iua = widgets.FloatSlider(
-                value=0.8,
-                min=0,
-                max=1.0,
-                step=0.1,
-                description="Inter user agreement:",
-                disabled=False,
-                continuous_update=False,
-                orientation="horizontal",
-                readout=True,
-                readout_format=".1f",
-                display="flex",
-                flex_flow="column",
-                align_items="stretch",
-                style={"description_width": "initial"},
-            )
-            # Create HTML widget for description
-            description_widget = HTML(
-                "<p>The minimum proportion of users inside a given cluster that must agree on the frame annotation for it to be accepted.</p>"
-            )
-            # Display both widgets in a VBox
-            display(agg_iua)
-            display(description_widget)
+        agg_iua = widgets.FloatSlider(
+            value=0.8,
+            min=0,
+            max=1.0,
+            step=0.1,
+            description="Inter user agreement:",
+            disabled=False,
+            continuous_update=False,
+            orientation="horizontal",
+            readout=True,
+            readout_format=".1f",
+            display="flex",
+            flex_flow="column",
+            align_items="stretch",
+            style={"description_width": "initial"},
+        )
+        # Create HTML widget for description
+        description_widget = HTML(
+            "<p>The minimum proportion of users inside a given cluster that must agree on the frame annotation for it to be accepted.</p>"
+        )
+        # Display both widgets in a VBox
+        display(agg_iua)
+        display(description_widget)
 
-            return agg_users, min_users, agg_obj, agg_iou, agg_iua
-        else:
-            return agg_users, min_users
+        return agg_users, min_users, agg_obj, agg_iou, agg_iua
+    else:
+        return agg_users, min_users
 
 
 def choose_w_version(workflows_df: pd.DataFrame, workflow_id: str):
