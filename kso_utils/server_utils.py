@@ -7,7 +7,6 @@ import zipfile
 import boto3
 import logging
 import sys
-import ftfy
 from tqdm import tqdm
 from pathlib import Path
 
@@ -92,7 +91,9 @@ def download_init_csv(project: Project, init_keys: list, server_connection: dict
 
     if project.server == ServerType.TEMPLATE:
         gdrive_id = "1PZGRoSY_UpyLfMhRphMUMwDXw4yx1_Fn"
-        download_gdrive(gdrive_id, project.csv_folder)
+        download_gdrive(
+            gdrive_id=gdrive_id, folder_name=project.csv_folder, fix_encoding=False
+        )
 
     elif project.server in [ServerType.LOCAL, ServerType.SNIC]:
         logging.info("Running locally so no csv files were downloaded from the server.")
@@ -156,11 +157,9 @@ def get_ml_data(project: Project, test: bool = False):
 
             # Download template training files from Gdrive
             if test:
-                download_gdrive(
-                    gdrive_id, os.path.join("../test/test_output", ml_folder)
-                )
+                download_gdrive(gdrive_id, Path("../test/test_output") / ml_folder)
             else:
-                download_gdrive(gdrive_id, ml_folder)
+                download_gdrive(gdrive_id, Path(ml_folder))
             logging.info("Template data downloaded successfully")
         else:
             logging.info("No download method implemented for this data")
@@ -426,6 +425,7 @@ def upload_file_to_s3(client: boto3.client, *, bucket: str, key: str, filename: 
                 Filename=filename,
                 Bucket=bucket,
                 Key=key,
+                Config=boto3.s3.transfer.TransferConfig(use_threads=False),
                 Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
             )
     else:
@@ -450,49 +450,12 @@ def delete_file_from_s3(client: boto3.client, *, bucket: str, key: str):
     client.delete_object(Bucket=bucket, Key=key)
 
 
-##############################
-# #######SNIC functions########
-# #############################
-
-
-def fix_text_encoding(folder_name):
-    """
-    This function corrects for text encoding errors, which occur when there is
-    for example an ä,å,ö present. It runs through all the file and folder names
-    of the directory you give it. It uses the package ftfy, which recognizes
-    which encoding the text has based on the text itself, and it encodes/decodes
-    it to utf8.
-    This function was tested on a Linux and Windows device with package version
-    6.1.1. With package version 5.8 it did not work.
-
-    This function can replace the unswedify and reswedify functions from
-    koster_utils, but this is not implemented yet.
-    """
-    dirpaths = []
-    for dirpath, dirnames, filenames in os.walk(folder_name):
-        for filename in filenames:
-            os.rename(
-                os.path.join(dirpath, filename),
-                os.path.join(dirpath, ftfy.fix_text(filename)),
-            )
-        dirpaths.append(dirpath)
-
-    for dirpath in dirpaths:
-        if sys.platform.startswith("win"):  # windows has different file-path formatting
-            index = dirpath.rfind("\\")
-        else:  # mac and linux have the same file-path formatting
-            index = dirpath.rfind("/")
-        old_dir = ftfy.fix_text(dirpath[:index]) + dirpath[index:]
-        new_dir = ftfy.fix_text(dirpath)
-        os.rename(old_dir, new_dir)
-
-
 ###################################
-# #######Google Drive functions#####
-# ##################################
+########Google Drive functions#####
+###################################
 
 
-def download_gdrive(gdrive_id: str, folder_name: str):
+def download_gdrive(gdrive_id: str, folder_name: str, fix_encoding: bool = True):
     # Specify the url of the file to download
     url_input = f"https://drive.google.com/uc?&confirm=s5vl&id={gdrive_id}"
 
@@ -506,10 +469,13 @@ def download_gdrive(gdrive_id: str, folder_name: str):
 
     # Unzip the folder with the files
     with zipfile.ZipFile(zip_file, "r") as zip_ref:
-        zip_ref.extractall(os.path.dirname(folder_name))
+        zip_ref.extractall(Path(folder_name).parent)
 
     # Remove the zipped file
-    os.remove(zip_file)
+    Path(zip_file).unlink()
 
-    # Correct the file names by using correct encoding
-    fix_text_encoding(folder_name)
+    if fix_encoding:
+        from kso_utils.koster_utils import fix_text_encoding_folder
+
+        # Correct the file names by using correct encoding
+        fix_text_encoding_folder(folder_name)

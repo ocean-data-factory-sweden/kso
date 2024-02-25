@@ -22,10 +22,13 @@ logging.getLogger().setLevel(logging.INFO)
 def create_classification_dataset(
     data_path: str, out_path: str, test_size: float, seed: int = 1337
 ):
-    if not os.path.exists(out_path):
-        Path(out_path).mkdir(parents=True, exist_ok=True)
+    out_path = Path(out_path)
+    if not out_path.exists():
+        out_path.mkdir(parents=True, exist_ok=True)
         # Recursively add permissions to folders created
-        [os.chmod(root, 0o777) for root, dirs, files in os.walk(out_path)]
+        for root, dirs, files in out_path.iterdir():
+            root.chmod(0o777)
+
     splitfolders.ratio(
         data_path, output=out_path, seed=seed, ratio=(1 - test_size, 0, test_size)
     )
@@ -46,16 +49,12 @@ def get_patch(row, out_path: str, pixels: int = 224, label_col: str = "sub_type"
 
         # Discard images where pos_X is negative
         if coord[0] < 0:
-            logging.error(
-                f"Negative X value in {os.path.basename(row.fpath)}. Skipping..."
-            )
+            logging.error(f"Negative X value in {Path(row.fpath).name}. Skipping...")
             return
 
         # Discard images where label is NA
         if not isinstance(row[label_col][ix], str):
-            logging.error(
-                f"Invalid label in {os.path.basename(row.fpath)}. Skipping..."
-            )
+            logging.error(f"Invalid label in {Path(row.fpath).name}. Skipping...")
             return
 
         cropped_ys, cropped_ye = int(coord[1] - pixels / 2), int(coord[1] + pixels / 2)
@@ -79,19 +78,16 @@ def get_patch(row, out_path: str, pixels: int = 224, label_col: str = "sub_type"
 
         # Get label
         label = row[label_col][ix]
-        if not os.path.exists(Path(out_path, label)):
-            Path(out_path, label).mkdir(parents=True, exist_ok=True)
-            # Recursively add permissions to folders created
-            [
-                os.chmod(root, 0o777)
-                for root, dirs, files in os.walk(str(Path(out_path, label)))
-            ]
+        label_path = Path(out_path, label)
+        label_path.mkdir(parents=True, exist_ok=True)
+
+        # Recursively add permissions to folders created
+        for root, dirs, files in label_path.iterdir():
+            root.chmod(0o777)
 
         # Write patches to a folder
-        cv2.imwrite(
-            f"{Path(out_path, label)}/{Path(row.fpath).stem}_patch_{row.point[ix]}.jpg",
-            cropped_image,
-        )
+        patch_filename = f"{Path(row.fpath).stem}_patch_{row.point[ix]}.jpg"
+        cv2.imwrite(str(label_path / patch_filename), cropped_image)
 
 
 def get_patches(

@@ -1521,9 +1521,7 @@ def process_detections(
     model: str = None,
     project_name: str = None,
     team_name: str = None,
-    thres: int = 5,  # number of seconds for thresholding in interval
-    int_length: int = 10,
-    plot: bool = False,
+    source_movies: str = None,
 ):
     """
     > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
@@ -1538,15 +1536,7 @@ def process_detections(
     :param model: the name of the model in wandb used to obtain the detections
     :param project_name: name of the project in wandb
     :param team_name: name of the team in wandb.
-    :param thres: The `thres` parameter is used to filter out columns in the `result_df`
-    DataFrame where the corresponding `frame_count` column has a value less than `thres`. This
-    means that only columns with a minimum number of frames per interval greater than or equal to
-    `thres, defaults to 5
-    :param int_length: An integer value specifying the length in seconds of interval for filtering
-    :param plot: A boolean parameter that determines whether to plot the results or not. If set to True,
-    the function will generate plots showing the number of maximum detections per minute and the number
-    of species frame detections per minute, defaults to False
-
+    :param source_movies: A string with the path to the movies where the model ran inferences from
     """
 
     # Read the annotations.csv file
@@ -1656,13 +1646,21 @@ def process_detections(
             table_name="species",
         )
 
-        # Calculate the corresponding second of the frame in the movie
-        df["second_in_movie"] = (df["frame_no"] / df["fps"]).astype(int)
+    # Set the fps information for movies without info in the sql db
+    if "fps" not in df.columns:
+        # Get the fps of the movie
+        df["fps"], _ = movie_utils.get_fps_duration(movie_path=source_movies)
 
-        # Report the function ran without issues.
-        logging.info(
-            f"Detections processed. The dataframe has a total of {df.shape[0]} rows and {df.shape[1]} columns",
-        )
+        # Set the movie id to 0
+        df["movie_id"] = 0
+
+    # Calculate the corresponding second of the frame in the movie
+    df["second_in_movie"] = (df["frame_no"] / df["fps"]).astype(int)
+
+    # Report the function ran without issues.
+    logging.info(
+        f"Detections processed. The dataframe has a total of {df.shape[0]} rows and {df.shape[1]} columns",
+    )
 
     return df
 

@@ -1,6 +1,5 @@
 # base imports
 import sys
-import os
 import cv2
 import logging
 import ffmpeg
@@ -12,40 +11,28 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 from urllib.request import pathname2url
+from urllib.parse import urlparse
 from IPython.display import HTML
 
 # util imports
 from kso_utils.project_utils import Project
 
 # server imports
-from kso_utils.server_utils import ServerType, get_matching_s3_keys
+from kso_utils.server_utils import ServerType, get_matching_s3_keys, upload_file_server
+
 
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 
-# Function to prevent issues with Swedish characters
-# Converting the Swedish characters ä and ö to utf-8.
-def unswedify(string: str):
-    """Convert ä and ö to utf-8"""
-    return (
-        string.encode("utf-8")
-        .replace(b"\xc3\xa4", b"a\xcc\x88")
-        .replace(b"\xc3\xb6", b"o\xcc\x88")
-        .decode("utf-8")
-    )
-
-
-# Function to prevent issues with Swedish characters
-def reswedify(string: str):
-    """Convert ä and ö to utf-8"""
-    return (
-        string.encode("utf-8")
-        .replace(b"a\xcc\x88", b"\xc3\xa4")
-        .replace(b"o\xcc\x88", b"\xc3\xb6")
-        .decode("utf-8")
-    )
+# Function to check if an url is valid or not
+def is_url(url):
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc])
+    except ValueError:
+        return False
 
 
 def get_fps_duration(movie_path: str):
@@ -121,12 +108,9 @@ def movies_in_movie_folder(project: Project, db_connection, server_connection: d
     elif project.server in [ServerType.LOCAL, ServerType.SNIC]:
         logging.info("Retrieving movies that are available locally")
         # Read the movie files from the movie_path folder
-        local_files = os.listdir(project.movie_folder)
+        local_files = list(Path(project.movie_folder).rglob("*"))
         available_movies_list = [
-            os.path.join(dp, f)
-            for dp, dn, filenames in os.walk(project.movie_folder)
-            for f in filenames
-            if os.path.splitext(f)[1].endswith(get_movie_extensions())
+            str(f) for f in local_files if f.suffix.endswith(get_movie_extensions())
         ]
 
         # Save the list of movies as a pd df
@@ -334,17 +318,20 @@ def extract_frames(
 
     # Set the filename of the frames
     df["frame_path"] = df.apply(
-        lambda row: os.path.join(
-            frames_folder, f"{row['filename']}_{row['frame_number']}_{row['label']}.jpg"
+        lambda row: str(
+            Path(frames_folder)
+            / f"{row['filename']}_{row['frame_number']}_{row['label']}.jpg"
         ),
         axis=1,
     )
 
     # Create the folder to store the frames if not exist
-    if not os.path.exists(frames_folder):
-        Path(frames_folder).mkdir(parents=True, exist_ok=True)
+    frames_folder_path = Path(frames_folder)
+    if not frames_folder_path.exists():
+        frames_folder_path.mkdir(parents=True, exist_ok=True)
         # Recursively add permissions to folders created
-        [os.chmod(root, 0o777) for root, dirs, files in os.walk(frames_folder)]
+        for root, dirs, files in frames_folder_path.iterdir():
+            Path(root).chmod(0o777)
 
     for movie in df["fpath"].unique():
         url = get_movie_path(
@@ -379,15 +366,16 @@ def write_movie_frames(key_movie_df: pd.DataFrame, url: str):
         # Get the frame numbers for each movie the fps and duration
         for index, row in tqdm(key_movie_df.iterrows(), total=key_movie_df.shape[0]):
             # Create the folder to store the frames if not exist
-            if not os.path.exists(row["frame_path"]):
+            frame_path = Path(row["frame_path"])
+            if not frame_path.exists():
                 cap.set(1, row["frame_number"])
                 ret, frame = cap.read()
                 if frame is not None:
-                    cv2.imwrite(row["frame_path"], frame)
-                    os.chmod(row["frame_path"], 0o777)
+                    cv2.imwrite(str(frame_path), frame)
+                    frame_path.chmod(0o777)
                 else:
-                    cv2.imwrite(row["frame_path"], np.zeros((100, 100, 3), np.uint8))
-                    os.chmod(row["frame_path"], 0o777)
+                    cv2.imwrite(str(frame_path), np.zeros((100, 100, 3), np.uint8))
+                    frame_path.chmod(0o777)
                     logging.info(
                         f"No frame was extracted for {url} at frame {row['frame_number']}"
                     )
@@ -423,21 +411,20 @@ def convert_video(
     :type fps_output: str
     :return: The path to the converted video file.
     """
-    from kso_utils.tutorials_utils import is_url
 
     # Set the name of the converted movie
     conv_filename = "conv_" + movie_filename
 
     # Check the movie is accessible locally
-    if os.path.exists(movie_path):
+    if Path(movie_path).exists():
         # Store the directory and filename of the movie
-        movie_fpath = os.path.dirname(movie_path)
-        conv_fpath = os.path.join(movie_fpath, conv_filename)
+        movie_fpath = Path(movie_path).parent
+        conv_fpath = movie_fpath / conv_filename
 
     # Check if the path to the movie is a url
     elif is_url(movie_path):
         # Specify the directory to store the converted movie
-        conv_fpath = os.path.join(conv_filename)
+        conv_fpath = Path(conv_filename)
 
     else:
         logging.error(f"The path to {conv_fpath} is invalid")
@@ -475,15 +462,15 @@ def convert_video(
         raise e
 
     # Ensure the movie was extracted
-    if not os.path.exists(conv_fpath):
+    if not conv_fpath.exists():
         raise FileNotFoundError(f"{conv_fpath} was not converted and stored locally.")
 
     else:
         # Ensure open permissions on file
-        os.chmod(conv_fpath, 0o777)
+        conv_fpath.chmod(0o777)
         logging.info(f"{conv_fpath} successfully converted and stored locally.")
 
-    return conv_fpath
+    return str(conv_fpath)
 
 
 def standarise_movie_format(
@@ -509,13 +496,10 @@ def standarise_movie_format(
     :type gpu_available: bool
     """
 
-    from kso_utils.tutorials_utils import is_url
-    from kso_utils.server_utils import upload_file_server
-
     ##### Check movie format ######
     ext = Path(movie_filename).suffix
 
-    # Set video convertion to false as default
+    # Set video conversion to false as default
     convert_video_T_F = False
 
     if not ext.lower() == ".mp4":
@@ -568,9 +552,9 @@ def standarise_movie_format(
         duration_mins = duration / 60
 
         # Check if the movie is accessible locally
-        if os.path.exists(movie_path):
+        if Path(movie_path).exists():
             # Store the size of the movie
-            size = os.path.getsize(movie_path)
+            size = Path(movie_path).stat().st_size
 
         # Check if the path to the movie is a url
         elif is_url(movie_path):
@@ -817,22 +801,17 @@ def check_movies_meta(
 
 
 def concatenate_local_movies(csv_paths):
-    # concatenates the movies specified in the "go_pro_files" column
-    # and saves them to fpath
-
     # Load the csv with movies information
     df = pd.read_csv(csv_paths["local_movies_csv"])
 
     # Select only the path of the folder
-    df["Path"] = df["fpath"].str.rsplit("\\", n=1).str[0]
+    df["Path"] = df["fpath"].apply(lambda x: Path(x).parent)
 
     # Function to merge directory path and multiple filenames into a list
     def merge_paths(row):
         directory_path = row["Path"]
         filenames = row["go_pro_files"].split("; ")
-        merged_paths = [
-            os.path.join(directory_path, filename.strip()) for filename in filenames
-        ]
+        merged_paths = [directory_path / filename.strip() for filename in filenames]
         return merged_paths
 
     # Combine the path of the folder with the go_profiles inside the folder
@@ -845,17 +824,16 @@ def concatenate_local_movies(csv_paths):
     for index, row in tqdm(df.iterrows(), total=df.shape[0]):
         # Start text file and list to keep track of the videos to concatenate
         textfile_name = "a_file.txt"
-        textfile = open(textfile_name, "w")
-        video_list = []
+        with open(textfile_name, "w") as textfile:
+            video_list = []
 
-        for movie_i in sorted(row["path_go_pros"]):
-            # Keep track of the videos to concatenate
-            textfile.write("file '" + movie_i + "'" + "\n")
-            video_list.append(movie_i)
-        textfile.close()
+            for movie_i in sorted(row["path_go_pros"]):
+                # Keep track of the videos to concatenate
+                textfile.write("file '" + str(movie_i) + "'" + "\n")
+                video_list.append(movie_i)
 
         # Concatenate the files
-        if os.path.exists(row["fpath"]):
+        if Path(row["fpath"]).exists():
             logging.info(f"{row['fpath']} not concatenated because it already exists")
         else:
             logging.info(f"Concatenating {row['fpath']}")
@@ -872,19 +850,14 @@ def concatenate_local_movies(csv_paths):
                     "a_file.txt",
                     "-c",
                     "copy",
-                    row["fpath"],
+                    str(row["fpath"]),
                 ]
             )
 
         logging.info(f"{row['fpath']} concatenated successfully")
 
         # Delete the text file
-        os.remove(textfile_name)
-
-
-#         # Delete the go_pro_videos
-#         for f in video_list:
-#             os.remove(f)
+        Path(textfile_name).unlink()
 
 
 def select_project_movies(

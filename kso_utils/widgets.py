@@ -1,6 +1,6 @@
 # base imports
-import logging
 import os
+import logging
 import random
 import subprocess
 import pandas as pd
@@ -99,62 +99,71 @@ def choose_project(
     projects_csv: str = "../kso_utils/db_starter/projects_list.csv",
 ):
     """
-    > This function takes a csv file with a list of projects and returns a dropdown menu with the
-    projects listed
+    This function generates a dropdown menu with project names listed based on a CSV file.
 
-    :param projects_csv: str = "../kso_utils/db_starter/projects_list.csv", defaults to ../kso_utils/db_starter/projects_list.csv
-    :type projects_csv: str (optional)
-    :return: A dropdown widget with the project names as options.
+    :param projects_csv: Path to the CSV file with a list of projects, defaults to "../kso_utils/db_starter/projects_list.csv"
+    :type projects_csv: str, optional
+    :return: A dropdown widget with the project names as options
+    :rtype: ipywidgets.Dropdown
     """
+    projects_csv_path = Path(projects_csv)
 
-    # Check path to the list of projects is a csv
-    if os.path.exists(projects_csv) and not projects_csv.endswith(".csv"):
-        logging.error("A csv file was not selected. Please try again.")
-
-    # If list of projects doesn't exist retrieve it from github
-    if not os.path.exists(projects_csv):
-        projects_csv = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/projects_list.csv?raw=true"
-
-    projects_df = pd.read_csv(projects_csv)
-
-    if "Project_name" not in projects_df.columns:
-        logging.error(
-            "We were unable to find any projects in that file, \
-                      please choose a projects csv file that matches our template."
+    # Check if the specified path exists and it's a CSV file
+    if projects_csv_path.exists() and projects_csv_path.suffix != ".csv":
+        raise ValueError(
+            "The provided file is not a CSV. Please select a valid CSV file."
         )
 
-    # Display the project options
-    choose_project = widgets.Dropdown(
-        options=projects_df.Project_name.unique().tolist(),
-        value=projects_df.Project_name.unique().tolist()[0],
+    # If the file doesn't exist, try to retrieve it from GitHub
+    if not projects_csv_path.exists():
+        projects_csv_url = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/projects_list.csv?raw=true"
+        projects_csv_path = Path.cwd() / "projects_list.csv"
+        # Download the CSV file
+        projects_df = pd.read_csv(projects_csv_url)
+        # Save the downloaded CSV file
+        projects_df.to_csv(projects_csv_path, index=False)
+    else:
+        projects_df = pd.read_csv(projects_csv_path)
+
+    if "Project_name" not in projects_df.columns:
+        raise ValueError("The CSV file does not contain a 'Project_name' column.")
+
+    # Create the dropdown widget
+    choose_project_widget = widgets.Dropdown(
+        options=projects_df["Project_name"].unique(),
+        value=projects_df["Project_name"].iloc[0],
         description="Project:",
         disabled=False,
     )
 
-    display(choose_project)
-    return choose_project
+    display(choose_project_widget)
+    return choose_project_widget
 
 
 def gpu_select():
     """
-    If the user selects "No GPU", then the function will return a boolean value of False. If the user
-    selects "Colab GPU", then the function will install the GPU requirements and return a boolean value
-    of True. If the user selects "Other GPU", then the function will return a boolean value of True
-    :return: The gpu_available variable is being returned.
+    This function allows the user to select GPU availability and installs GPU requirements if needed.
+
+    If the user selects "No GPU", the function returns False.
+    If the user selects "Colab GPU", the function installs GPU requirements and returns True.
+    If the user selects "Other GPU", the function returns True.
+
+    :return: The gpu_available variable
+    :rtype: bool
     """
 
     def gpu_output(gpu_option):
         if gpu_option == "No GPU":
-            logging.info("You are set to start the modifications")
+            print("You are set to start the modifications")
             # Set GPU argument
             gpu_available = False
             return gpu_available
 
         if gpu_option == "Colab GPU":
             # Install the GPU requirements
-            if not os.path.exists("./colab-ffmpeg-cuda/bin/."):
+            if not Path("./colab-ffmpeg-cuda/bin").exists():
                 try:
-                    logging.info(
+                    print(
                         "Installing the GPU requirements. PLEASE WAIT 10-20 SECONDS"
                     )  # Install ffmpeg with GPU version
 
@@ -171,10 +180,10 @@ def gpu_select():
                     print("Installation finished!")
                     subprocess.run(["rm", "-fr", "/content/ffmpeg-colab"])
 
-                    logging.info("GPU Requirements installed!")
+                    print("GPU Requirements installed!")
 
                 except subprocess.CalledProcessError as e:
-                    logging.error(
+                    print(
                         f"There was an issue trying to install the GPU requirements: {e}"
                     )
 
@@ -939,18 +948,19 @@ def choose_new_videos_to_upload():
     movie_list = []
 
     fc = FileChooser()
-    fc.title = "First choose your directory of interest"
-    " and then the movies you would like to upload"
-    logging.info("Choose the file that you want to upload: ")
+    fc.title = "First choose your directory of interest and then the movies you would like to upload"
+    print("Choose the file that you want to upload: ")
 
     def change_dir(chooser):
-        sel.options = os.listdir(chooser.selected)
+        sel.options = [
+            str(Path(chooser.selected, item)) for item in os.listdir(chooser.selected)
+        ]
         fc.children[1].children[2].layout.display = "none"
         sel.layout.visibility = "visible"
 
     fc.register_callback(change_dir)
 
-    sel = widgets.SelectMultiple(options=os.listdir(fc.selected))
+    sel = widgets.SelectMultiple(options=[])
 
     display(fc)
     display(sel)
@@ -960,9 +970,7 @@ def choose_new_videos_to_upload():
     button_add = widgets.Button(description="Add selected file")
     output_add = widgets.Output()
 
-    logging.info(
-        "Showing paths to the selected movies:\nRerun cell to reset\n--------------"
-    )
+    print("Showing paths to the selected movies:\nRerun cell to reset\n--------------")
 
     display(button_add, output_add)
 
@@ -971,10 +979,10 @@ def choose_new_videos_to_upload():
             if sel.value is not None:
                 for movie in sel.value:
                     if Path(movie).suffix in [".mp4", ".mov"]:
-                        movie_list.append([Path(fc.selected, movie), movie])
-                        logging.info(Path(fc.selected, movie))
+                        movie_list.append([Path(movie), movie])
+                        print(Path(movie))
                     else:
-                        logging.error("Invalid file extension")
+                        print("Invalid file extension")
                     fc.reset()
 
     button_add.on_click(on_button_add_clicked)
@@ -1146,11 +1154,9 @@ def view_clips(example_clips: list, modified_clip_path: str):
     """
 
     # Get the path of the modified clip selected
-    example_clip_name = os.path.basename(modified_clip_path).replace(
-        "_example_original", ""
-    )
+    example_clip_name = Path(modified_clip_path).stem.replace("_example_original", "")
     example_clip_path = next(
-        filter(lambda x: os.path.basename(x) == example_clip_name, example_clips), None
+        filter(lambda x: Path(x).name == example_clip_name, example_clips), None
     )
 
     # Get the extension of the video
@@ -1165,8 +1171,7 @@ def view_clips(example_clips: list, modified_clip_path: str):
     wi2 = widgets.Video(value=vid2, format=extension, width=400, height=500)
 
     # Display videos side-by-side
-    a = [wi1, wi2]
-    wid = widgets.HBox(a)
+    wid = widgets.HBox([wi1, wi2])
 
     return wid
 
@@ -1287,12 +1292,12 @@ def extract_custom_frames(
 
             if ret:
                 # Construct the output filename for this frame
-                output_filename = os.path.join(
-                    output_dir, f"{input_stem}_frame_{frame_idx}.jpg"
+                output_filename = (
+                    Path(output_dir) / f"{input_stem}_frame_{frame_idx}.jpg"
                 )
 
                 # Write the frame to a JPEG file
-                cv2.imwrite(output_filename, frame)
+                cv2.imwrite(str(output_filename), frame)
 
                 # Add output filename to list of files
                 output_files.append(output_filename)
@@ -1313,12 +1318,10 @@ def extract_custom_frames(
             frame = frame.image
 
             # Construct the output filename for this frame
-            output_filename = os.path.join(
-                output_dir, f"{input_stem}_frame_{frame_idx}.jpg"
-            )
+            output_filename = Path(output_dir) / f"{input_stem}_frame_{frame_idx}.jpg"
 
             # Write the frame to a JPEG file
-            cv2.imwrite(output_filename, frame)
+            cv2.imwrite(str(output_filename), frame)
 
             # Add output filename to list of files
             output_files.append(output_filename)

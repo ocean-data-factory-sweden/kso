@@ -1,5 +1,6 @@
 # base imports
 import os
+from pathlib import Path
 import logging
 import pandas as pd
 from dataclasses import dataclass
@@ -35,22 +36,22 @@ def find_project(
     """Find project information using
     project csv path and project name"""
     # Specify the path to the list of projects
-    tut_path = os.getcwd()
-    abspath = os.path.abspath(__file__)
-    dname = os.path.dirname(abspath)
+    tut_path = Path.cwd()
+    abspath = Path(__file__).resolve()
+    dname = abspath.parent
     os.chdir(dname)
 
     # Switch to cdn project list (temporary fix)
-    if os.path.exists("/buckets"):
+    if Path("/buckets").exists():
         project_csv = "db_starter/cdn_projects_list.csv"
 
     # Check path to the list of projects is a csv
-    if os.path.exists(project_csv) and not project_csv.endswith(".csv"):
+    if Path(project_csv).exists() and not project_csv.endswith(".csv"):
         logging.error("A csv file was not selected. Please try again.")
 
     # If list of projects doesn't exist retrieve it from github
-    elif not os.path.exists(project_csv):
-        if os.path.exists("/buckets"):
+    elif not Path(project_csv).exists():
+        if Path("/buckets").exists():
             github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/cdn_projects_list.csv?raw=true"
         else:
             github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/projects_list.csv?raw=true"
