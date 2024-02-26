@@ -1215,7 +1215,7 @@ def extract_custom_frames(
 
             if ret:
                 # Construct the output filename for this frame
-                output_filename = (
+                output_filename = str(
                     Path(output_dir) / f"{input_stem}_frame_{frame_idx}.jpg"
                 )
 
@@ -1241,7 +1241,9 @@ def extract_custom_frames(
             frame = frame.image
 
             # Construct the output filename for this frame
-            output_filename = Path(output_dir) / f"{input_stem}_frame_{frame_idx}.jpg"
+            output_filename = str(
+                Path(output_dir) / f"{input_stem}_frame_{frame_idx}.jpg"
+            )
 
             # Write the frame to a JPEG file
             cv2.imwrite(str(output_filename), frame)
