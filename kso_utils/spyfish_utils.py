@@ -5,6 +5,7 @@ import pandas as pd
 from pathlib import Path
 from kso_utils.server_utils import download_object_from_s3
 
+
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -63,66 +64,38 @@ def process_spyfish_subjects(
     :return: Processed DataFrame with columns: filename, clip_start_time, clip_end_time, frame_number,
              subject_type, ScientificName, frame_exp_sp_id, movie_id
     """
-
     # Merge columns and drop redundant ones
     if "Subject_type" in subjects.columns:
-        if not "subject_type" in subjects.columns:
-            subjects.rename(columns={"Subject_type": "subject_type"}, inplace=True)
-
-        else:
-            subjects["subject_type"] = subjects["subject_type"].fillna(
-                subjects["Subject_type"]
-            )
-            subjects = subjects.drop(columns=["Subject_type"])
-
-    # Fix weird bug where Subject_type is used instead of subject_type for the column name for some clips
-    if "#Subject_type" in subjects.columns and "subject_type" in subjects.columns:
-        subjects["subject_type"] = subjects[["subject_type", "#Subject_type"]].apply(
-            lambda x: x[1] if isinstance(x[1], str) else x[0], 1
+        subjects["subject_type"] = subjects["subject_type"].fillna(
+            subjects["Subject_type"]
         )
-        subjects.drop(columns=["#Subject_type"], inplace=True)
+        subjects = subjects.drop(columns=["Subject_type"])
 
     # Rename non-standard column names
     column_rename_map = {
         "#VideoFilename": "filename",
-        #         "#Subject_type": "subject_type",
+        "#Subject_type": "subject_type",
     }
     subjects.rename(columns=column_rename_map, inplace=True)
 
     # Remove unreliable movie_id column
     subjects = subjects.drop(columns="movie_id", errors="ignore")
 
-    from kso_utils.server_utils import get_matching_s3_keys, download_object_from_s3
+    # Retrieve filename lookup CSV file
+    csv_filename = "update_of_movie_filenames_24_02_2023.csv"
+    local_csv_path = Path.cwd() / csv_filename
+    server_csv_key = f"{project.key}/{csv_filename}"
 
-    # Fetch CSV files from S3
-    csv_files = get_matching_s3_keys(
-        client=server_connection["client"],
-        bucket=project.bucket,
-        suffix="csv",
-    )
-
-    # Target filename
-    lookup_filename = "update_of_movie_filenames"
-
-    # Filter matching files
-    matching_files = [file for file in csv_files if lookup_filename in file]
-
-    if len(matching_files) > 1:
-        logging.info(f"Multiple matching files found: {matching_files}")
-    elif matching_files:
-        file_to_download = matching_files[0]
-        local_path = Path(project.csv_folder, Path(file_to_download).name)
+    if not local_csv_path.exists():
         download_object_from_s3(
             client=server_connection["client"],
             bucket=project.bucket,
-            key=file_to_download,
-            filename=str(local_path),
+            key=server_csv_key,
+            filename=local_csv_path,
         )
-    else:
-        logging.info(f"No matching file found with name: {lookup_filename}")
 
     # Replace old filenames with updated ones
-    renames_df = pd.read_csv(local_path)
+    renames_df = pd.read_csv(local_csv_path)
     filenames_dict = dict(zip(renames_df["OLD"], renames_df["NEW"]))
     subjects["filename"] = (
         subjects["filename"].map(filenames_dict).fillna(subjects["filename"])

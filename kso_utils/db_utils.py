@@ -1,7 +1,7 @@
 # base imports
+from pathlib import Path
 import sqlite3
 import logging
-from pathlib import Path
 import pandas as pd
 
 # util imports
@@ -534,9 +534,12 @@ def add_db_info_to_df(
 
     # If there are missing values, raise an issue
     if missing_values.any():
-        # Log a warning or raise an exception with relevant information
+        # Get the indices of the missing values
+        missing_indices = missing_values[missing_values].index
+
+        # Print a warning or raise an exception with relevant information
         logging.error(
-            f"Some rows in df do not have corresponding values in sql_df. Rows with missing values are: {comb_df[missing_values]}"
+            f"Some rows in df do not have corresponding values in sql_df. Rows with missing values: {missing_indices}"
         )
 
     # Drop the id column to prevent duplicated column issues
