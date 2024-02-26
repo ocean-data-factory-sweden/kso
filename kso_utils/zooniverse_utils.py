@@ -1750,7 +1750,7 @@ def modify_frames(
         if not mod_frames_folder.exists():
             mod_frames_folder.mkdir(parents=True, exist_ok=True)
             # Recursively add permissions to folders created
-            [os.chmod(0o777) for root, _, _ in os.walk(mod_frames_folder)]
+            [os.chmod(root, 0o777) for root, _, _ in os.walk(mod_frames_folder)]
 
         #### Modify the clips###
         # Read each clip and modify them (showing a progress bar)
