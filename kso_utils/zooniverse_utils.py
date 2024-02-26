@@ -1735,7 +1735,7 @@ def modify_frames(
 
     # Specify the path of the modified frames
     frames_to_upload_df["modif_frame_path"] = frames_to_upload_df["frame_path"].apply(
-        lambda x: str(mod_frames_folder / Path(x).name)
+        lambda x: mod_frames_folder / Path(x).name
     )
 
     # Remove existing modified clips
@@ -1826,7 +1826,7 @@ def set_zoo_frame_metadata(
         "modif_frame_path" in df.columns
         and "no_modification" not in df["modif_frame_path"].values
     ):
-        df["frame_path"] = df["modif_frame_path"]
+        df["frame_path"] = df["modif_frame_path"].apply(str)
 
     # Roadblock to prevent uploading frames to template project:
     if project.Zooniverse_number == 9754:
