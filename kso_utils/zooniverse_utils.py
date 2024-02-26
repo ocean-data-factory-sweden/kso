@@ -1735,7 +1735,7 @@ def modify_frames(
 
     # Specify the path of the modified frames
     frames_to_upload_df["modif_frame_path"] = frames_to_upload_df["frame_path"].apply(
-        lambda x: mod_frames_folder / Path(x).name
+        lambda x: str(mod_frames_folder / Path(x).name)
     )
 
     # Remove existing modified clips
