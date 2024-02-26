@@ -20,7 +20,6 @@ from ipywidgets.widgets.interaction import interact
 import mlflow
 
 # util imports
-import kso_utils.tutorials_utils as t_utils
 import kso_utils.project_utils as project_utils
 import kso_utils.db_utils as db_utils
 import kso_utils.movie_utils as movie_utils
@@ -602,25 +601,6 @@ class ProjectProcessor:
     def add_species(self):
         pass
 
-    def view_annotations(self, folder_path: str, annotation_classes: list):
-        """
-        > This function takes in a folder path and a list of annotation classes and returns a widget that
-        allows you to view the annotations in the folder
-
-        :param folder_path: The path to the folder containing the images you want to annotate
-        :type folder_path: str
-        :param annotation_classes: list of strings
-        :type annotation_classes: list
-        :return: A list of dictionaries, each dictionary containing the following keys
-                 - 'image_path': the path to the image
-                 - 'annotations': a list of dictionaries, each dictionary containing the following keys:
-                 - 'class': the class of the annotation
-                 - 'bbox': the bounding box of the annotation
-        """
-        return t_utils.get_annotations_viewer(
-            folder_path, species_list=annotation_classes
-        )
-
     #############
     # t3
     #############
@@ -722,7 +702,7 @@ class ProjectProcessor:
             )
 
             def on_button_clicked(b):
-                self.generated_clips = t_utils.create_clips(
+                self.generated_clips = zoo_utils.create_clips(
                     available_movies_df=self.available_movies_df,
                     movies_selected=movies_selected,
                     movies_paths=movies_paths,
@@ -746,7 +726,7 @@ class ProjectProcessor:
             clip_selection.kwargs = {"clip_length": 5, "clips_range": [0, 10]}
             clip_selection.result = {}
             clip_selection.result["clip_start_time"] = [0]
-            self.generated_clips = t_utils.create_clips(
+            self.generated_clips = zoo_utils.create_clips(
                 available_movies_df=self.available_movies_df,
                 movies_selected=movies_selected,
                 movies_paths=movies_paths,
@@ -757,6 +737,17 @@ class ProjectProcessor:
                 pool_size=pool_size,
                 is_example=False,
             )
+
+    def check_clip_size(clips_list: list):
+        """
+        > This function takes a list of file paths and returns a dataframe with the file path and size of
+        each file. If the size is too large, we suggest compressing them as a first step.
+
+        :param clips_list: list of file paths to the clips you want to check
+        :type clips_list: list
+        :return: A dataframe with the file path and size of each clip
+        """
+        zoo_utils.check_clip_size(clips_list=clips_list)
 
     def upload_zoo_subjects(self, subject_type: str):
         """
@@ -838,25 +829,17 @@ class ProjectProcessor:
             workflow_checks = self.workflow_widget.checks
 
         # Retrieve a subset of the subjects from the workflows of interest and
-        # populate the sql subjects table
-        selected_zoo_workflows = zoo_utils.sample_subjects_from_workflows(
+        # populate the sql subjects table and flatten the classifications provided the cit. scientists
+        self.processed_zoo_classifications = zoo_utils.process_zoo_classifications(
             project=self.project,
             server_connection=self.server_connection,
             db_connection=self.db_connection,
             workflow_widget_checks=workflow_checks,
             workflows_df=self.zoo_info["workflows"],
             subjects_df=self.zoo_info["subjects"],
-        )
-
-        # Make sure all the classifications have existing subjects,
-        # Flatten the classifications provided the cit. scientists
-        self.processed_zoo_classifications = zoo_utils.process_zoo_classifications(
-            project=self.project,
-            db_connection=self.db_connection,
             csv_paths=self.csv_paths,
             classifications_data=self.zoo_info["classifications"],
             subject_type=workflow_checks["Subject type: #0"],
-            selected_zoo_workflows=selected_zoo_workflows,
         )
 
     def aggregate_zoo_classifications(self, agg_params, test: bool = False):
@@ -1042,6 +1025,24 @@ class ProjectProcessor:
         display(frame_modification)
         display(button)
 
+    def check_frame_size(frame_paths: list):
+        """
+        It takes a list of file paths, gets the size of each file, and returns a dataframe with the file
+        path and size of each file
+
+        :param frame_paths: a list of paths to the frames you want to check
+        :return: A dataframe with the file path and size of each frame.
+        """
+        # Check the size of the frames
+        zoo_utils.check_frame_size(frame_paths=frame_paths)
+
+    # Function to compare original to modified frames
+    def compare_frames(df):
+        from widgets import compare_frames
+
+        # Function to compare original to modified frames
+        compare_frames(df)
+
     #############
     # t8
     #############
@@ -1050,10 +1051,12 @@ class ProjectProcessor:
         It displays the processed classifications for a given subject
 
         """
+        from widgets import explore_classifications_per_subject
+
         # Display the displays the processed classifications for a given subject
-        t_utils.explore_classifications_per_subject(
-            self.processed_zoo_classifications,
-            self.workflow_widget.checks["Subject type: #0"],
+        explore_classifications_per_subject(
+            class_df=self.processed_zoo_classifications,
+            subject_type=self.workflow_widget.checks["Subject type: #0"],
         )
 
     def get_classifications(
@@ -1072,6 +1075,31 @@ class ProjectProcessor:
             class_df=class_df,
         )
 
+    def launch_table(agg_class_df: pd.DataFrame, subject_type: str):
+        """
+        It takes in a dataframe of aggregated classifications and a subject type, and returns a dataframe
+        with the columns "subject_ids", "label", "how_many", and "first_seen"
+
+        :param agg_class_df: the dataframe that you want to launch
+        :param subject_type: "clip" or "subject"
+        """
+        zoo_utils.launch_table(agg_class_df=agg_class_df, subject_type=subject_type)
+
+    def launch_viewer(class_df: pd.DataFrame, subject_type: str):
+        """
+        > This function takes a dataframe of classifications and a subject type (frame or video) and
+        displays a dropdown menu of subjects of that type. When a subject is selected, it displays the
+        subject and the classifications for that subject
+
+        :param class_df: The dataframe containing the classifications
+        :type class_df: pd.DataFrame
+        :param subject_type: The type of subject you want to view. This can be either "frame" or "video"
+        :type subject_type: str
+        """
+        from widgets import launch_viewer
+
+        launch_viewer(class_df=class_df, subject_type=subject_type)
+
     def download_classications_csv(self, class_df):
         # Add the site and movie information to the classifications based on the subject information
         class_df = zoo_utils.add_subject_site_movie_info_to_class(
@@ -1089,6 +1117,25 @@ class ProjectProcessor:
 
         logging.info(f"The classications have been downloaded to {csv_filename}")
 
+    def get_annotations_viewer(self, folder_path: str, annotation_classes: list):
+        """
+        > This function takes in a folder path and a list of annotation classes and returns a widget that
+        allows you to view the annotations in the folder
+
+        :param folder_path: The path to the folder containing the images you want to annotate
+        :type folder_path: str
+        :param annotation_classes: list of strings
+        :type annotation_classes: list
+        :return: A list of dictionaries, each dictionary containing the following keys
+                 - 'image_path': the path to the image
+                 - 'annotations': a list of dictionaries, each dictionary containing the following keys:
+                 - 'class': the class of the annotation
+                 - 'bbox': the bounding box of the annotation
+        """
+        return yolo_utils.get_annotations_viewer(
+            folder_path, species_list=annotation_classes
+        )
+
     def download_gbif_occurrences(self, classified_by, df):
         if classified_by == "citizen_scientists":
             # Add the site and movie information to the classifications based on the subject information
@@ -1100,7 +1147,7 @@ class ProjectProcessor:
             )
 
         # Format the classifications to Darwin Core Standard occurrences
-        occurrence_df = t_utils.format_to_gbif(
+        occurrence_df = widgets.format_to_gbif(
             self.project,
             self.db_connection,
             df,
@@ -1120,107 +1167,24 @@ class ProjectProcessor:
 
         logging.info(f"The occurences have been downloaded to {csv_filename}")
 
-    #############
-    # t9
-    #############
-    def download_detections_csv(self, df):
-        # Download the processed detections as a csv file
-        csv_filename = (
-            self.project.csv_folder
-            + self.project.Project_name
-            + str(datetime.date.today())
-            + "detections.csv"
-        )
+    def choose_test_prop():
+        """
+        > The function `choose_test_prop()` creates a slider widget that allows the user to choose the
+        proportion of the data to be used for testing
+        :return: A widget object
+        """
+        from widgets import choose_test_prop
 
-        df.to_csv(csv_filename, index=False)
+        choose_test_prop()
 
-        logging.info(f"The detections have been downloaded to {csv_filename}")
+    def choose_eval_params():
+        """
+        It creates one slider for confidence threshold
+        :return: the value of the slider.
+        """
+        from widgets import choose_eval_params
 
-    def download_detections_species_cols_csv(self, df):
-        # Specify the species labels
-        if "commonName" in df.columns:
-            # Define the movie col of interest
-            sp_group_col = "commonName"
-        else:
-            # Define the movie col of interest
-            sp_group_col = "class_id"
-
-        # Transpose the rows/cols to have species as cols
-        transposed_df = df.pivot_table(
-            index=["movie_id", "second_in_movie"],
-            columns=sp_group_col,
-            values=["min_conf", "mean_conf", "max_n", "max_conf"],
-            aggfunc="first",
-        )
-
-        # Flatten the MultiIndex columns
-        transposed_df.columns = [
-            f"{species}_{column}" for column, species in transposed_df.columns
-        ]
-
-        # Reset index to get a regular DataFrame
-        transposed_df.reset_index(inplace=True)
-
-        # Specify columns to drop from original df to avoid large df and confussions
-        df_col_drop = [
-            "class_id",
-            "x",
-            "y",
-            "w",
-            "h",
-            "conf",
-            "frame_no",
-            "min_conf",
-            "mean_conf",
-            "max_n",
-            "max_conf",
-            "scientificName",
-            "taxonRank",
-            "kingdom",
-            "commonName",
-        ]
-        df_to_merge = df.drop(df_col_drop, axis=1).drop_duplicates()
-
-        # Merge with the original DataFrame based on common columns
-        merged_df = pd.merge(
-            transposed_df, df_to_merge, on=["movie_id", "second_in_movie"]
-        )
-
-        ###### Sort columns into the expected order as specified by Leon
-        sp_list = df[sp_group_col].unique()
-
-        # Separate columns with species_info and the rest
-        columns_sp_group = [
-            col for col in merged_df.columns if any(sp in col for sp in sp_list)
-        ]
-
-        # Corrected syntax: use "not in" before "for sp in sp_list"
-        columns_no_sp_group = [
-            col for col in merged_df.columns if all(sp not in col for sp in sp_list)
-        ]
-
-        # Sort columns with species_info
-        columns_sp_group = sorted(columns_sp_group)
-
-        # Concatenate columns with and without species_info
-        sorted_columns = columns_no_sp_group + columns_sp_group
-
-        # Select the cols based on the sorted list
-        merged_df = merged_df[sorted_columns]
-
-        # Download the processed detections as a csv file
-        csv_filename = (
-            self.project.csv_folder
-            + self.project.Project_name
-            + str(datetime.date.today())
-            + "detections.csv"
-        )
-
-        merged_df.to_csv(csv_filename, index=False)
-
-        logging.info(
-            f"The detections organised by species cols have been downloaded to {csv_filename}"
-        )
+        choose_eval_params()
 
 
 class MLProjectProcessor(ProjectProcessor):
@@ -1499,7 +1463,7 @@ class MLProjectProcessor(ProjectProcessor):
 
     def choose_entity(self, alt_name: bool = False):
         if self.team_name is None:
-            return t_utils.choose_entity()
+            return widgets.choose_entity()
         else:
             if not alt_name:
                 logging.info(
@@ -1508,7 +1472,7 @@ class MLProjectProcessor(ProjectProcessor):
                     " set the argument alt_name to True"
                 )
             else:
-                return t_utils.choose_entity()
+                return widgets.choose_entity()
 
     def setup_paths(self, test: bool = False):
         if not isinstance(self.output_path, str) and self.output_path is not None:
@@ -1523,7 +1487,7 @@ class MLProjectProcessor(ProjectProcessor):
             )
 
     def choose_train_params(self):
-        return t_utils.choose_train_params(self.model_type)
+        return widgets.choose_train_params(self.model_type)
 
     def train_yolo(
         self,
@@ -2324,6 +2288,152 @@ class MLProjectProcessor(ProjectProcessor):
         else:
             logging.error("Unsupported registry")
             return "", ""
+
+    #############
+    # t9
+    #############
+    def download_detections_csv(self, df):
+        # Download the processed detections as a csv file
+        csv_filename = (
+            self.project.csv_folder
+            + self.project.Project_name
+            + str(datetime.date.today())
+            + "detections.csv"
+        )
+
+        df.to_csv(csv_filename, index=False)
+
+        logging.info(f"The detections have been downloaded to {csv_filename}")
+
+    def download_detections_species_cols_csv(self, df):
+        # Specify the species labels
+        if "commonName" in df.columns:
+            # Define the movie col of interest
+            sp_group_col = "commonName"
+        else:
+            # Define the movie col of interest
+            sp_group_col = "class_id"
+
+        # Transpose the rows/cols to have species as cols
+        transposed_df = df.pivot_table(
+            index=["movie_id", "second_in_movie"],
+            columns=sp_group_col,
+            values=["min_conf", "mean_conf", "max_n", "max_conf"],
+            aggfunc="first",
+        )
+
+        # Flatten the MultiIndex columns
+        transposed_df.columns = [
+            f"{species}_{column}" for column, species in transposed_df.columns
+        ]
+
+        # Reset index to get a regular DataFrame
+        transposed_df.reset_index(inplace=True)
+
+        # Specify columns to drop from original df to avoid large df and confussions
+        df_col_drop = [
+            "class_id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "conf",
+            "frame_no",
+            "min_conf",
+            "mean_conf",
+            "max_n",
+            "max_conf",
+            "scientificName",
+            "taxonRank",
+            "kingdom",
+            "commonName",
+        ]
+        df_to_merge = df.drop(df_col_drop, axis=1).drop_duplicates()
+
+        # Merge with the original DataFrame based on common columns
+        merged_df = pd.merge(
+            transposed_df, df_to_merge, on=["movie_id", "second_in_movie"]
+        )
+
+        ###### Sort columns into the expected order as specified by Leon
+        sp_list = df[sp_group_col].unique()
+
+        # Separate columns with species_info and the rest
+        columns_sp_group = [
+            col for col in merged_df.columns if any(sp in col for sp in sp_list)
+        ]
+
+        # Corrected syntax: use "not in" before "for sp in sp_list"
+        columns_no_sp_group = [
+            col for col in merged_df.columns if all(sp not in col for sp in sp_list)
+        ]
+
+        # Sort columns with species_info
+        columns_sp_group = sorted(columns_sp_group)
+
+        # Concatenate columns with and without species_info
+        sorted_columns = columns_no_sp_group + columns_sp_group
+
+        # Select the cols based on the sorted list
+        merged_df = merged_df[sorted_columns]
+
+        # Download the processed detections as a csv file
+        csv_filename = (
+            self.project.csv_folder
+            + self.project.Project_name
+            + str(datetime.date.today())
+            + "detections.csv"
+        )
+
+        merged_df.to_csv(csv_filename, index=False)
+
+        logging.info(
+            f"The detections organised by species cols have been downloaded to {csv_filename}"
+        )
+
+    def process_detections(
+        project,
+        db_connection,
+        csv_paths,
+        annotations_csv_path,
+        model_registry,
+        movies_selected_id,
+        model,
+        project_name,
+        team_name,
+        source_movies,
+    ):
+        """
+        > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+        and saves the results in different csv files.
+        """
+        from yolo_utils import process_detections
+
+        process_detections(
+            project=project,
+            db_connection=db_connection,
+            csv_paths=csv_paths,
+            annotations_csv_path=annotations_csv_path,
+            model_registry=model_registry,
+            movies_selected_id=movies_selected_id,
+            model=model,
+            project_name=project_name,
+            team_name=team_name,
+            source_movies=source_movies,
+        )
+
+    def plot_processed_detections(df, thres, int_length):
+        """
+        > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+        and saves the results in different csv files.
+        """
+        from yolo_utils import plot_processed_detections
+
+        plot_processed_detections(
+            df=df,
+            thres=thres,
+            int_length=int_length,
+        )
 
 
 class Annotator:

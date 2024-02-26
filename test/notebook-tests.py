@@ -133,8 +133,6 @@ def test_t3(zoo_user, zoo_pass):
 # since we do not want to upload things to them all the time.
 # """
 def test_t4(zoo_user, zoo_pass):
-    import kso_utils.tutorials_utils as t_utils
-
     # import kso_utils.widgets as kso_widgets
 
     # Log into Zooniverse and load relevant data from their DB
@@ -146,7 +144,7 @@ def test_t4(zoo_user, zoo_pass):
     # Fetch relevant frame subjects in dataframe (by default all species for testing)
     pp.extract_zoo_frames(test=True)
     # Review the size of the clips
-    t_utils.check_frame_size(frame_paths=pp.generated_frames["frame_path"].unique())
+    pp.check_frame_size(frame_paths=pp.generated_frames["frame_path"].unique())
     # Generate frames from based on subject metadata
     pp.modify_zoo_frames(test=True)
     # input_folder = kso_widgets.choose_folder()
@@ -161,11 +159,9 @@ def test_t4(zoo_user, zoo_pass):
     #    frames_skip=None,
     # )
     # Ensure that extracted and modified frames are of suitable size for upload to ZU
-    t_utils.check_frame_size(
-        frame_paths=pp.modified_frames["modif_frame_path"].unique()
-    )
+    pp.check_frame_size(frame_paths=pp.modified_frames["modif_frame_path"].unique())
     # Compare original vs modified frames (no interactivity tested)
-    t_utils.compare_frames(df=pp.modified_frames)
+    pp.compare_frames(df=pp.modified_frames)
     # Test that final generated frames contain 9 rows (representing a classification)
     assert len(pp.modified_frames) == 9
 
@@ -212,12 +208,12 @@ def test_t5():
     assert len(list(Path(exp_path, "weights").glob("*"))) == 2
 
     # Model evaluation
-    conf_thres = t_utils.choose_eval_params()
+    conf_thres = widgets.choose_eval_params()
     # Evaluate YOLO Model on Unseen Test data
     mlp.eval_yolo(exp_name=exp_name, conf_thres=conf_thres.value)
 
     # Enhancement tests (leave out for now)
-    # eh_conf_thres = t_utils.choose_eval_params()
+    # eh_conf_thres = widgets.choose_eval_params()
     # mlp.enhance_yolov5(conf_thres=eh_conf_thres.value,
     #                   in_path=os.path.join(mlp.output_path, "ml-template-data"),
     #                   project_path=project_path, img_size=[640, 640])
@@ -257,7 +253,7 @@ def test_t6():
     artifact_dir = mlp.get_model(model, mlp.output_path)
     source = str(Path("../test/test_output", mlp.project.ml_folder, "images"))
     save_dir = project_path
-    conf_thres = t_utils.choose_conf()
+    conf_thres = widgets.choose_conf()
     mlp.detect_yolo(
         project=project_path,
         name=exp_name,
