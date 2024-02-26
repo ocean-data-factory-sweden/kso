@@ -122,14 +122,14 @@ def download_init_csv(project: Project, init_keys: list, server_connection: dict
             db_initial_info[str("server_" + init_key + "_csv")] = server_csv
 
             # Specify the local path for the csv
-            local_i_csv = str(Path(project.csv_folder, Path(server_csv).name))
+            local_i_csv = Path(project.csv_folder, Path(server_csv).name)
 
             # Download the csv
             download_object_from_s3(
                 client=server_connection["client"],
                 bucket=project.bucket,
                 key=server_csv,
-                filename=local_i_csv,
+                filename=str(local_i_csv),
             )
 
     else:
@@ -425,6 +425,7 @@ def upload_file_to_s3(client: boto3.client, *, bucket: str, key: str, filename: 
                 Filename=filename,
                 Bucket=bucket,
                 Key=key,
+                Config=boto3.s3.transfer.TransferConfig(use_threads=False),
                 Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
             )
     else:

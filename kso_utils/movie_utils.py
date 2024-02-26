@@ -11,8 +11,8 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 from urllib.request import pathname2url
-from urllib.parse import urlparse
 from IPython.display import HTML
+from ultralytics.utils.downloads import is_url
 
 # util imports
 from kso_utils.project_utils import Project
@@ -26,12 +26,14 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 
-# Function to check if an url is valid or not
-def is_url(url):
+# Function to check if ffmpeg is available in the system's PATH.
+def check_ffmpeg_availability():
     try:
-        result = urlparse(url)
-        return all([result.scheme, result.netloc])
-    except ValueError:
+        # Try to import the ffmpeg module from ffmpeg-python
+        import ffmpeg
+
+        return True
+    except ImportError:
         return False
 
 
