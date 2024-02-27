@@ -1258,11 +1258,24 @@ class MLProjectProcessor(ProjectProcessor):
         except OSError:
             pass
 
+        ## Set backend to MACOS to enable mp4 output
+        import platform
+
+        # Define the fake system name
+        fake_system_name = "Darwin"
+
+        # Define a function to return the fake system name
+        def fake_system():
+            return fake_system_name
+
+        # Monkey patch platform.system() with the fake_system function
+        platform.system = fake_system
+
         self.modules = g_utils.import_modules([])
         self.modules.update(g_utils.import_modules(["yolo_utils"], utils=True))
         self.modules.update(
             g_utils.import_modules(
-                ["torch", "wandb", "yaml", "ultralytics"],
+                ["wandb", "yaml", "ultralytics"],
                 utils=False,
             )
         )
@@ -1275,19 +1288,6 @@ class MLProjectProcessor(ProjectProcessor):
             )
 
         self.team_name = "koster"
-
-        # Set backend to MACOS to enable mp4 output
-        import platform
-
-        # Define the fake system name
-        fake_system_name = "Darwin"
-
-        # Define a function to return the fake system name
-        def fake_system():
-            return fake_system_name
-
-        # Monkey patch platform.system() with the fake_system function
-        platform.system = fake_system
 
     def prepare_dataset(
         self,
