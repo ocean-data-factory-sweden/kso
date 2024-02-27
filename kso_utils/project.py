@@ -1258,6 +1258,19 @@ class MLProjectProcessor(ProjectProcessor):
         except OSError:
             pass
 
+        import cv2
+
+        # Monkey-patch the cv2.VideoWriter class to use the default codec
+        class CustomVideoWriter(cv2.VideoWriter):
+            def __init__(self, *args, **kwargs):
+                args = list(args)
+                args[0] = args[0].replace(".avi", ".mp4")
+                args[1] = cv2.VideoWriter_fourcc(*"avc1")
+                super().__init__(*args, **kwargs)
+
+        # Replace cv2.VideoWriter with the patched version
+        cv2.VideoWriter = CustomVideoWriter
+
         self.modules = g_utils.import_modules([])
         self.modules.update(g_utils.import_modules(["yolo_utils"], utils=True))
         self.modules.update(
@@ -1911,21 +1924,8 @@ class MLProjectProcessor(ProjectProcessor):
         else:
             logging.info("No trained model found, using yolov8 base model...")
             best_model = "yolov8s.pt"
+
         model = self.modules["ultralytics"].YOLO(best_model)
-
-        # Set backend to MACOS to enable mp4 output
-        import platform
-
-        # Define the fake system name
-        fake_system_name = "Darwin"
-
-        # Define a function to return the fake system name
-        def fake_system():
-            return fake_system_name
-
-        # Monkey patch platform.system() with the fake_system function
-        platform.system = fake_system
-
         project = str(Path(save_dir))
         self.eval_dir = str(increment_path(Path(project) / name, exist_ok=False))
         if latest:
@@ -1943,7 +1943,7 @@ class MLProjectProcessor(ProjectProcessor):
                         stream=True,
                     )
                     for i in results:
-                        print(i.speed)
+                        logging.debug(i.speed)
             else:
                 results = model.predict(
                     project=project,
@@ -1957,7 +1957,7 @@ class MLProjectProcessor(ProjectProcessor):
                     stream=True,
                 )
                 for i in results:
-                    print(i.speed)
+                    logging.debug(i.speed)
         else:
             if isinstance(source, list):
                 for src in source:
@@ -2010,7 +2010,13 @@ class MLProjectProcessor(ProjectProcessor):
                 eval_dir, self.run, log=True, registry=self.registry
             )
             self.modules["yolo_utils"].add_data(
-                eval_dir, "detection_output", self.registry, self.run
+                Path(eval_dir, "annotations.csv"),
+                "detection_output",
+                self.registry,
+                self.run,
+            )
+            self.modules["yolo_utils"].add_data(
+                Path(eval_dir, "labels"), "detection_output", self.registry, self.run
             )
         elif self.registry == "mlflow":
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
@@ -2020,7 +2026,13 @@ class MLProjectProcessor(ProjectProcessor):
                 registry=self.registry,
             )
             self.modules["yolo_utils"].add_data(
-                path=eval_dir,
+                path=Path(eval_dir, "annotations.csv"),
+                name="detection_output",
+                registry=self.registry,
+                run=self.run,
+            )
+            self.modules["yolo_utils"].add_data(
+                path=Path(eval_dir, "labels"),
                 name="detection_output",
                 registry=self.registry,
                 run=self.run,
@@ -2031,10 +2043,19 @@ class MLProjectProcessor(ProjectProcessor):
             conf=conf_thres, model_name=model, evaluation_directory=eval_dir
         )
         self.modules["yolo_utils"].add_data(
-            path=eval_dir, name="detection_output", registry=self.registry, run=self.run
+            path=Path(eval_dir, "labels"),
+            name="detection_output",
+            registry=self.registry,
+            run=self.run,
         )
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
             eval_dir, self.run, log=True
+        )
+        self.modules["yolo_utils"].add_data(
+            path=Path(eval_dir, "annotations.csv"),
+            name="detection_output",
+            registry=self.registry,
+            run=self.run,
         )
 
     def segment_footage(self, source: str):

@@ -13,7 +13,7 @@ import folium
 import ipywidgets as widgets
 from ipyfilechooser import FileChooser
 from IPython.display import HTML, display, clear_output
-from ipywidgets import interactive, Layout
+from ipywidgets import interactive, Layout, Video
 from folium.plugins import MiniMap
 from pathlib import Path
 import asyncio
@@ -1305,3 +1305,43 @@ def choose_footage(
         fc.title = f"Choose location of {folder_type}"
         display(fc)
         return fc
+
+
+def movie_viewer():
+    def check_movie(change):
+        filepath = file_chooser.selected
+        if filepath.endswith(".mp4"):
+            # Implement your function to show the movie here
+            logging.info(f"Showing movie: {filepath}")
+            show_movie(filepath)
+        else:
+            logging.error("Please select an MP4 file.")
+
+    def show_movie(
+        movie_path: str,
+    ):
+        """
+        This function takes a movie file path as input, reads the video file, and returns the video object.
+
+        :param movie_path: The `movie_path` parameter is a string that represents the file path to a movie
+        file
+        :type movie_path: str
+        :return: The function `show_movie` returns the `Video` object created from the file located at the
+        `movie_path` provided as input.
+        """
+        with movie_output:
+            clear_output(wait=True)
+            video = Video.from_file(movie_path)
+            display(video)
+
+    movie_output = widgets.Output()
+
+    file_chooser = FileChooser(os.getcwd())
+    file_chooser.use_dir_icons = True
+    file_chooser.filter_pattern = "*.mp4"
+    file_chooser.register_callback(check_movie)
+
+    file_chooser_widget = widgets.VBox(
+        [widgets.Label("Select an MP4 file:"), file_chooser, movie_output]
+    )
+    display(file_chooser_widget)
