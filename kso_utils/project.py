@@ -33,21 +33,6 @@ import kso_utils.widgets as kso_widgets
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-# Set backend to MACOS to enable mp4 output
-import platform
-
-# Define the fake system name
-fake_system_name = "Darwin"
-
-
-# Define a function to return the fake system name
-def fake_system():
-    return fake_system_name
-
-
-# Monkey patch platform.system() with the fake_system function
-platform.system = fake_system
-
 
 class ProjectProcessor:
     # The ProjectProcessor class initializes various attributes and methods for processing a project,
@@ -1290,6 +1275,19 @@ class MLProjectProcessor(ProjectProcessor):
             )
 
         self.team_name = "koster"
+
+        # Set backend to MACOS to enable mp4 output
+        import platform
+
+        # Define the fake system name
+        fake_system_name = "Darwin"
+
+        # Define a function to return the fake system name
+        def fake_system():
+            return fake_system_name
+
+        # Monkey patch platform.system() with the fake_system function
+        platform.system = fake_system
 
     def prepare_dataset(
         self,
