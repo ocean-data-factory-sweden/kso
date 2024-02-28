@@ -174,8 +174,7 @@ def test_t4(zoo_user, zoo_pass):
 # """
 # ...
 # """
-def test_t5():
-    import kso_utils.tutorials_utils as t_utils
+def test_t5():    
     import kso_utils.yolo_utils as y_utils
     import kso_utils.server_utils as s_utils
 
@@ -236,7 +235,6 @@ def test_t5():
 
 
 def test_t6():
-    import kso_utils.tutorials_utils as t_utils
     import kso_utils.server_utils as s_utils
 
     # Generate current timestamp

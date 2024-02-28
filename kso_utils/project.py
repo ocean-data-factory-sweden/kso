@@ -758,6 +758,13 @@ class ProjectProcessor:
                 is_example=False,
             )
 
+    def check_clip_size(self):
+        """
+        > This function takes a list of file paths and returns a dataframe with the file path and size of
+        each file. If the size is too large, we suggest compressing them as a first step.
+        """
+        return zoo_utils.check_clip_size(clips_list=self.generated_clips.clip_path)
+
     def upload_zoo_subjects(self, subject_type: str):
         """
         This function uploads clips or frames to Zooniverse, depending on the subject_type argument
@@ -1042,6 +1049,22 @@ class ProjectProcessor:
         display(frame_modification)
         display(button)
 
+    def check_frame_size(self):
+        """
+        It takes a list of file paths, gets the size of each file, and returns a dataframe with the file
+        path and size of each file
+
+        :param frame_paths: a list of paths to the frames you want to check
+        :return: A dataframe with the file path and size of each frame.
+        """
+        # Check the size of the frames
+        return zoo_utils.check_frame_size(frame_paths=self.generated_frames["frame_path"].unique())
+
+    # Function to compare original to modified frames
+    def compare_frames(df):
+        # Function to compare original to modified frames
+        kso_widgets.compare_frames(df)
+
     #############
     # t8
     #############
@@ -1051,9 +1074,9 @@ class ProjectProcessor:
 
         """
         # Display the displays the processed classifications for a given subject
-        t_utils.explore_classifications_per_subject(
-            self.processed_zoo_classifications,
-            self.workflow_widget.checks["Subject type: #0"],
+        kso_widgets.explore_classifications_per_subject(
+            class_df=self.processed_zoo_classifications,
+            subject_type=self.workflow_widget.checks["Subject type: #0"],
         )
 
     def get_classifications(
@@ -1070,6 +1093,29 @@ class ProjectProcessor:
             workflows_df=workflows_df,
             subj_type=subj_type,
             class_df=class_df,
+        )
+
+    def launch_table(self):
+        """
+        It takes in a dataframe of aggregated classifications and a subject type, and returns a dataframe
+        with the columns "subject_ids", "label", "how_many", and "first_seen"
+        """
+        agg_class_df = zoo_utils.launch_table(
+            agg_class_df=self.aggregated_zoo_classifications, 
+            subject_type=self.workflow_widget.checks["Subject type: #0"]
+        )
+        
+        return agg_class_df
+
+    def launch_viewer(self):
+        """
+        > This function takes a dataframe of classifications and a subject type (frame or video) and
+        displays a dropdown menu of subjects of that type. When a subject is selected, it displays the
+        subject and the classifications for that subject
+        """
+        kso_widgets.launch_viewer(
+            class_df=self.aggregated_zoo_classifications, 
+            subject_type=self.workflow_widget.checks["Subject type: #0"]
         )
 
     def download_classications_csv(self, class_df):
@@ -1100,7 +1146,7 @@ class ProjectProcessor:
             )
 
         # Format the classifications to Darwin Core Standard occurrences
-        occurrence_df = t_utils.format_to_gbif(
+        occurrence_df = kso_widgets.format_to_gbif(
             self.project,
             self.db_connection,
             df,
@@ -1120,107 +1166,21 @@ class ProjectProcessor:
 
         logging.info(f"The occurences have been downloaded to {csv_filename}")
 
-    #############
-    # t9
-    #############
-    def download_detections_csv(self, df):
-        # Download the processed detections as a csv file
-        csv_filename = (
-            self.project.csv_folder
-            + self.project.Project_name
-            + str(datetime.date.today())
-            + "detections.csv"
-        )
 
-        df.to_csv(csv_filename, index=False)
+    def choose_test_prop():
+        """
+        > The function `choose_test_prop()` creates a slider widget that allows the user to choose the
+        proportion of the data to be used for testing
+        :return: A widget object
+        """
+        kso_widgets.choose_test_prop()
 
-        logging.info(f"The detections have been downloaded to {csv_filename}")
-
-    def download_detections_species_cols_csv(self, df):
-        # Specify the species labels
-        if "commonName" in df.columns:
-            # Define the movie col of interest
-            sp_group_col = "commonName"
-        else:
-            # Define the movie col of interest
-            sp_group_col = "class_id"
-
-        # Transpose the rows/cols to have species as cols
-        transposed_df = df.pivot_table(
-            index=["movie_id", "second_in_movie"],
-            columns=sp_group_col,
-            values=["min_conf", "mean_conf", "max_n", "max_conf"],
-            aggfunc="first",
-        )
-
-        # Flatten the MultiIndex columns
-        transposed_df.columns = [
-            f"{species}_{column}" for column, species in transposed_df.columns
-        ]
-
-        # Reset index to get a regular DataFrame
-        transposed_df.reset_index(inplace=True)
-
-        # Specify columns to drop from original df to avoid large df and confussions
-        df_col_drop = [
-            "class_id",
-            "x",
-            "y",
-            "w",
-            "h",
-            "conf",
-            "frame_no",
-            "min_conf",
-            "mean_conf",
-            "max_n",
-            "max_conf",
-            "scientificName",
-            "taxonRank",
-            "kingdom",
-            "commonName",
-        ]
-        df_to_merge = df.drop(df_col_drop, axis=1).drop_duplicates()
-
-        # Merge with the original DataFrame based on common columns
-        merged_df = pd.merge(
-            transposed_df, df_to_merge, on=["movie_id", "second_in_movie"]
-        )
-
-        ###### Sort columns into the expected order as specified by Leon
-        sp_list = df[sp_group_col].unique()
-
-        # Separate columns with species_info and the rest
-        columns_sp_group = [
-            col for col in merged_df.columns if any(sp in col for sp in sp_list)
-        ]
-
-        # Corrected syntax: use "not in" before "for sp in sp_list"
-        columns_no_sp_group = [
-            col for col in merged_df.columns if all(sp not in col for sp in sp_list)
-        ]
-
-        # Sort columns with species_info
-        columns_sp_group = sorted(columns_sp_group)
-
-        # Concatenate columns with and without species_info
-        sorted_columns = columns_no_sp_group + columns_sp_group
-
-        # Select the cols based on the sorted list
-        merged_df = merged_df[sorted_columns]
-
-        # Download the processed detections as a csv file
-        csv_filename = (
-            self.project.csv_folder
-            + self.project.Project_name
-            + str(datetime.date.today())
-            + "detections.csv"
-        )
-
-        merged_df.to_csv(csv_filename, index=False)
-
-        logging.info(
-            f"The detections organised by species cols have been downloaded to {csv_filename}"
-        )
+    def choose_eval_params():
+        """
+        It creates one slider for confidence threshold
+        :return: the value of the slider.
+        """
+        kso_widgets.choose_eval_params()
 
 
 class MLProjectProcessor(ProjectProcessor):

@@ -8,6 +8,7 @@ import getpass
 import pandas as pd
 import json
 import logging
+import math
 import numpy as np
 import gdown
 import datetime
@@ -26,7 +27,6 @@ from kso_utils.db_utils import add_db_info_to_df
 import kso_utils.db_utils as db_utils
 import kso_utils.movie_utils as movie_utils
 import kso_utils.server_utils as server_utils
-from kso_utils.tutorials_utils import WidgetMaker
 
 # Widget imports
 from IPython.display import display
@@ -1293,6 +1293,350 @@ def sample_subjects_from_workflows(
 # Upload clips functions
 ##########################
 
+# Func to expand seconds
+def expand_list(df: pd.DataFrame, list_column: str, new_column: str):
+    """
+    We take a dataframe with a column that contains lists, and we expand that column into a new
+    dataframe with a new column that contains the items in the list
+
+    :param df: the dataframe you want to expand
+    :param list_column: the column that contains the list
+    :param new_column: the name of the new column that will be created
+    :return: A dataframe with the list column expanded into a new column.
+    """
+    lens_of_lists = df[list_column].apply(len)
+    origin_rows = range(df.shape[0])
+    destination_rows = np.repeat(origin_rows, lens_of_lists)
+    non_list_cols = [idx for idx, col in enumerate(df.columns) if col != list_column]
+    expanded_df = df.iloc[destination_rows, non_list_cols].copy()
+    expanded_df[new_column] = [item for items in df[list_column] for item in items]
+    expanded_df.reset_index(inplace=True, drop=True)
+    return expanded_df
+
+
+# Function to extract the videos
+def extract_clips(
+    movie_path: str,
+    clip_length: int,
+    upl_second_i: int,
+    output_clip_path: str,
+    modification_details: dict,
+    gpu_available: bool,
+    remove_audio: bool = True,
+):
+    """
+    This function takes in a movie path, a clip length, a starting second index, an output clip path, a
+    dictionary of modification details, and a boolean indicating whether a GPU is available. It then
+    extracts a clip from the movie, and applies the modifications specified in the dictionary.
+
+    The function is written in such a way that it can be used to extract clips from a movie, and apply
+    modifications to the clips.
+
+    :param movie_path: The path to the movie file
+    :param clip_length: The length of the clip in seconds
+    :param upl_second_i: The second in the video to start the clip
+    :param output_clip_path: The path to the output clip
+    :param modification_details: a dictionary of dictionaries, where each dictionary contains the
+           details of a modification to be made to the video. The keys of the dictionary are the names of the
+           modifications, and the values are dictionaries containing the details of the modification.
+    :param gpu_available: If you have a GPU, set this to True. If you don't, set it to False
+    :param remove_audio: Boolen parameter specifying if remove the audio or not
+    """
+    # Ensure the clip doesn't already exist
+    output_clip_path_check = Path(output_clip_path)
+
+    if output_clip_path_check.exists():
+        logging.info(
+            f"The clip {output_clip_path} already exists, please remove it and run the code again."
+        )
+        pass
+
+    from kso_utils.movie_utils import check_ffmpeg_availability
+
+    # Ensure ffmpeg is installed
+    if not check_ffmpeg_availability():
+        raise FileNotFoundError(
+            "ffmpeg is not found in your system's PATH. Please install or add its path to the PATH environment variable."
+        )
+
+    # Set up input and output default prompts
+    input_path = movie_path
+    output_path = str(output_clip_path)
+
+    input_options = {}
+    output_options = {}
+
+    # Add GPU-related options if available
+    if gpu_available:
+        input_options["hwaccel"] = "cuda"
+        output_options["c"] = "copy"
+
+    # Add audio-related options if needed
+    if remove_audio:
+        output_options["an"] = None
+
+    # Access modifications from clip_modification_widget
+    if modification_details.checks:
+        # Set up modification
+        for (
+            modif_number,
+            modification_details_dict,
+        ) in modification_details.checks.items():
+            if "filter" in modification_details_dict:
+                output_options["vf"] = modification_details_dict["filter"]
+            elif "crf" in modification_details_dict:
+                crf = modification_details_dict["crf"]
+                # add the cuda-compatible vcodec
+                if gpu_available:
+                    del output_options["c"]
+                    if int(crf) < 27:
+                        # small compression
+                        output_options["c:v"] = "h264_nvenc"
+                        output_options["b:v"] = "10M"
+                        logging.info("Compressing using h264_nvenc 10M")
+                    elif int(crf) == 27:
+                        # medium compression
+                        output_options["c:v"] = "h264_nvenc"
+                        output_options["b:v"] = "5M"
+                        logging.info("Compressing using h264_nvenc 5M")
+                    elif int(crf) > 27:
+                        # high compression
+                        output_options["c:v"] = "h264_nvenc"
+                        output_options["b:v"] = "3M"
+                        logging.info("Compressing using h264_nvenc 3M")
+
+                else:
+                    output_options["crf"] = crf
+                    # Add standard pix_format and preset values
+                    output_options.update(
+                        {
+                            "movflags": "+faststart",
+                            "preset": "veryfast",
+                            "pix_fmt": "yuv420p",
+                        }
+                    )
+
+    input_options["ss"] = upl_second_i
+    input_options["t"] = clip_length
+
+    # Run the ffmpeg clip extraction code
+    try:
+        ffmpeg.input(input_path, **input_options).output(
+            output_path, **output_options
+        ).run(overwrite_output=True)
+
+    except ffmpeg.Error as e:
+        logging.error("ffmpeg error occurred.")
+        logging.error(f"stderr: {e}")
+        if e.stdout is not None:
+            logging.error(f"stdout: {e.stdout.decode('utf8')}")
+        if e.stderr is not None:
+            logging.error(f"stderr: {e.stderr.decode('utf8')}")
+        raise e
+
+    # Ensure the clip was extracted
+    if not os.path.exists(output_clip_path):
+        raise FileNotFoundError("The clip wasn't extracted")
+
+    else:
+        os.chmod(output_clip_path, 0o777)
+        logging.info("Clip extracted successfully")
+
+
+def create_clips(
+    available_movies_df: pd.DataFrame,
+    movies_selected: str,
+    movies_paths: str,
+    clip_selection,
+    project: Project,
+    modification_details: dict,
+    gpu_available: bool,
+    is_example: bool,
+    pool_size: int = 4,
+):
+    """
+    This function takes a movie and extracts clips from it
+
+    :param available_movies_df: the dataframe with the movies that are available for the project
+    :param movies_selected: the name(s) of the movie(s) you want to extract clips from
+    :param movies_paths: the path(s) to the movie(s) you want to extract clips from
+    :param clip_selection: a ClipSelection object
+    :param project: the project object
+    :param modification_details: a dictionary with the following keys:
+    :param gpu_available: True or False, depending on whether you have a GPU available to use
+    :param is_example: If True and there are clip modifications, two clips will be generated (original and modified).
+    :param pool_size: the number of threads to use to extract the clips, defaults to 4 (optional)
+    :return: A dataframe with the clip_path, clip_filename, clip_length, upl_seconds, and clip_modification_details
+    """
+
+    # Store the desired length of the clips
+    clip_length = clip_selection.kwargs["clip_length"]
+
+    # Store the starting seconds of the clips
+    if isinstance(clip_selection.result, int):
+        # Clipping video from a range of seconds (e.g. 10-180)
+        # Store the starting and ending of the range
+        start_trim = clip_selection.kwargs["clips_range"][0]
+        end_trim = clip_selection.kwargs["clips_range"][1]
+
+        # Create a list with the starting seconds of the clips
+        list_clip_start = [
+            list(
+                range(
+                    start_trim,
+                    start_trim
+                    + math.floor((end_trim - start_trim) / clip_length) * clip_length,
+                    clip_length,
+                )
+            )
+        ]
+
+        if not clip_selection.result == len(list_clip_start[0]):
+            if clip_selection.result < len(list_clip_start[0]):
+                # Choose random starting points based on the number of samples (example clips, by default this is 3)
+                list_clip_start = [
+                    np.random.choice(
+                        list_clip_start[0], size=clip_selection.result, replace=False
+                    )
+                ]
+            else:
+                logging.info(
+                    "There was an issue estimating the starting seconds for the clips."
+                )
+
+    else:
+        # Clipping specific sections of a video at random (e.g. starting at 10, 20, 180)
+        # Store the starting seconds of the clips
+        list_clip_start = [clip_selection.result["clip_start_time"]]
+
+    # Filter the df for the movie of interest
+    movies_selected_df = available_movies_df[
+        available_movies_df["filename"] == movies_selected
+    ].reset_index(drop=True)
+
+    # Add the list of starting seconds to the df
+    movies_selected_df["list_clip_start"] = list_clip_start
+
+    # Reshape the dataframe with the starting seconds for the new clips
+    clips_start_df = expand_list(movies_selected_df, "list_clip_start", "upl_seconds")
+
+    # Add the length of the clips to df (to keep track of the length of each uploaded clip)
+    clips_start_df["clip_length"] = clip_length
+
+    # Specify output path for zooniverse clip extraction
+    if project.server == "SNIC":
+        if Path("/mimer").exists():
+            temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir"
+        elif Path("/tmp").exists() and not Path("/mimer").exists():
+            temp_path = "/tmp"
+        else:
+            logging.error("No suitable writable path found.")
+            return
+    else:
+        temp_path = "."
+    clips_folder = str(Path(temp_path, movies_selected + "_zooniverseclips"))
+
+    # Set the filename of the clips
+    clips_start_df["clip_filename"] = clips_start_df.apply(
+        lambda row: f"{movies_selected}_clip_{row['upl_seconds']}_{clip_length}.mp4",
+        axis=1,
+    )
+
+    # Set the path of the clips
+    clips_start_df["clip_path"] = clips_start_df["clip_filename"].apply(
+        lambda x: str(Path(clips_folder, x))
+    )
+
+    # Create the folder to store the videos if not exist
+    if os.path.exists(clips_folder):
+        shutil.rmtree(clips_folder)
+    Path(clips_folder).mkdir(parents=True, exist_ok=True)
+    # Recursively add permissions to folders created
+    [os.chmod(root, 0o777) for root, dirs, files in os.walk(clips_folder)]
+
+    logging.info("Extracting clips")
+
+    # Read each movie and extract the clips
+    for index, row in tqdm(clips_start_df.iterrows(), total=clips_start_df.shape[0]):
+        # Extract the videos and store them in the folder
+        extract_clips(
+            movie_path=movies_paths,
+            clip_length=clip_length,
+            upl_second_i=row["upl_seconds"],
+            output_clip_path=row["clip_path"],
+            modification_details=modification_details,
+            gpu_available=gpu_available,
+        )
+
+    if modification_details.children[0].value > 0 and is_example:
+        # Set the filename of the original clips to be compared against the modified
+        clips_start_df["clip_example_original_filename"] = clips_start_df.apply(
+            lambda row: f"{movies_selected}_clip_example_original_{row['upl_seconds']}_{clip_length}.mp4",
+            axis=1,
+        )
+
+        # Set the path of the clips
+        clips_start_df["clip_example_original_path"] = clips_start_df[
+            "clip_example_original_filename"
+        ].apply(lambda x: str(Path(clips_folder, x)))
+
+        logging.info("Extracting original clips")
+        # Read each movie and extract the original clips
+        for index, row in tqdm(
+            clips_start_df.iterrows(), total=clips_start_df.shape[0]
+        ):
+            # Set modification details to 0 to extract clips that are copies of the original movie
+            modification_details.bool_widget_holder.children = ()
+
+            # Extract the videos and store them in the folder
+            extract_clips(
+                movie_path=movies_paths,
+                clip_length=clip_length,
+                upl_second_i=row["upl_seconds"],
+                output_clip_path=row["clip_example_original_path"],
+                modification_details=modification_details,
+                gpu_available=gpu_available,
+            )
+    # Add information on the modification of the clips
+    clips_start_df["clip_modification_details"] = str(modification_details)
+
+    logging.info("All the clips were extracted successfully")
+
+    return clips_start_df
+
+
+def check_clip_size(clips_list: list):
+    """
+    > This function takes a list of file paths and returns a dataframe with the file path and size of
+    each file. If the size is too large, we suggest compressing them as a first step.
+
+    :param clips_list: list of file paths to the clips you want to check
+    :type clips_list: list
+    :return: A dataframe with the file path and size of each clip
+    """
+
+    # Get list of files with size
+    if clips_list is None:
+        logging.error("No clips found.")
+        return None
+    files_with_size = [
+        (file_path, Path(file_path).stat().st_size / float(1 << 20))
+        for file_path in clips_list
+    ]
+
+    df = pd.DataFrame(files_with_size, columns=["File_path", "Size"])
+
+    if df["Size"].ge(8).any():
+        logging.info(
+            "Clips are too large (over 8 MB) to be uploaded to Zooniverse. Compress them!"
+        )
+        return df
+    else:
+        logging.info(
+            "Clips are a good size (below 8 MB). Ready to be uploaded to Zooniverse"
+        )
+        return df
+
 
 def set_zoo_clip_metadata(
     project: Project,
@@ -1931,10 +2275,14 @@ def upload_frames_to_zooniverse(
         )
 
     else:
+        sitename = upload_to_zoo["siteName"].unique()[0]
+        
         # Name the subject for frames from multiple sites/movies
         subject_set_name = (
             "frames_"
             + str(int(n_frames))
+            + "_"             
+            + sitename
             + "_"
             + "_".join(species_list)
             + datetime.date.today().strftime("_%d_%m_%Y")

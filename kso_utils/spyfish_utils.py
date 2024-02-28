@@ -3,7 +3,9 @@ import sqlite3
 import logging
 import pandas as pd
 from pathlib import Path
-from kso_utils.server_utils import download_object_from_s3
+
+from kso_utils.server_utils import get_matching_s3_keys, download_object_from_s3
+
 
 
 # Logging
@@ -81,21 +83,33 @@ def process_spyfish_subjects(
     # Remove unreliable movie_id column
     subjects = subjects.drop(columns="movie_id", errors="ignore")
 
-    # Retrieve filename lookup CSV file
-    csv_filename = "update_of_movie_filenames_24_02_2023.csv"
-    local_csv_path = Path.cwd() / csv_filename
-    server_csv_key = f"{project.key}/{csv_filename}"
+    # Fetch CSV files from S3
+    csv_files = get_matching_s3_keys(
+        client=server_connection["client"],
+        bucket=project.bucket,
+        suffix="csv",
+    )
 
-    if not local_csv_path.exists():
+    # Target filename
+    lookup_filename = "update_of_movie_filenames"
+
+    # Filter matching files
+    matching_files = [file for file in csv_files if lookup_filename in file]
+
+    if len(matching_files) > 1:
+        logging.info(f"Multiple matching files found: {matching_files}")
+    elif matching_files:
+        file_to_download = matching_files[0]
+        local_path = Path(project.csv_folder, Path(file_to_download).name)
         download_object_from_s3(
             client=server_connection["client"],
             bucket=project.bucket,
-            key=server_csv_key,
-            filename=local_csv_path,
+            key=file_to_download,
+            filename=local_path,
         )
 
     # Replace old filenames with updated ones
-    renames_df = pd.read_csv(local_csv_path)
+    renames_df = pd.read_csv(local_path)
     filenames_dict = dict(zip(renames_df["OLD"], renames_df["NEW"]))
     subjects["filename"] = (
         subjects["filename"].map(filenames_dict).fillna(subjects["filename"])
