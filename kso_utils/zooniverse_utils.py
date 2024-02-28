@@ -1292,7 +1292,6 @@ def sample_subjects_from_workflows(
 ##########################
 # Upload clips functions
 ##########################
-
 # Func to expand seconds
 def expand_list(df: pd.DataFrame, list_column: str, new_column: str):
     """

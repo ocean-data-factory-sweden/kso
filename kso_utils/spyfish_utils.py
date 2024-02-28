@@ -101,6 +101,7 @@ def process_spyfish_subjects(
     elif matching_files:
         file_to_download = matching_files[0]
         local_path = Path(project.csv_folder, Path(file_to_download).name)
+
         download_object_from_s3(
             client=server_connection["client"],
             bucket=project.bucket,
@@ -109,7 +110,7 @@ def process_spyfish_subjects(
         )
 
     # Replace old filenames with updated ones
-    renames_df = pd.read_csv(local_path)
+    renames_df = pd.read_csv(local_csv_path)
     filenames_dict = dict(zip(renames_df["OLD"], renames_df["NEW"]))
     subjects["filename"] = (
         subjects["filename"].map(filenames_dict).fillna(subjects["filename"])
