@@ -1913,19 +1913,6 @@ class MLProjectProcessor(ProjectProcessor):
             best_model = "yolov8s.pt"
         model = self.modules["ultralytics"].YOLO(best_model)
 
-        # Set backend to MACOS to enable mp4 output
-        import platform
-
-        # Define the fake system name
-        fake_system_name = "Darwin"
-
-        # Define a function to return the fake system name
-        def fake_system():
-            return fake_system_name
-
-        # Monkey patch platform.system() with the fake_system function
-        platform.system = fake_system
-
         project = str(Path(save_dir))
         self.eval_dir = str(increment_path(Path(project) / name, exist_ok=False))
         if latest:
