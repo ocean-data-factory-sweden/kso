@@ -12,7 +12,7 @@ from pathlib import Path
 from tqdm import tqdm
 from urllib.request import pathname2url
 from urllib.parse import urlparse
-from IPython.display import HTML
+from IPython.display import HTML, display
 import ipywidgets as widgets
 
 # util imports
