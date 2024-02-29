@@ -241,7 +241,10 @@ def preview_movie(
     video_width = "60%"  # Adjust as needed
     metadata_width = "40%"  # Adjust as needed
 
-    video_widget = widgets.Video.from_file(movie_path, width=video_width)
+    if "http" in movie_path:
+        video_widget = widgets.Video.from_url(movie_path, width=video_width)
+    else:
+        video_widget = widgets.Video.from_file(movie_path, width=video_width)
 
     metadata_html = movie_metadata.T.to_html()
 
@@ -252,6 +255,8 @@ def preview_movie(
 
     # Create a horizontal box layout to display video and metadata side by side
     display_widget = widgets.HBox([video_widget, metadata_widget])
+
+    display(display_widget)
 
     return display_widget
 
