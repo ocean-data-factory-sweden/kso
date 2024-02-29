@@ -13,6 +13,7 @@ from tqdm import tqdm
 from urllib.request import pathname2url
 from urllib.parse import urlparse
 from IPython.display import HTML
+import ipywidgets as widgets
 
 # util imports
 from kso_utils.project_utils import Project
@@ -224,37 +225,35 @@ def retrieve_movie_info_from_server(
     return available_movies_df, no_available_movies_df, no_info_movies_df
 
 
-# Function to preview underwater movies
 def preview_movie(
     movie_path: str,
     movie_metadata: pd.DataFrame,
 ):
     """
-    It takes a movie filename and its associated metadata and returns a HTML object that can be displayed in the notebook
+    It takes a movie filename and its associated metadata and returns a widget object that can be displayed in the notebook
 
     :param movie_path: the filename of the movie you want to preview
     :param movie_metadata: the metadata of the movie you want to preview
-    :return: HTML object
+    :return: Widget object
     """
 
     # Adjust the width of the video and metadata sections based on your preference
     video_width = "60%"  # Adjust as needed
     metadata_width = "40%"  # Adjust as needed
 
-    html_code = f"""<html>
-            <div style="display: flex; align-items: center; width: 100%;">
-                <div style="width: {video_width}; padding-right: 10px;">
-                    <video width="100%" controls>
-                        <source src={movie_path}>
-                    </video>
-                </div>
-                <div style="width: {metadata_width}; overflow: auto;">
-                    {movie_metadata.T.to_html()}
-                </div>
-            </div>
-            </html>"""
+    video_widget = widgets.Video.from_file(movie_path, width=video_width)
 
-    return HTML(html_code)
+    metadata_html = movie_metadata.T.to_html()
+
+    metadata_widget = widgets.HTML(
+        value=metadata_html,
+        layout=widgets.Layout(width=metadata_width, overflow="auto"),
+    )
+
+    # Create a horizontal box layout to display video and metadata side by side
+    display_widget = widgets.HBox([video_widget, metadata_widget])
+
+    return display_widget
 
 
 def check_movies_uploaded(project: Project, db_connection, movies_selected: list):
