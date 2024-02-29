@@ -1037,7 +1037,8 @@ def add_data(path: str, name: str, registry: str, run):
             my_data.add_dir(path)
             run.log_artifact(my_data)
         else:
-            run.log_artifact(path)
+            my_data.add_file(path)
+            run.log_artifact(my_data)
     elif registry == "mlflow":
         mlflow.log_artifact(path, artifact_path=name)
 
