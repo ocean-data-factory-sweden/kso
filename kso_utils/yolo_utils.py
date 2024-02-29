@@ -1035,7 +1035,9 @@ def add_data(path: str, name: str, registry: str, run):
         my_data = wandb.Artifact(name, type="raw_data")
         if Path(path).is_dir():
             my_data.add_dir(path)
-        run.log_artifact(my_data)
+            run.log_artifact(my_data)
+        else:
+            run.log_artifact(path)
     elif registry == "mlflow":
         mlflow.log_artifact(path, artifact_path=name)
 
