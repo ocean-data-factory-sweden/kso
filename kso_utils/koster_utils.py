@@ -448,7 +448,9 @@ def process_koster_movies_csv(movies_df: pd.DataFrame):
     movies_df["filename"] = movies_df["filename"].apply(lambda x: fix_text_encoding(x))
 
     # TO DO Include server's path to the movie files
-    movies_df["fpath"] = movies_df["filename"]
+    movies_df["fpath"] = (
+        movies_df["filename"].replace(".MP4", ".mp4").replace(".mov", ".mp4")
+    )
 
     # Rename relevant fields
     movies_df = movies_df.rename(
