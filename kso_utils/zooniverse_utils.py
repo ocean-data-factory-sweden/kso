@@ -172,20 +172,11 @@ def retrieve_zoo_info(
             export_df = pd.read_csv(export)
 
         if len(export_df) > 0:
-            # If KSO deal with duplicated subjects
-            if project.Project_name == "Koster_Seafloor_Obs":
-                from kso_utils.koster_utils import (
-                    clean_duplicated_subjects,
-                    combine_annot_from_duplicates,
-                )
-
-                # Clear duplicated subjects
-                if info_n == "subjects":
-                    export_df = clean_duplicated_subjects(export_df, project)
-
-                # Combine classifications from duplicated subjects to unique subject id
-                if info_n == "classifications":
-                    export_df = combine_annot_from_duplicates(export_df, project)
+            # Clear duplicated subjects
+            if info_n == "subjects":
+                # Select info from each unique subject to avoid loading subject info
+                # multiple times (because the subject has been classified in multiple workflows)
+                export_df = export_df.drop_duplicates(subset="subject_id", keep="first")
 
         else:
             raise ValueError(
@@ -196,12 +187,6 @@ def retrieve_zoo_info(
         # Ensure subject_ids and workflow_ids match db format
         if info_n == "classifications":
             export_df["subject_ids"] = export_df["subject_ids"].astype(np.int64)
-
-        if info_n == "subjects":
-            # Ensure workflow_id is stored as an integer
-            export_df["workflow_id"] = (
-                export_df["workflow_id"].fillna(0).astype(np.int64)
-            )
 
         # Add df to dictionary
         info_df[info_n] = export_df
@@ -374,53 +359,93 @@ def get_workflow_labels(
 # Classification-specific functions
 ##########################
 
+
 ### Flatten the classifications provided the cit. scientists
-
-
 def process_zoo_classifications(
     project: Project,
+    server_connection: dict,
     db_connection,
+    workflow_widget_checks,
+    workflows_df: pd.DataFrame,
+    subjects_df: pd.DataFrame,
     csv_paths: dict,
     classifications_data: pd.DataFrame,
     subject_type: str,
-    selected_zoo_workflows: list,
 ):
     """
-    This function takes in a dataframe of classifications and returns a dataframe of annotations.
+    This function select subjects from the workflows of interest, populates the sql subjects table, process the classifications received and returns a dataframe of annotations.
 
     :param project: the project object
+    :param server_connection: A dictionary with the client and sftp_client
     :param db_connection: SQL connection object
+    :param workflow_widget_checks: the widget with information of the selected workflows
+    :param workflows_df: dataframe with the project workflows information (retrieved from Zooniverse)
+    :param subjects_df: dataframe with the project subjects information (retrieved from Zooniverse)
     :param csv_paths: a dictionary with the paths of the csvs used to initiate the db
     :param classifications_data: the dataframe of classifications from the Zooniverse API
     :param subject_type: This is the type of subject you want to retrieve classifications for. This
            can be either "clip" or "frame"
     """
 
-    ### Make sure all the classifications have existing subjects
+    # Store the names of the workflows and their versions
+    workflow_names, workflow_versions = [], []
+    for i in range(0, len(workflow_widget_checks), 3):
+        workflow_names.append(list(workflow_widget_checks.values())[i])
+        workflow_versions.append(list(workflow_widget_checks.values())[i + 2])
+
+    # Get the ids of the workflows of interest
+    selected_zoo_workflows = [
+        workflows_df[workflows_df.display_name == wf_name].workflow_id.unique()[0]
+        for wf_name in workflow_names
+    ]
+
+    if not isinstance(selected_zoo_workflows, list):
+        selected_zoo_workflows = literal_eval(selected_zoo_workflows)
+
+    ######Classifications selected##############
+    # Select only classification from the workflows of interest
+    classes_df = classifications_data[
+        classifications_data["workflow_id"].isin(selected_zoo_workflows)
+    ].copy()
+
+    # Get the unique subject IDs from the classes DataFrame
+    unique_subject_ids = classes_df["subject_ids"].unique()
+
+    # Count the number of unique subject IDs
+    number_of_unique_subjects = len(unique_subject_ids)
+
+    # Report the number of classifications retrieved
+    logging.info(
+        f"{classes_df.shape[0]:,} Zooniverse classifications have been retrieved"
+        f" from {number_of_unique_subjects:,} subjects"
+    )
+
+    ########Subjects selected########################
+    # Select only subjects from the workflows of interest
+    subjects_series = subjects_df[
+        subjects_df["subject_id"].isin(unique_subject_ids)
+    ].copy()
+
+    from kso_utils.db_utils import drop_table
+
+    # Safely remove subjects table
+    drop_table(conn=db_connection, table_name="subjects")
+
+    if len(subjects_series) > 0:
+        # Fill or re-fill subjects table
+        populate_subjects(project, server_connection, db_connection, subjects_series)
+    else:
+        logging.error("No subjects to populate database from the workflows selected.")
+
+    ########## Combine classifications and subject info#####
     # Combine the classifications and subjects dataframes
     classes_df = add_db_info_to_df(
         project,
         db_connection,
         csv_paths,
-        classifications_data,
+        classes_df,
         "subjects",
-        "id, subject_type, filename, clip_start_time, clip_end_time, frame_exp_sp_id, frame_number, subject_set_id, classifications_count, retired_at, retirement_reason, https_location, movie_id",
-    )
-
-    # Exclude classifications with missing subjects
-    # (often leaving only classifications from the
-    # workflow of interest)
-    classes_df = classes_df.dropna(subset=["subject_type"], how="any").reset_index(
-        drop=True
-    )
-
-    # Select only classification from the workflows of interest
-    classes_df = classes_df[classes_df.workflow_id.isin(selected_zoo_workflows)].copy()
-
-    # Report the number of classifications retrieved
-    logging.info(
-        f"{classes_df.shape[0]:,} Zooniverse classifications have been retrieved"
-        f" from {classes_df.subject_ids.nunique():,} subjects"
+        "id, subject_type, filename, clip_start_time, clip_end_time, frame_exp_sp_id, frame_number, subject_set_id, https_location, movie_id",
     )
 
     ### Flatten the classifications provided the cit. scientists
@@ -544,9 +569,6 @@ def process_zoo_classifications(
             "frame_exp_sp_id",
             "frame_number",
             "movie_id",
-            "classifications_count",
-            "retired_at",
-            "retirement_reason",
         ]
     )
 
@@ -902,6 +924,22 @@ def add_subject_site_movie_info_to_class(
     return class_df
 
 
+def launch_table(agg_class_df: pd.DataFrame, subject_type: str):
+    """
+    It takes in a dataframe of aggregated classifications and a subject type, and returns a dataframe
+    with the columns "subject_ids", "label", "how_many", and "first_seen"
+
+    :param agg_class_df: the dataframe that you want to launch
+    :param subject_type: "clip" or "subject"
+    """
+    if subject_type == "clip":
+        a = agg_class_df[["subject_ids", "label", "how_many", "first_seen"]]
+    else:
+        a = agg_class_df
+
+    return a
+
+
 ##########################
 # Subject-specific functions
 ##########################
@@ -1039,60 +1077,32 @@ def populate_subjects(
     Populate the subjects table with the subject metadata
     :param project: the project object
     :param server_connection: A dictionary with the client and sftp_client
-    :param subjects: the subjects dataframe
+    :param subjects: a dataframe of the subset of subjects from the workflows of interest
     :param db_connection: SQL connection object
 
     """
 
     # Check if the Zooniverse project is the KSO
-    if not project.Project_name == "Koster_Seafloor_Obs":
+    if project.Project_name == "Koster_Seafloor_Obs":
+        from kso_utils.koster_utils import process_koster_subjects
+
+        subjects = process_koster_subjects(subjects, db_connection)
+
+    else:
         # Extract metadata from uploaded subjects
         subjects_df, subjects_meta = extract_metadata(subjects)
 
         # Combine metadata info with the subjects df
         subjects = pd.concat([subjects_df, subjects_meta], axis=1)
 
-    else:
-        from kso_utils.koster_utils import process_koster_subjects
+        # Check if the Zooniverse project is the Spyfish
+        if project.Project_name == "Spyfish_Aotearoa":
+            from kso_utils.spyfish_utils import process_spyfish_subjects
 
-        subjects = process_koster_subjects(subjects, db_connection)
-        # Fix weird bug where Subject_type is used instead of subject_type for the column name for some clips
-    #     if "Subject_type" in subjects.columns:
-    #         subjects["subject_type"] = subjects[
-    #             ["subject_type", "Subject_type"]
-    #         ].apply(lambda x: x[1] if isinstance(x[1], str) else x[0], 1)
-    #         subjects.drop(columns=["Subject_type"], inplace=True)
-
-    #     # Create columns to match schema if they don't exist
-    #     missing_cols = ["upl_seconds","#VideoFilename","#frame_number","#clip_length","movie_id"]
-    #     for i in missing_cols:
-    #         subjects[i] = subjects.get(i, np.nan)
-
-    #     # Add a subject type if it is missing
-    #     subjects["subject_type"] = subjects[["clip_start_time", "subject_type"]].apply(
-    #         lambda x: "frame" if np.isnan(x[0]) else "clip", 1
-    #     )
-    #     # Remove clip subjects with no clip_start_time info (from different projects)
-    #     subjects = subjects[
-    #         ~(
-    #             (subjects["subject_type"] == "clip")
-    #             & (subjects["clip_start_time"].isna())
-    #         )
-    #     ]
-    #     # Fix subjects where clip_start_time is not provided but upl_seconds is
-    #     if "clip_start_time" in subjects.columns and "upl_seconds" in subjects.columns:
-    #         subjects["clip_start_time"] = subjects[
-    #             ["clip_start_time", "upl_seconds"]
-    #         ].apply(lambda x: x[0] if not np.isnan(x[0]) else x[1], 1)
-
-    # Check if the Zooniverse project is the Spyfish
-    if project.Project_name == "Spyfish_Aotearoa":
-        from kso_utils.spyfish_utils import process_spyfish_subjects
-
-        # Process the spyfish movies
-        subjects = process_spyfish_subjects(
-            project, server_connection, subjects, db_connection
-        )
+            # Process the spyfish movies
+            subjects = process_spyfish_subjects(
+                project, server_connection, subjects, db_connection
+            )
 
     # Ensure that subject_ids are not duplicated by workflow
     subjects = subjects.drop_duplicates(subset="subject_id")
@@ -1103,6 +1113,7 @@ def populate_subjects(
     # Rename columns to match the db format
     subjects = subjects.rename(columns=hash_columns)
 
+    ### Fix subject_type missing info and non-standard format
     # Fix weird bug where Subject_type is used instead of subject_type for the column name for some clips
     if "Subject_type" in subjects.columns and "subject_type" in subjects.columns:
         subjects["subject_type"] = subjects[["subject_type", "Subject_type"]].apply(
@@ -1135,6 +1146,64 @@ def populate_subjects(
     # Rename columns to match the db format
     subjects = subjects.rename(columns=rename_cols)
 
+    if hasattr(subjects["subject_type"], "columns"):
+        # Avoid having two subject_type columns (one from Zoo one from the db)
+        subjects["subject_type0"] = subjects["subject_type"].iloc[:, 0]
+        subjects["subject_type1"] = subjects["subject_type"].iloc[:, 1]
+
+        # Update with non-empty values
+        subjects["combined_subject_type"] = subjects["subject_type0"].combine_first(
+            subjects["subject_type1"]
+        )
+
+        # Drop unnecesary cols
+        subjects.drop(
+            columns=["subject_type", "subject_type0", "subject_type1"], inplace=True
+        )
+
+        # Rename the combined subject type
+        subjects = subjects.rename(columns={"combined_subject_type": "subject_type"})
+
+    # Extract the html location of the subjects
+    subjects["https_location"] = subjects["locations"].apply(
+        lambda x: literal_eval(x)["0"]
+    )
+
+    # Check for empty values in subject_type
+    if subjects["subject_type"].isna().any():
+        # Manually write the subject type based on the extension of the subject location (link in Zooniverse)
+        from kso_utils.movie_utils import get_movie_extensions
+
+        # Calculate the number of subjects with empty subject type info
+        num_updated_empty = subjects[subjects["subject_type"].isna()].shape[0]
+
+        # Update empty values with "clip" based on https_location extension
+        subjects.loc[
+            subjects["subject_type"].isna(),
+            "subject_type",
+        ] = subjects[
+            subjects["subject_type"].isna()
+        ]["https_location"].apply(
+            lambda url: "clip"
+            if any(url.endswith(ext) for ext in get_movie_extensions)
+            else "frame"
+        )
+        logging.info(
+            f"Updated {num_updated_empty} empty rows with subject_type based on extension."
+        )
+
+    # Ensure only subjects with the right format get populated
+    right_types = ["frame", "clip"]
+    if subjects[subjects.subject_type.isin(right_types)].all().all():
+        # Count the number of rows to be excluded
+        logging.info(
+            f"{subjects[~subjects.subject_type.isin(right_types)].shape[0]}"
+            f" subjects missing the right subject_type info"
+        )
+
+        # Select only rows with the right subject_type info
+        subjects = subjects[subjects["subject_type"].isin(right_types)]
+
     if "movie_id" not in subjects.columns:
         from kso_utils.db_utils import get_df_from_db_table
 
@@ -1147,39 +1216,6 @@ def populate_subjects(
 
         # Reference the movienames with the id movies table
         subjects = pd.merge(subjects, movies_df, how="left", on="filename")
-
-    # Ensure only subjects with the right format get populated
-    right_types = ["frame", "clip"]
-
-    if subjects[subjects.subject_type.isin(right_types)].all().all():
-        # Count the number of rows to be excluded
-        logging.info(
-            f"{subjects[~subjects.subject_type.isin(right_types)].shape[0]}"
-            f" subjects missing the right subject_type info"
-        )
-
-        # Select only rows with the right subject_type info
-        subjects = subjects[subjects["subject_type"].isin(right_types)]
-
-    if subjects["subject_type"].value_counts().idxmax() == "clip":
-        # Calculate the clip_end_time
-        subjects["clip_end_time"] = (
-            subjects["clip_start_time"] + subjects["clip_length"]
-        )
-
-    if subjects["subject_type"].value_counts().idxmax() == "frame":
-        # Ensure only one value per expected species id
-        # this value is not crucial as we use the labels
-        # to process the actual classifications
-        # Modify the DataFrame to retain only the first value from each list
-        subjects["frame_exp_sp_id"] = subjects["frame_exp_sp_id"].apply(
-            lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x
-        )
-
-    # Extract the html location of the subjects
-    subjects["https_location"] = subjects["locations"].apply(
-        lambda x: literal_eval(x)["0"]
-    )
 
     # Warn users if original movies can't be traced
     # back using the subject information
@@ -1194,6 +1230,21 @@ def populate_subjects(
             f" related to the orignal movie matches the information in the movies.csv,"
             #             f" The trouble subjects are: {movie_missing.id.unique()}"
             f" The trouble filename of the movies are: {movie_missing.filename.unique()}"
+        )
+
+    if subjects["subject_type"].value_counts().idxmax() == "clip":
+        # Calculate the clip_end_time
+        subjects["clip_end_time"] = (
+            subjects["clip_start_time"] + subjects["clip_length"]
+        )
+
+    if subjects["subject_type"].value_counts().idxmax() == "frame":
+        # Ensure only one value per expected species id
+        # this value is not crucial as we use the labels
+        # to process the actual classifications
+        # Modify the DataFrame to retain only the first value from each list
+        subjects["frame_exp_sp_id"] = subjects["frame_exp_sp_id"].apply(
+            lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x
         )
 
     # Get the names required for the subject table
@@ -1222,7 +1273,7 @@ def populate_subjects(
         conn=db_connection,
         table_name="subjects",
         values=[tuple(i) for i in subjects.values],
-        num_fields=15,
+        num_fields=11,
     )
 
     ##### log how many subjects are in the db
@@ -1234,64 +1285,11 @@ def populate_subjects(
     )
 
 
-def sample_subjects_from_workflows(
-    project: Project,
-    server_connection: dict,
-    db_connection,
-    workflow_widget_checks,
-    workflows_df: pd.DataFrame,
-    subjects_df: pd.DataFrame,
-):
-    """
-    Retrieve a subset of the subjects from the workflows of interest and
-    populate the sql subjects table
-
-    :param project: the project object
-    :param server_connection: A dictionary with the client and sftp_client
-    :param db_connection: SQL connection object
-    :param workflow_widget_checks: the widget with information of the selected workflows
-    :param workflows_df: dataframe with the project workflows information (retrieved from Zooniverse)
-    :param subjects_df: dataframe with the project subjects information (retrieved from Zooniverse)
-
-    """
-
-    # Store the names of the workflows and their versions
-    workflow_names, workflow_versions = [], []
-    for i in range(0, len(workflow_widget_checks), 3):
-        workflow_names.append(list(workflow_widget_checks.values())[i])
-        workflow_versions.append(list(workflow_widget_checks.values())[i + 2])
-
-    # Get the ids of the workflows of interest
-    selected_zoo_workflows = [
-        workflows_df[workflows_df.display_name == wf_name].workflow_id.unique()[0]
-        for wf_name in workflow_names
-    ]
-
-    if not isinstance(selected_zoo_workflows, list):
-        selected_zoo_workflows = literal_eval(selected_zoo_workflows)
-
-    # Select only subjects from the workflows of interest
-    subjects_series = subjects_df[
-        subjects_df.workflow_id.isin(selected_zoo_workflows)
-    ].copy()
-
-    from kso_utils.db_utils import drop_table
-
-    # Safely remove subjects table
-    drop_table(conn=db_connection, table_name="subjects")
-
-    if len(subjects_series) > 0:
-        # Fill or re-fill subjects table
-        populate_subjects(project, server_connection, db_connection, subjects_series)
-    else:
-        logging.error("No subjects to populate database from the workflows selected.")
-
-    return selected_zoo_workflows
-
-
 ##########################
 # Upload clips functions
 ##########################
+
+
 # Func to expand seconds
 def expand_list(df: pd.DataFrame, list_column: str, new_column: str):
     """
@@ -1960,6 +1958,37 @@ def extract_frames_for_zoo(
         frames_folder=frames_folder,
     )
     return generated_frames
+
+
+def check_frame_size(frame_paths: list):
+    """
+    It takes a list of file paths, gets the size of each file, and returns a dataframe with the file
+    path and size of each file
+
+    :param frame_paths: a list of paths to the frames you want to check
+    :return: A dataframe with the file path and size of each frame.
+    """
+
+    # Get list of files with size
+    files_with_size = [
+        (file_path, os.stat(file_path).st_size) for file_path in frame_paths
+    ]
+
+    df = pd.DataFrame(files_with_size, columns=["File_path", "Size"])
+
+    # Change bytes to MB
+    df["Size"] = df["Size"] / 1000000
+
+    if df["Size"].ge(1).any():
+        logging.info(
+            "Frames are too large (over 1 MB) to be uploaded to Zooniverse. Compress them!"
+        )
+        return df
+    else:
+        logging.info(
+            "Frames are a good size (below 1 MB). Ready to be uploaded to Zooniverse"
+        )
+        return df
 
 
 # Function to gather information of frames already uploaded to Zooniverse

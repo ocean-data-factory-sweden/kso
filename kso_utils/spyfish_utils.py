@@ -66,17 +66,29 @@ def process_spyfish_subjects(
     :return: Processed DataFrame with columns: filename, clip_start_time, clip_end_time, frame_number,
              subject_type, ScientificName, frame_exp_sp_id, movie_id
     """
+
     # Merge columns and drop redundant ones
     if "Subject_type" in subjects.columns:
-        subjects["subject_type"] = subjects["subject_type"].fillna(
-            subjects["Subject_type"]
+        if not "subject_type" in subjects.columns:
+            subjects.rename(columns={"Subject_type": "subject_type"}, inplace=True)
+
+        else:
+            subjects["subject_type"] = subjects["subject_type"].fillna(
+                subjects["Subject_type"]
+            )
+            subjects = subjects.drop(columns=["Subject_type"])
+
+    # Fix weird bug where Subject_type is used instead of subject_type for the column name for some clips
+    if "#Subject_type" in subjects.columns and "subject_type" in subjects.columns:
+        subjects["subject_type"] = subjects[["subject_type", "#Subject_type"]].apply(
+            lambda x: x[1] if isinstance(x[1], str) else x[0], 1
         )
-        subjects = subjects.drop(columns=["Subject_type"])
+        subjects.drop(columns=["#Subject_type"], inplace=True)
 
     # Rename non-standard column names
     column_rename_map = {
         "#VideoFilename": "filename",
-        "#Subject_type": "subject_type",
+        #         "#Subject_type": "subject_type",
     }
     subjects.rename(columns=column_rename_map, inplace=True)
 
@@ -101,16 +113,17 @@ def process_spyfish_subjects(
     elif matching_files:
         file_to_download = matching_files[0]
         local_path = Path(project.csv_folder, Path(file_to_download).name)
-
         download_object_from_s3(
             client=server_connection["client"],
             bucket=project.bucket,
             key=file_to_download,
-            filename=local_path,
+            filename=str(local_path),
         )
+    else:
+        logging.info(f"No matching file found with name: {lookup_filename}")
 
     # Replace old filenames with updated ones
-    renames_df = pd.read_csv(local_csv_path)
+    renames_df = pd.read_csv(local_path)
     filenames_dict = dict(zip(renames_df["OLD"], renames_df["NEW"]))
     subjects["filename"] = (
         subjects["filename"].map(filenames_dict).fillna(subjects["filename"])

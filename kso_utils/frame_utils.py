@@ -140,3 +140,41 @@ def filter_bboxes(
 
     else:
         return [], bboxes
+
+
+def draw_annotations_in_frame(im: PILImage.Image, class_df_subject: pd.DataFrame):
+    """
+    > The function takes an image and a dataframe of annotations and returns the image with the
+    annotations drawn on it
+
+    :param im: the image object of type PILImage
+    :param class_df_subject: a dataframe containing the annotations for a single subject
+    :return: The image with the annotations
+    """
+    # Calculate image size
+    dw, dh = im._size
+
+    # Draw rectangles of each annotation
+    img1 = ImageDraw.Draw(im)
+
+    # Merge annotation info into a tuple
+    class_df_subject["vals"] = class_df_subject[["x", "y", "w", "h"]].values.tolist()
+
+    for index, row in class_df_subject.iterrows():
+        # Specify the vals object
+        vals = row.vals
+
+        # Adjust annotantions to image size
+        vals_adjusted = tuple(
+            [
+                int(vals[0]),
+                int(vals[1]),
+                int((vals[0] + vals[2])),
+                int((vals[1] + vals[3])),
+            ]
+        )
+
+        # Draw annotation
+        img1.rectangle(vals_adjusted, width=2)
+
+    return im

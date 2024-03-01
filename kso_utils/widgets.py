@@ -1,15 +1,14 @@
 # base imports
-import os
+import cv2
 import logging
+import numpy as np
+import os
+import pandas as pd
 import random
 import subprocess
-import pandas as pd
-import numpy as np
-import cv2
 import requests
 from io import BytesIO
 from base64 import b64encode
-
 
 # widget imports
 import ipysheet
@@ -27,7 +26,6 @@ from PIL import Image as PILImage, ImageDraw
 from kso_utils.video_reader import VideoReader
 from kso_utils.project_utils import Project
 import kso_utils.movie_utils as movie_utils
-import kso_utils.tutorials_utils as t_utils
 
 # Logging
 logging.basicConfig()
@@ -349,7 +347,7 @@ def choose_agg_parameters(subject_type: str = "clip"):
         min=1,
         max=15,
         step=1,
-        description="Min numbers of users:",
+        description="Min number of users:",
         disabled=False,
         continuous_update=False,
         orientation="horizontal",
@@ -369,7 +367,7 @@ def choose_agg_parameters(subject_type: str = "clip"):
     display(description_widget)
     if subject_type == "frame":
         agg_obj = widgets.FloatSlider(
-            value=0.8,
+            value=0.5,
             min=0,
             max=1.0,
             step=0.1,
@@ -392,7 +390,7 @@ def choose_agg_parameters(subject_type: str = "clip"):
         display(agg_obj)
         display(description_widget)
         agg_iou = widgets.FloatSlider(
-            value=0.5,
+            value=0.7,
             min=0,
             max=1.0,
             step=0.1,
@@ -415,7 +413,7 @@ def choose_agg_parameters(subject_type: str = "clip"):
         display(agg_iou)
         display(description_widget)
         agg_iua = widgets.FloatSlider(
-            value=0.8,
+            value=0.4,
             min=0,
             max=1.0,
             step=0.1,
@@ -724,6 +722,52 @@ def choose_movie_review():
     return choose_movie_review_widget
 
 
+def log_meta_changes(
+    project: Project,
+    meta_key: str,
+    new_sheet_df: pd.DataFrame,
+    csv_paths: dict,
+):
+    """Records changes to csv files in log file (json format)"""
+
+    from csv_diff import compare
+    import time
+    import json
+
+    diff = {
+        "timestamp": int(time.time()),
+        "change_info": compare(
+            {
+                int(k): v
+                for k, v in pd.read_csv(csv_paths[meta_key]).to_dict("index").items()
+            },
+            {int(k): v for k, v in new_sheet_df.to_dict("index").items()},
+        ),
+    }
+
+    if len(diff) == 0:
+        logging.info("No changes were logged")
+        return
+
+    else:
+        try:
+            with open(Path(project.csv_folder, "change_log.json"), "r+") as f:
+                try:
+                    existing_data = json.load(f)
+                except json.decoder.JSONDecodeError:
+                    existing_data = []
+                existing_data.append(diff)
+                f.seek(0)
+                json.dump(existing_data, f)
+        except FileNotFoundError:
+            with open(Path(project.csv_folder, "change_log.json"), "w") as f:
+                json.dump([diff], f)
+        logging.info(
+            f"Changelog updated at: {Path(project.csv_folder, 'change_log.json')}"
+        )
+        return
+
+
 def update_meta(
     project: Project,
     conn,
@@ -790,7 +834,7 @@ def update_meta(
             )
 
             # Log changes locally
-            t_utils.log_meta_changes(
+            log_meta_changes(
                 project=project,
                 meta_key="local_" + meta_name + "_csv",
                 new_sheet_df=sheet_df,
