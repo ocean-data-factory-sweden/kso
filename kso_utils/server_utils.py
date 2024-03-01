@@ -394,6 +394,7 @@ def download_object_from_s3(
             Key=key,
             ExtraArgs=ExtraArgs,
             Filename=filename,
+            Config=boto3.s3.transfer.TransferConfig(use_threads=False),
             Callback=lambda bytes_transferred: pbar.update(bytes_transferred),
         )
 
