@@ -988,25 +988,25 @@ class ProjectProcessor:
             class_df=class_df,
         )
 
-    def launch_table(self):
+    def launch_classifications_table(self):
         """
         It takes in a dataframe of aggregated classifications and a subject type, and returns a dataframe
         with the columns "subject_ids", "label", "how_many", and "first_seen"
         """
-        agg_class_df = zoo_utils.launch_table(
+        agg_class_df = zoo_utils.launch_classifications_table(
             agg_class_df=self.aggregated_zoo_classifications,
             subject_type=self.workflow_widget.checks["Subject type: #0"],
         )
 
         return agg_class_df
 
-    def launch_viewer(self):
+    def launch_classifications_viewer(self):
         """
         > This function takes a dataframe of classifications and a subject type (frame or video) and
         displays a dropdown menu of subjects of that type. When a subject is selected, it displays the
         subject and the classifications for that subject
         """
-        kso_widgets.launch_viewer(
+        kso_widgets.launch_classifications_viewer(
             class_df=self.aggregated_zoo_classifications,
             subject_type=self.workflow_widget.checks["Subject type: #0"],
         )
@@ -1076,23 +1076,9 @@ class ProjectProcessor:
         )
         occurrence_df.to_csv(csv_filename, index=False)
 
-        logging.info(f"The occurences have been downloaded to {csv_filename}")
+        logging.info(f"The occurences have been downloaded to {csv_filename}")    
 
-    def choose_test_prop():
-        """
-        > The function `choose_test_prop()` creates a slider widget that allows the user to choose the
-        proportion of the data to be used for testing
-        :return: A widget object
-        """
-        kso_widgets.choose_test_prop()
-
-    def choose_eval_params():
-        """
-        It creates one slider for confidence threshold
-        :return: the value of the slider.
-        """
-        kso_widgets.choose_eval_params()
-
+    
     def process_detections(
         self,
         project,

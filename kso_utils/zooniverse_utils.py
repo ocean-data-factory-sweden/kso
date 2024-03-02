@@ -924,7 +924,7 @@ def add_subject_site_movie_info_to_class(
     return class_df
 
 
-def launch_table(agg_class_df: pd.DataFrame, subject_type: str):
+def launch_classifications_table(agg_class_df: pd.DataFrame, subject_type: str):
     """
     It takes in a dataframe of aggregated classifications and a subject type, and returns a dataframe
     with the columns "subject_ids", "label", "how_many", and "first_seen"
@@ -1332,28 +1332,6 @@ def check_movies_uploaded_zoo(project: Project, db_connection, movies_selected: 
     else:
         logging.info(f"{clips_uploaded} clips have already been uploaded.")
 
-
-# Func to expand seconds
-def expand_list(df: pd.DataFrame, list_column: str, new_column: str):
-    """
-    We take a dataframe with a column that contains lists, and we expand that column into a new
-    dataframe with a new column that contains the items in the list
-
-    :param df: the dataframe you want to expand
-    :param list_column: the column that contains the list
-    :param new_column: the name of the new column that will be created
-    :return: A dataframe with the list column expanded into a new column.
-    """
-    lens_of_lists = df[list_column].apply(len)
-    origin_rows = range(df.shape[0])
-    destination_rows = np.repeat(origin_rows, lens_of_lists)
-    non_list_cols = [idx for idx, col in enumerate(df.columns) if col != list_column]
-    expanded_df = df.iloc[destination_rows, non_list_cols].copy()
-    expanded_df[new_column] = [item for items in df[list_column] for item in items]
-    expanded_df.reset_index(inplace=True, drop=True)
-    return expanded_df
-
-
 # Function to extract the videos
 def extract_clips(
     movie_path: str,
@@ -1556,9 +1534,12 @@ def create_clips(
 
     # Add the list of starting seconds to the df
     movies_selected_df["list_clip_start"] = list_clip_start
+        
+    # Use explode() to expand the list column
+    clips_start_df = movies_selected_df.explode("list_clip_start")
 
-    # Reshape the dataframe with the starting seconds for the new clips
-    clips_start_df = expand_list(movies_selected_df, "list_clip_start", "upl_seconds")
+    # Rename the exploded column
+    clips_start_df.rename(columns={"list_clip_start": "upl_seconds"}, inplace=True)
 
     # Add the length of the clips to df (to keep track of the length of each uploaded clip)
     clips_start_df["clip_length"] = clip_length

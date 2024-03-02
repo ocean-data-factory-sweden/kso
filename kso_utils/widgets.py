@@ -1621,41 +1621,6 @@ def choose_entity():
     display(entity)
     return entity
 
-
-def choose_model_type():
-    """
-    It creates a dropdown box that allows you to choose a model type
-    :return: The dropdown box widget.
-    """
-    model_type = widgets.Dropdown(
-        value=None,
-        description="Required model type:",
-        options=[
-            (
-                "Object Detection (e.g. identifying individuals in an image using rectangles)",
-                1,
-            ),
-            (
-                "Image Classification (e.g. assign a class or label to an entire image)",
-                2,
-            ),
-            (
-                "Instance Segmentation (e.g. fit a suitable mask on top of identified objects)",
-                3,
-            ),
-            ("Custom model (currently only Faster RCNN)", 4),
-        ],
-        disabled=False,
-        display="flex",
-        flex_flow="column",
-        align_items="stretch",
-        layout={"width": "max-content"},
-        style={"description_width": "initial"},
-    )
-    display(model_type)
-    return model_type
-
-
 def choose_conf():
     w = widgets.FloatSlider(
         value=0.5,
@@ -2030,7 +1995,7 @@ def view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
     return HTML(html_code)
 
 
-def launch_viewer(class_df: pd.DataFrame, subject_type: str):
+def launch_classifications_viewer(class_df: pd.DataFrame, subject_type: str):
     """
     > This function takes a dataframe of classifications and a subject type (frame or video) and
     displays a dropdown menu of subjects of that type. When a subject is selected, it displays the
