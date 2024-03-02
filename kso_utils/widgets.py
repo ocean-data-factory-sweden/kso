@@ -321,8 +321,8 @@ def choose_footage(
             if preview_media:
                 with movie_output:
                     clear_output()
-                    previews = []                   
-                                        
+                    previews = []
+
                     # Display/preview each selected movie
                     for (
                         index,

@@ -27,6 +27,7 @@ import kso_utils.server_utils as server_utils
 import kso_utils.zooniverse_utils as zoo_utils
 import kso_utils.general as g_utils
 import kso_utils.widgets as kso_widgets
+import kso_utils.yolo_utils as yolo_utils
 
 # Logging
 logging.basicConfig()
@@ -1091,7 +1092,7 @@ class ProjectProcessor:
         :return: the value of the slider.
         """
         kso_widgets.choose_eval_params()
-        
+
     def process_detections(
         self,
         project,
@@ -1107,33 +1108,130 @@ class ProjectProcessor:
         > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
         and saves the results in different csv files.
         """
-
-        from yolo_utils import process_detections
-
-        process_detections(
+        return yolo_utils.process_detections(
             project=project,
             db_connection=db_connection,
             csv_paths=csv_paths,
             annotations_csv_path=annotations_csv_path,
             model_registry=model_registry,
-            movies_selected_id=self.selected_movies_id,
+            movies_selected_id=self.selected_movies_ids,
             model=model,
             project_name=project_name,
             team_name=team_name,
-            source_movies=self.selected_movies_path,
+            source_movies=self.selected_movies_paths,
         )
 
-    def plot_processed_detections(df, thres, int_length):
+    def plot_processed_detections(self, df, thres, int_length):
         """
         > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
         and saves the results in different csv files.
         """
-        from yolo_utils import plot_processed_detections
-
-        plot_processed_detections(
+        yolo_utils.plot_processed_detections(
             df=df,
             thres=thres,
             int_length=int_length,
+        )
+
+    #############
+    # t9
+    #############
+    def download_detections_csv(self, df):
+        # Download the processed detections as a csv file
+        csv_filename = (
+            self.project.csv_folder
+            + self.project.Project_name
+            + str(datetime.date.today())
+            + "detections.csv"
+        )
+
+        df.to_csv(csv_filename, index=False)
+
+        logging.info(f"The detections have been downloaded to {csv_filename}")
+
+    def download_detections_species_cols_csv(self, df):
+        # Specify the species labels
+        if "commonName" in df.columns:
+            # Define the movie col of interest
+            sp_group_col = "commonName"
+        else:
+            # Define the movie col of interest
+            sp_group_col = "class_id"
+
+        # Transpose the rows/cols to have species as cols
+        transposed_df = df.pivot_table(
+            index=["movie_id", "second_in_movie"],
+            columns=sp_group_col,
+            values=["min_conf", "mean_conf", "max_n", "max_conf"],
+            aggfunc="first",
+        )
+
+        # Flatten the MultiIndex columns
+        transposed_df.columns = [
+            f"{species}_{column}" for column, species in transposed_df.columns
+        ]
+
+        # Reset index to get a regular DataFrame
+        transposed_df.reset_index(inplace=True)
+
+        # Specify columns to drop from original df to avoid large df and confussions
+        df_col_drop = [
+            "class_id",
+            "x",
+            "y",
+            "w",
+            "h",
+            "conf",
+            "frame_no",
+            "min_conf",
+            "mean_conf",
+            "max_n",
+            "max_conf",
+            "scientificName",
+            "taxonRank",
+            "kingdom",
+            "commonName",
+        ]
+        df_to_merge = df.drop(df_col_drop, axis=1).drop_duplicates()
+
+        # Merge with the original DataFrame based on common columns
+        merged_df = pd.merge(
+            transposed_df, df_to_merge, on=["movie_id", "second_in_movie"]
+        )
+
+        ###### Sort columns into the expected order as specified by Leon
+        sp_list = df[sp_group_col].unique()
+
+        # Separate columns with species_info and the rest
+        columns_sp_group = [
+            col for col in merged_df.columns if any(sp in col for sp in sp_list)
+        ]
+
+        # Corrected syntax: use "not in" before "for sp in sp_list"
+        columns_no_sp_group = [
+            col for col in merged_df.columns if all(sp not in col for sp in sp_list)
+        ]
+
+        # Sort columns with species_info
+        columns_sp_group = sorted(columns_sp_group)
+
+        # Concatenate columns with and without species_info
+        sorted_columns = columns_no_sp_group + columns_sp_group
+
+        # Select the cols based on the sorted list
+        merged_df = merged_df[sorted_columns]
+
+        # Download the processed detections as a csv file
+        csv_filename = (
+            self.project.csv_folder
+            + self.project.Project_name
+            + str(datetime.date.today())
+            + "detections.csv"
+        )
+
+        merged_df.to_csv(csv_filename, index=False)
+
+        logging.info(
+            f"The detections organised by species cols have been downloaded to {csv_filename}"
         )
 
 
@@ -1805,9 +1903,8 @@ class MLProjectProcessor(ProjectProcessor):
         img_size: int = 640,
         save_output: bool = True,
         test: bool = False,
-        latest: bool = True
-    ):               
-
+        latest: bool = True,
+    ):
         from yolov5.utils.general import increment_path
 
         if self.registry == "mlflow":
@@ -2238,110 +2335,6 @@ class MLProjectProcessor(ProjectProcessor):
         else:
             logging.error("Unsupported registry")
             return "", ""
-
-    #############
-    # t9
-    #############
-    def download_detections_csv(self, df):
-        # Download the processed detections as a csv file
-        csv_filename = (
-            self.project.csv_folder
-            + self.project.Project_name
-            + str(datetime.date.today())
-            + "detections.csv"
-        )
-
-        df.to_csv(csv_filename, index=False)
-
-        logging.info(f"The detections have been downloaded to {csv_filename}")
-
-    def download_detections_species_cols_csv(self, df):
-        # Specify the species labels
-        if "commonName" in df.columns:
-            # Define the movie col of interest
-            sp_group_col = "commonName"
-        else:
-            # Define the movie col of interest
-            sp_group_col = "class_id"
-
-        # Transpose the rows/cols to have species as cols
-        transposed_df = df.pivot_table(
-            index=["movie_id", "second_in_movie"],
-            columns=sp_group_col,
-            values=["min_conf", "mean_conf", "max_n", "max_conf"],
-            aggfunc="first",
-        )
-
-        # Flatten the MultiIndex columns
-        transposed_df.columns = [
-            f"{species}_{column}" for column, species in transposed_df.columns
-        ]
-
-        # Reset index to get a regular DataFrame
-        transposed_df.reset_index(inplace=True)
-
-        # Specify columns to drop from original df to avoid large df and confussions
-        df_col_drop = [
-            "class_id",
-            "x",
-            "y",
-            "w",
-            "h",
-            "conf",
-            "frame_no",
-            "min_conf",
-            "mean_conf",
-            "max_n",
-            "max_conf",
-            "scientificName",
-            "taxonRank",
-            "kingdom",
-            "commonName",
-        ]
-        df_to_merge = df.drop(df_col_drop, axis=1).drop_duplicates()
-
-        # Merge with the original DataFrame based on common columns
-        merged_df = pd.merge(
-            transposed_df, df_to_merge, on=["movie_id", "second_in_movie"]
-        )
-
-        ###### Sort columns into the expected order as specified by Leon
-        sp_list = df[sp_group_col].unique()
-
-        # Separate columns with species_info and the rest
-        columns_sp_group = [
-            col for col in merged_df.columns if any(sp in col for sp in sp_list)
-        ]
-
-        # Corrected syntax: use "not in" before "for sp in sp_list"
-        columns_no_sp_group = [
-            col for col in merged_df.columns if all(sp not in col for sp in sp_list)
-        ]
-
-        # Sort columns with species_info
-        columns_sp_group = sorted(columns_sp_group)
-
-        # Concatenate columns with and without species_info
-        sorted_columns = columns_no_sp_group + columns_sp_group
-
-        # Select the cols based on the sorted list
-        merged_df = merged_df[sorted_columns]
-
-        # Download the processed detections as a csv file
-        csv_filename = (
-            self.project.csv_folder
-            + self.project.Project_name
-            + str(datetime.date.today())
-            + "detections.csv"
-        )
-
-        merged_df.to_csv(csv_filename, index=False)
-
-        logging.info(
-            f"The detections organised by species cols have been downloaded to {csv_filename}"
-        )
-
-    
 
 
 class Annotator:

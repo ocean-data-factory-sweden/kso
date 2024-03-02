@@ -1882,6 +1882,38 @@ def adjust_tracking(
     return filtered_df.to_csv(str(Path(tracking_folder, "tracking_clean.csv")))
 
 
+# Auxiliary function to obtain a dictionary with the mapping between the class ids used by the detection model and the species names
+def get_species_mapping(model, project_name, team_name="koster"):
+    import wandb
+
+    api = wandb.Api()
+
+    full_path = f"{team_name}/{project_name}"
+    runs = api.runs(full_path)  # Get all runs in the project
+    for r in runs:
+        # Choose the run corresponding to the model given as parameter
+        if r.id == model.split("_")[1]:
+            run = api.run(project_name + "/" + r.id)
+
+    import yaml
+
+    def read_yaml_file(file_path):
+        with open(file_path, "r") as file:
+            yaml_data = yaml.safe_load(file)
+        return yaml_data
+
+    # Read species mapping into data dictionary
+    try:
+        data_dict = run.rawconfig["data_dict"]
+        species_mapping = data_dict["names"]
+    except:
+        data_dict = read_yaml_file(run.rawconfig["data"])
+        species_mapping = data_dict["names"]
+        species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
+
+    return species_mapping
+
+
 def process_detections(
     project: Project,
     db_connection,
@@ -2019,8 +2051,10 @@ def process_detections(
 
     # Set the fps information for movies without info in the sql db
     if "fps" not in df.columns:
+        from kso_utils.movie_utils import get_fps_duration
+
         # Get the fps of the movie
-        df["fps"], _ = movie_utils.get_fps_duration(movie_path=source_movies)
+        df["fps"], _ = get_fps_duration(movie_path=source_movies)
 
         # Set the movie id to 0
         df["movie_id"] = 0
