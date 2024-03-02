@@ -149,12 +149,12 @@ def retrieve_zoo_info(
                 )
             except pd.errors.ParserError as e:
                 # Handle the case where a ParserError occurs
-                logging.error("ParserError occurred while reading CSV data: %s", e)
+                logging.error(f"ParserError occurred while reading CSV data: %s {e}")
                 # Optionally, provide a more specific error message or handle the error accordingly
                 export_df = None
             except Exception as e:
                 # Handle other specific exceptions that may occur
-                logging.error("An error occurred while reading CSV data: %s", e)
+                logging.error(f"An error occurred while reading CSV data: %s {e}")
                 # Optionally, provide a more specific error message or handle the error accordingly
                 export_df = None
         except panoptes.PanoptesAPIException:
@@ -1184,7 +1184,7 @@ def populate_subjects(
             subjects["subject_type"].isna()
         ]["https_location"].apply(
             lambda url: "clip"
-            if any(url.endswith(ext) for ext in get_movie_extensions)
+            if any(url.endswith(ext) for ext in get_movie_extensions())
             else "frame"
         )
         logging.info(

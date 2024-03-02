@@ -951,7 +951,7 @@ class ProjectProcessor:
         )
 
     # Function to compare original to modified frames
-    def compare_frames(df):
+    def compare_frames(self, df):
         # Function to compare original to modified frames
         kso_widgets.compare_frames(df)
 
