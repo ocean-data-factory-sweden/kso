@@ -1,11 +1,14 @@
 # base imports
-import os
+import cv2
 import logging
+import numpy as np
+import os
+import pandas as pd
 import random
 import subprocess
-import pandas as pd
-import numpy as np
-import cv2
+import requests
+from io import BytesIO
+from base64 import b64encode
 
 # widget imports
 import ipysheet
@@ -17,20 +20,20 @@ from ipywidgets import interactive, Layout, Video
 from folium.plugins import MiniMap
 from pathlib import Path
 import asyncio
+from PIL import Image as PILImage
 
 # util imports
 from kso_utils.video_reader import VideoReader
 from kso_utils.project_utils import Project
 import kso_utils.movie_utils as movie_utils
-import kso_utils.tutorials_utils as t_utils
 
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-######################################################################
-############Functions for interactive widgets#########################
-######################################################################
+######################################
+# ###### Functions for interactive widgets ###########
+# #####################################
 
 
 # Function to update widget based on user interaction (eg. click)
@@ -58,9 +61,9 @@ def single_wait_for_change(widget, value):
     return future
 
 
-######################################################################
-#####################Common widgets###################################
-######################################################################
+######################################
+# ###### Common widgets ###########
+# #####################################
 
 
 def choose_species(db_connection, species_list=None):
@@ -253,9 +256,129 @@ def choose_folder(start_path: str = ".", folder_type: str = ""):
     return fc
 
 
-######################################################################
-###################Common ZOO widgets#################################
-######################################################################
+def choose_footage_source():
+    # Create radio buttons
+    source_widget = widgets.RadioButtons(
+        options=["Existing Footage", "New Footage"],
+        value=None,
+        description="Choose footage source:",
+    )
+
+    # Display the radio buttons
+    display(source_widget)
+
+    return source_widget
+
+
+def choose_footage(
+    df: pd.DataFrame,
+    project: Project,
+    server_connection: dict,
+    footage_source: str,
+    preview_media: bool,
+    test: bool,
+):
+    """
+    > The function `choose_footage` is a function that takes in a `self` argument and returns a
+    function `f` that takes in three arguments: `project`, `csv_paths`, and `available_movies_df`. The
+    function `f` is an asynchronous function that takes in the value of the `selected_movies` widget
+    and previews the movies if specified
+    :param df: the dataframe of available movies
+    :param project: the project object
+    :param server_connection: a dictionary with the connection to the server
+    :param footage_source: a string specifying whether the footage is already in the system or is new
+    :param preview_media: a boolean parameter to display or not the movie selected
+    :param test: a boolean parameter to specify if running the test scripts
+
+    """
+
+    if footage_source == "Existing Footage":
+        # Initiate and display the movie_widget output
+        movie_output = widgets.Output()
+        display(movie_output)
+
+        # Display the available movies
+        select_movie_widg = select_movie(df)
+
+        def update_movie(change):
+            selected_movies = change.new
+
+            # Get the df and paths of the selected movies
+            (
+                selected_movies_paths,
+                selected_movies,
+                selected_movies_df,
+                selected_movies_ids,
+            ) = movie_utils.get_info_selected_movies(
+                selected_movies=selected_movies,
+                footage_source=footage_source,
+                df=df,
+                project=project,
+                server_connection=server_connection,
+            )
+
+            # Display the movie
+            if preview_media:
+                with movie_output:
+                    clear_output()
+                    previews = []
+
+                    # Display/preview each selected movie
+                    for (
+                        index,
+                        movie_row,
+                    ) in selected_movies_df.iterrows():
+                        movie_path = selected_movies_paths[index]
+                        movie_metadata = pd.DataFrame(
+                            [movie_row.values], columns=movie_row.index
+                        )
+
+                        html = preview_movie(
+                            movie_path=movie_path,
+                            movie_metadata=movie_metadata,
+                        )
+
+                        previews.append(html)
+
+                display(*previews)
+
+        # Observe changes in the widget
+        select_movie_widg.observe(update_movie, "value")
+        display(select_movie_widg)
+
+        if test:
+            # For the test case, directly call the update_movie logic
+            select_movie_widg.options = (select_movie_widg.options[0],)
+            update_movie({"new": select_movie_widg.options[0]})
+
+    elif footage_source == "New Footage":
+
+        def on_folder_selected(change):
+            selected_folder = select_movie_widg.selected
+
+            if selected_folder is not None:
+                print(f"Selected folder: {selected_folder}")
+            else:
+                print("No folder selected")
+
+        select_movie_widg = choose_folder(
+            start_path=project.movie_folder
+            if project.movie_folder not in [None, "None"]
+            else ".",
+            folder_type="new footage",
+        )
+
+        select_movie_widg.register_callback(on_folder_selected)
+
+    else:
+        logging.info("Select a valid option from the choose_footage_source function")
+
+    return select_movie_widg
+
+
+######################################
+# ###### Common ZOO widgets ###########
+# #####################################
 
 
 def request_latest_zoo_info():
@@ -344,7 +467,7 @@ def choose_agg_parameters(subject_type: str = "clip"):
         min=1,
         max=15,
         step=1,
-        description="Min numbers of users:",
+        description="Min number of users:",
         disabled=False,
         continuous_update=False,
         orientation="horizontal",
@@ -364,7 +487,7 @@ def choose_agg_parameters(subject_type: str = "clip"):
     display(description_widget)
     if subject_type == "frame":
         agg_obj = widgets.FloatSlider(
-            value=0.8,
+            value=0.5,
             min=0,
             max=1.0,
             step=0.1,
@@ -387,7 +510,7 @@ def choose_agg_parameters(subject_type: str = "clip"):
         display(agg_obj)
         display(description_widget)
         agg_iou = widgets.FloatSlider(
-            value=0.5,
+            value=0.7,
             min=0,
             max=1.0,
             step=0.1,
@@ -410,7 +533,7 @@ def choose_agg_parameters(subject_type: str = "clip"):
         display(agg_iou)
         display(description_widget)
         agg_iua = widgets.FloatSlider(
-            value=0.8,
+            value=0.4,
             min=0,
             max=1.0,
             step=0.1,
@@ -527,9 +650,9 @@ def choose_workflows(workflows_df: pd.DataFrame):
     return workflow_name, subj_type, workflow_version
 
 
-######################################################################
-#####################Tutorial 1 widgets###############################
-######################################################################
+######################################
+# ###### TUT 1 widgets ###########
+# #####################################
 
 
 def map_sites(project: Project, csv_paths: dict):
@@ -685,6 +808,43 @@ def display_ipysheet_changes(isheet: ipysheet.Sheet, df_filtered: pd.DataFrame):
         return highlight_changes, sheet_df
 
 
+# Function to preview underwater movies
+def preview_movie(
+    movie_path: str,
+    movie_metadata: pd.DataFrame,
+):
+    """
+    It takes a movie filename and its associated metadata and returns a widget object that can be displayed in the notebook
+
+    :param movie_path: the filename of the movie you want to preview
+    :param movie_metadata: the metadata of the movie you want to preview
+    :return: HTML object
+    """
+
+    # Adjust the width of the video and metadata sections based on your preference
+    video_width = "60%"  # Adjust as needed
+    metadata_width = "40%"  # Adjust as needed
+
+    if "http" in movie_path:
+        video_widget = widgets.Video.from_url(movie_path, width=video_width)
+    else:
+        video_widget = widgets.Video.from_file(movie_path, width=video_width)
+
+    metadata_html = movie_metadata.T.to_html()
+
+    metadata_widget = widgets.HTML(
+        value=metadata_html,
+        layout=widgets.Layout(width=metadata_width, overflow="auto"),
+    )
+
+    # Create a horizontal box layout to display video and metadata side by side
+    display_widget = widgets.HBox([video_widget, metadata_widget])
+
+    display(display_widget)
+
+    return display_widget
+
+
 def choose_movie_review():
     """
     This function creates a widget that allows the user to choose between two methods to review the
@@ -719,6 +879,52 @@ def choose_movie_review():
     return choose_movie_review_widget
 
 
+def log_meta_changes(
+    project: Project,
+    meta_key: str,
+    new_sheet_df: pd.DataFrame,
+    csv_paths: dict,
+):
+    """Records changes to csv files in log file (json format)"""
+
+    from csv_diff import compare
+    import time
+    import json
+
+    diff = {
+        "timestamp": int(time.time()),
+        "change_info": compare(
+            {
+                int(k): v
+                for k, v in pd.read_csv(csv_paths[meta_key]).to_dict("index").items()
+            },
+            {int(k): v for k, v in new_sheet_df.to_dict("index").items()},
+        ),
+    }
+
+    if len(diff) == 0:
+        logging.info("No changes were logged")
+        return
+
+    else:
+        try:
+            with open(Path(project.csv_folder, "change_log.json"), "r+") as f:
+                try:
+                    existing_data = json.load(f)
+                except json.decoder.JSONDecodeError:
+                    existing_data = []
+                existing_data.append(diff)
+                f.seek(0)
+                json.dump(existing_data, f)
+        except FileNotFoundError:
+            with open(Path(project.csv_folder, "change_log.json"), "w") as f:
+                json.dump([diff], f)
+        logging.info(
+            f"Changelog updated at: {Path(project.csv_folder, 'change_log.json')}"
+        )
+        return
+
+
 def update_meta(
     project: Project,
     conn,
@@ -734,6 +940,8 @@ def update_meta(
 
     :param sheet_df: The dataframe of the sheet you want to update
     :param meta_name: the name of the metadata file (e.g. "movies")
+    :param server_connection: a dictionary with the connection to the server
+
     """
 
     from kso_utils.db_utils import process_test_csv
@@ -780,12 +988,12 @@ def update_meta(
             df_orig.reset_index(drop=False, inplace=True)
 
             # Process the csv of interest and tests for compatibility with sql table
-            df_to_db = process_test_csv(
+            process_test_csv(
                 conn=conn, project=project, local_df=df_orig, init_key=meta_name
             )
 
             # Log changes locally
-            t_utils.log_meta_changes(
+            log_meta_changes(
                 project=project,
                 meta_key="local_" + meta_name + "_csv",
                 new_sheet_df=sheet_df,
@@ -856,9 +1064,9 @@ def open_csv(
     return df_filtered, sheet
 
 
-######################################################################
-#####################Tutorial 2 widgets###############################
-######################################################################
+######################################
+# ###### Tut 2 widgets ###########
+# #####################################
 
 
 def choose_new_videos_to_upload():
@@ -912,9 +1120,9 @@ def choose_new_videos_to_upload():
     return movie_list
 
 
-######################################################################
-#####################Tutorial 3 widgets###############################
-######################################################################
+######################################
+# ###### Tut 3 widgets ###########
+# #####################################
 
 
 # Display the number of clips to generate based on the user's selection
@@ -935,7 +1143,7 @@ def to_clips(clip_length, clips_range, is_example: bool):
 def select_n_clips(
     project: Project,
     db_connection,
-    movies_selected: list,
+    selected_movies: list,
     is_example: bool,
 ):
     """
@@ -951,7 +1159,7 @@ def select_n_clips(
 
     # Query info about the movie of interest
     movie_df = pd.read_sql_query(
-        f"SELECT filename, duration, sampling_start, sampling_end FROM movies WHERE filename='{movies_selected}'",
+        f"SELECT filename, duration, sampling_start, sampling_end FROM movies WHERE filename='{selected_movies}'",
         db_connection,
     )
 
@@ -1066,7 +1274,7 @@ def select_modification():
 
 
 # Display the clips side-by-side
-def view_clips(example_clips: list, modified_clip_path: str):
+def view_clips(example_clips: list, modified_clips: list, modified_clip_selected: str):
     """
     > This function takes in a list of example clips and a path to a modified clip, and returns a widget
     that displays the original and modified clips side-by-side
@@ -1076,21 +1284,20 @@ def view_clips(example_clips: list, modified_clip_path: str):
     :return: A widget that displays the original and modified videos side-by-side.
     """
 
-    # Get the path of the modified clip selected
-    example_clip_name = Path(modified_clip_path).stem.replace("_example_original", "")
-    example_clip_path = next(
-        filter(lambda x: Path(x).name == example_clip_name, example_clips), None
-    )
+    # Get the path of the original clip based on the selected modified clip
+    example_clip_selected = example_clips[
+        modified_clips.tolist().index(modified_clip_selected)
+    ]
 
     # Get the extension of the video
-    extension = Path(example_clip_path).suffix
+    extension = Path(example_clip_selected).suffix
 
     # Open original video
-    vid1 = open(example_clip_path, "rb").read()
+    vid1 = open(example_clip_selected, "rb").read()
     wi1 = widgets.Video(value=vid1, format=extension, width=400, height=500)
 
     # Open modified video
-    vid2 = open(modified_clip_path, "rb").read()
+    vid2 = open(modified_clip_selected, "rb").read()
     wi2 = widgets.Video(value=vid2, format=extension, width=400, height=500)
 
     # Display videos side-by-side
@@ -1130,15 +1337,15 @@ def compare_clips(example_clips: list, modified_clips: list):
             if change["new"] == "0 No movie":
                 logging.info("It is OK to modify the clips again")
             else:
-                a = view_clips(example_clips, change["new"])
+                a = view_clips(example_clips, modified_clips, change["new"])
                 display(a)
 
     clip_path_widget.observe(on_change, names="value")
 
 
-######################################################################
-#####################Tutorial 4 widgets###############################
-######################################################################
+######################################
+# ###### Tut 4 widgets ###########
+# #####################################
 
 
 def extract_custom_frames(
@@ -1260,51 +1467,703 @@ def extract_custom_frames(
     )
 
 
-def choose_footage(
-    project: Project,
-    server_connection: dict,
-    db_connection,
-    start_path: str = ".",
-    folder_type: str = "",
-):
-    """
-    > This function enables users to select movies for ML purposes.
+# Display the frames using html
+def view_frames(df: pd.DataFrame, frame_path: str):
+    # Get path of the modified clip selected
+    modified_frame_path = df[df["frame_path"] == frame_path].modif_frame_path.values[0]
+    extension = os.path.splitext(frame_path)[1]
 
-    :param project: the project object
-    :param server_connection: a dictionary with the connection to the server
-    :param db_connection: SQL connection object
-    :param start_path: a string with the path of the origin for the folder
-    :param folder_type: a string with the names of the type of folder required
-    :return: A path of the folder of interest
+    img1 = open(frame_path, "rb").read()
+    wi1 = widgets.Image(value=img1, format=extension, width=400, height=500)
+    img2 = open(modified_frame_path, "rb").read()
+    wi2 = widgets.Image(value=img2, format=extension, width=400, height=500)
+    a = [wi1, wi2]
+    wid = widgets.HBox(a)
+
+    return wid
+
+
+# Function to compare original to modified frames
+def compare_frames(df):
+    if not isinstance(df, pd.DataFrame):
+        df = df.df
+
+    # Save the paths of the clips
+    original_frame_paths = df["frame_path"].unique()
+
+    # Add "no movie" option to prevent conflicts
+    original_frame_paths = np.append(original_frame_paths, "No frame")
+
+    clip_path_widget = widgets.Dropdown(
+        options=tuple(np.sort(original_frame_paths)),
+        description="Select original frame:",
+        ensure_option=True,
+        disabled=False,
+        layout=widgets.Layout(width="50%"),
+        style={"description_width": "initial"},
+    )
+
+    main_out = widgets.Output()
+    display(clip_path_widget, main_out)
+
+    # Display the original and modified clips
+    def on_change(change):
+        with main_out:
+            clear_output()
+            if change["new"] == "No frame":
+                logging.info("It is OK to modify the frames again")
+            else:
+                a = view_frames(df, change["new"])
+                display(a)
+
+    clip_path_widget.observe(on_change, names="value")
+
+
+######################################
+# ###### Tut 5 widgets ###########
+# #####################################
+
+
+def choose_train_params(model_type: str):
     """
-    if project.server == "AWS":
-        available_movies_df, _, _ = movie_utils.retrieve_movie_info_from_server(
-            project=project,
-            server_connection=server_connection,
-            db_connection=db_connection,
-        )
-        movie_dict = {
-            name: movie_utils.get_movie_path(f_path, project, server_connection)
-            for name, f_path in available_movies_df[0][["filename", "fpath"]].values
-        }
-        movie_widget = widgets.SelectMultiple(
-            options=[(name, movie) for name, movie in movie_dict.items()],
-            description="Select movie(s):",
-            ensure_option=False,
-            disabled=False,
-            layout=widgets.Layout(width="50%"),
+    It creates two sliders, one for batch size, one for epochs
+    :return: the values of the sliders.
+    """
+    v = widgets.FloatLogSlider(
+        value=1,
+        base=2,
+        min=0,  # max exponent of base
+        max=10,  # min exponent of base
+        step=1,  # exponent step
+        description="Batch size:",
+        readout=True,
+        readout_format="d",
+    )
+
+    z = widgets.IntSlider(
+        value=1,
+        min=0,
+        max=1000,
+        step=10,
+        description="Epochs:",
+        disabled=False,
+        continuous_update=False,
+        orientation="horizontal",
+        readout=True,
+        readout_format="d",
+    )
+
+    h = widgets.IntText(description="Height:", value=128)
+    w = widgets.IntText(description="Width:", value=128)
+    s = widgets.IntText(description="Image size:", value=128)
+
+    def on_value_change(change):
+        height = h.value
+        width = w.value
+        return [height, width]
+
+    h.observe(on_value_change, names="value")
+    w.observe(on_value_change, names="value")
+    s.observe(on_value_change, names="value")
+
+    if model_type == 1:
+        box = widgets.HBox([v, z, h, w])
+        display(box)
+        return v, z, h, w
+    elif model_type == 2:
+        box = widgets.HBox([v, z, s])
+        display(box)
+        return v, z, s, None
+    else:
+        logging.warning("Model in experimental stage.")
+        box = widgets.HBox([v, z])
+        display(box)
+        return v, z, None, None
+
+
+def choose_experiment_name():
+    """
+    It creates a text box that allows you to enter a name for your experiment
+    :return: The text box widget.
+    """
+    exp_name = widgets.Text(
+        value="exp_name",
+        placeholder="Choose an experiment name",
+        description="Experiment name:",
+        disabled=False,
+        display="flex",
+        flex_flow="column",
+        align_items="stretch",
+        style={"description_width": "initial"},
+    )
+    display(exp_name)
+    return exp_name
+
+
+def choose_entity():
+    """
+    It creates a text box that allows you to enter your username or teamname of WandB
+    :return: The text box widget.
+    """
+    entity = widgets.Text(
+        value="koster",
+        placeholder="Give your user or team name",
+        description="User or Team name:",
+        disabled=False,
+        display="flex",
+        flex_flow="column",
+        align_items="stretch",
+        style={"description_width": "initial"},
+    )
+    display(entity)
+    return entity
+
+
+def choose_conf():
+    w = widgets.FloatSlider(
+        value=0.5,
+        min=0,
+        max=1.0,
+        step=0.1,
+        description="Confidence threshold:",
+        disabled=False,
+        continuous_update=False,
+        orientation="horizontal",
+        readout=True,
+        readout_format=".1f",
+        display="flex",
+        flex_flow="column",
+        align_items="stretch",
+        style={"description_width": "initial"},
+    )
+    display(w)
+    return w
+
+
+def choose_text(name: str):
+    text_widget = widgets.Text(
+        description=f"Please enter a suitable {name} ",
+        display="flex",
+        flex_flow="column",
+        align_items="stretch",
+        style={"description_width": "initial"},
+    )
+    display(text_widget)
+    return text_widget
+
+
+class WidgetMaker(widgets.VBox):
+    def __init__(self):
+        """
+        The function creates a widget that allows the user to select which workflows to run
+
+        :param workflows_df: the dataframe of workflows
+        """
+        self.widget_count = widgets.IntText(
+            description="Number of authors:",
+            display="flex",
+            flex_flow="column",
+            align_items="stretch",
             style={"description_width": "initial"},
         )
 
-        display(movie_widget)
-        return movie_widget
+        self.bool_widget_holder = widgets.HBox(
+            layout=widgets.Layout(
+                width="100%", display="inline-flex", flex_flow="row wrap"
+            )
+        )
+        children = [
+            self.widget_count,
+            self.bool_widget_holder,
+        ]
+        self.widget_count.observe(self._add_bool_widgets, names=["value"])
+        super().__init__(children=children)
+
+    def _add_bool_widgets(self, widg):
+        num_bools = widg["new"]
+        new_widgets = []
+        for _ in range(num_bools):
+            new_widget = widgets.Text(
+                display="flex",
+                flex_flow="column",
+                align_items="stretch",
+                style={"description_width": "initial"},
+            ), widgets.Text(
+                display="flex",
+                flex_flow="column",
+                align_items="stretch",
+                style={"description_width": "initial"},
+            )
+            new_widget[0].description = "Author Name: " + f" #{_}"
+            new_widget[1].description = "Organisation: " + f" #{_}"
+            new_widgets.extend(new_widget)
+        self.bool_widget_holder.children = tuple(new_widgets)
+
+    @property
+    def checks(self):
+        return {w.description: w.value for w in self.bool_widget_holder.children}
+
+    @property
+    def author_dict(self):
+        init_dict = {w.description: w.value for w in self.bool_widget_holder.children}
+        names, organisations = [], []
+        for i in range(0, len(init_dict), 2):
+            names.append(list(init_dict.values())[i])
+            organisations.append(list(init_dict.values())[i + 1])
+        return {n: org for n, org in zip(names, organisations)}
+
+
+def format_to_gbif(
+    project: Project,
+    db_connection,
+    df: pd.DataFrame,
+    csv_paths: dict,
+    classified_by: str,
+    zoo_info_dict: dict = {},
+):
+    """
+    > This function takes a df of biological observations classified by citizen scientists, biologists or ML algorithms and returns a df of species occurrences to publish in GBIF/OBIS.
+    :param project: the project object
+    :param db_connection: SQL connection object
+    :param csv_paths: a dictionary with the paths of the csvs used to initiate the db
+    :param df: the dataframe containing the aggregated classifications
+    :param classified_by: the entity who classified the object of interest, either "citizen_scientists", "biologists" or "ml_algorithms"
+    :param zoo_info_dict: dictionary with the workflow/subjects/classifications retrieved from Zooniverse project
+    :return: a df of species occurrences to publish in GBIF/OBIS.
+    """
+
+    # If classifications have been created by citizen scientists
+    if classified_by == "citizen_scientists":
+        # Retrieve species/labels information #####
+        # Create a df with unique workflow ids and versions of interest
+        work_df = (
+            df[["workflow_id", "workflow_version"]].drop_duplicates().astype("int")
+        )
+
+        # Correct for some weird zooniverse version behaviour
+        #         work_df["workflow_version"] = work_df["workflow_version"] - 1
+
+        # Store df of all the common names and the labels into a list of df
+        from kso_utils.zooniverse_utils import get_workflow_labels
+
+        commonName_labels_list = [
+            get_workflow_labels(zoo_info_dict["workflows"], x, y)
+            for x, y in zip(work_df["workflow_id"], work_df["workflow_version"])
+        ]
+
+        # Concatenate the dfs and select only unique common names and the labels
+        commonName_labels_df = pd.concat(commonName_labels_list).drop_duplicates()
+
+        # Drop the clips classified as nothing here or other
+        df = df[~df["label"].isin(["OTHER", "NOTHINGHERE", "HUMANOBJECTS"])]
+
+        # Combine the labels with the commonNames of the classifications
+        comb_df = pd.merge(df, commonName_labels_df, how="left", on="label")
+
+        from kso_utils.db_utils import add_db_info_to_df
+
+        # Query info about the species of interest
+        comb_df = add_db_info_to_df(
+            project, db_connection, csv_paths, comb_df, "species"
+        )
+
+        # Identify the second of the original movie when the species first appears
+        comb_df["second_in_movie"] = comb_df["clip_start_time"] + comb_df["first_seen"]
+
+        # Select the max count of each species on each movie
+        comb_df = comb_df.sort_values("how_many").drop_duplicates(
+            ["movie_id", "commonName"], keep="last"
+        )
+
+        # Rename columns to match Darwin Data Core Standards
+        comb_df = comb_df.rename(
+            columns={
+                "created_on": "eventDate",
+                "how_many": "individualCount",
+                "commonName": "vernacularName",
+            }
+        )
+
+        # Create relevant columns for GBIF
+        comb_df["occurrenceID"] = (
+            project.Project_name
+            + "_"
+            + comb_df["siteName"]
+            + "_"
+            + comb_df["eventDate"].astype(str)
+            + "_"
+            + comb_df["second_in_movie"].astype(str)
+            + "_"
+            + comb_df["vernacularName"].astype(str)
+        )
+
+        # Set the basis of record as machine observation
+        comb_df["basisOfRecord"] = "MachineObservation"
+
+        # If coord uncertainity doesn't exist set to 30 metres
+        comb_df["coordinateUncertaintyInMeters"] = comb_df.get(
+            "coordinateUncertaintyInMeters", 30
+        )
+
+        # Select columns relevant for GBIF occurrences
+        comb_df = comb_df[
+            [
+                "occurrenceID",
+                "basisOfRecord",
+                "vernacularName",
+                "scientificName",
+                "eventDate",
+                "countryCode",
+                "taxonRank",
+                "kingdom",
+                "decimalLatitude",
+                "decimalLongitude",
+                "geodeticDatum",
+                "coordinateUncertaintyInMeters",
+                "individualCount",
+            ]
+        ]
+
+        return comb_df
+
+    # If classifications have been created by biologists
+    if classified_by == "biologists":
+        logging.info("This sections is currently under development")
+
+    # If classifications have been created by ml algorithms
+    if classified_by == "ml_algorithms":
+        # Rename columns to match Darwin Data Core Standards
+        df = df.rename(
+            columns={
+                "created_on": "eventDate",
+                "max_n": "individualCount",
+                "commonName": "vernacularName",
+            }
+        )
+
+        # Create relevant columns for GBIF
+        df["occurrenceID"] = (
+            project.Project_name
+            + "_"
+            + df["siteName"]
+            + "_"
+            + df["eventDate"].astype(str)
+            + "_"
+            + df["second_in_movie"].astype(str)
+            + "_"
+            + df["vernacularName"].astype(str)
+        )
+
+        # Set the basis of record as machine observation
+        df["basisOfRecord"] = "MachineObservation"
+
+        # If coord uncertainity doesn't exist set to 30 metres
+        df["coordinateUncertaintyInMeters"] = df.get(
+            "coordinateUncertaintyInMeters", 30
+        )
+
+        # Select columns relevant for GBIF occurrences
+        df = df[
+            [
+                "occurrenceID",
+                "basisOfRecord",
+                "vernacularName",
+                "scientificName",
+                "eventDate",
+                "countryCode",
+                "taxonRank",
+                "kingdom",
+                "decimalLatitude",
+                "decimalLongitude",
+                "geodeticDatum",
+                "coordinateUncertaintyInMeters",
+                "individualCount",
+            ]
+        ]
+
+        return df
+    else:
+        raise ValueError(
+            "Specify who classified the species of interest (citizen_scientists, biologists or ml_algorithms)"
+        )
+
+
+######################################
+# ###### Tut 8 widgets ###########
+# #####################################
+
+
+def view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
+    """
+    It takes a subject id, a dataframe containing the annotations for that subject, and the type of
+    subject (clip or frame) and returns an HTML object that can be displayed in a notebook
+
+    :param subject_id: The subject ID of the subject you want to view
+    :type subject_id: int
+    :param class_df: The dataframe containing the annotations for the class of interest
+    :type class_df: pd.DataFrame
+    :param subject_type: The type of subject you want to view. This can be either "clip" or "frame"
+    :type subject_type: str
+    """
+    if subject_id in class_df.subject_ids.tolist():
+        # Select the subject of interest
+        class_df_subject = class_df[class_df.subject_ids == subject_id].reset_index(
+            drop=True
+        )
+
+        # Get the location of the subject
+        subject_location = class_df_subject["https_location"].unique()[0]
 
     else:
-        # Specify the output folder
-        fc = FileChooser(start_path)
-        fc.title = f"Choose location of {folder_type}"
-        display(fc)
-        return fc
+        raise Exception("The reference data does not contain media for this subject.")
+
+    if len(subject_location) == 0:
+        raise Exception("Subject not found in provided annotations")
+
+    # Get the HTML code to show the selected subject
+    if subject_type == "clip":
+        html_code = f"""
+        <html>
+        <div style="display: flex; justify-content: space-around">
+        <div>
+          <video width=500 controls>
+          <source src={subject_location} type="video/mp4">
+        </video>
+        </div>
+        <div>{class_df_subject[['label','first_seen','how_many']].value_counts().sort_values(ascending=False).to_frame().to_html()}</div>
+        </div>
+        </html>"""
+
+    elif subject_type == "frame":
+        # Read image
+        response = requests.get(subject_location)
+        im = PILImage.open(BytesIO(response.content))
+
+        # if label is not empty draw rectangles
+        if class_df_subject.label.unique()[0] != "empty":
+            from kso_utils.frame_utils import draw_annotations_in_frame
+
+            # Create a temporary image with the annotations drawn on it
+            im = draw_annotations_in_frame(im, class_df_subject)
+
+        # Remove previous temp image if exist
+        try:
+            with open("test.txt", "w") as temp_file:
+                temp_file.write("Testing write access.")
+            temp_image_path = "temp.jpg"
+
+        except Exception as e:
+            # Handle the case when file creation fails
+            logging.error(f"Failed to create temporary file: {e}")
+
+            # Specify volume allocated by SNIC if available
+            if Path("/mimer").exists():
+                snic_tmp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir"
+            elif Path("/tmp").exists():
+                snic_tmp_path = "/tmp"
+            else:
+                logging.error("No suitable writable path found.")
+                return
+
+            temp_image_path = str(Path(snic_tmp_path, "temp.jpg"))
+
+        finally:
+            # Remove temporary file
+            if os.path.exists("test.txt"):
+                os.remove("test.txt")
+
+        # Remove temp image if it exists
+        if os.path.exists(temp_image_path):
+            os.remove(temp_image_path)
+
+        # Save the new image
+        im.save(temp_image_path)
+
+        # Load image data (used to enable viewing in Colab)
+        img = open(temp_image_path, "rb").read()
+        data_url = "data:image/jpeg;base64," + b64encode(img).decode()
+
+        html_code = f"""
+        <html>
+        <div style="display: flex; justify-content: space-around">
+        <div>
+          <img src={data_url} type="image/jpeg" width=500>
+        </img>
+        </div>
+        <div>{class_df_subject[['label','colour']].value_counts().sort_values(ascending=False).to_frame().to_html()}</div>
+        </div>
+        </html>"""
+    else:
+        Exception("Subject type not supported.")
+    return HTML(html_code)
+
+
+def launch_classifications_viewer(class_df: pd.DataFrame, subject_type: str):
+    """
+    > This function takes a dataframe of classifications and a subject type (frame or video) and
+    displays a dropdown menu of subjects of that type. When a subject is selected, it displays the
+    subject and the classifications for that subject
+
+    :param class_df: The dataframe containing the classifications
+    :type class_df: pd.DataFrame
+    :param subject_type: The type of subject you want to view. This can be either "frame" or "video"
+    :type subject_type: str
+    """
+
+    # If subject is frame assign a color to each label
+    if subject_type == "frame":
+        # Create a list of unique labels
+        list_labels = class_df.label.unique().tolist()
+
+        # Generate a list of random colors for each label
+        random_color_list = []
+        for index, item in enumerate(list_labels):
+            random_color_list = random_color_list + [
+                "#" + "".join([random.choice("ABCDEF0123456789") for i in range(6)])
+            ]
+
+        # Add a column with the color for each label
+        class_df["colour"] = class_df.apply(
+            lambda row: random_color_list[list_labels.index(row.label)], axis=1
+        )
+
+    # Select the subject
+    options = tuple(
+        sorted(
+            class_df[class_df["subject_type"] == subject_type]["subject_ids"]
+            .apply(int)
+            .apply(str)
+            .unique()
+        )
+    )
+    subject_widget = widgets.Dropdown(
+        options=options,
+        description="Subject id:",
+        ensure_option=True,
+        disabled=False,
+    )
+
+    main_out = widgets.Output()
+    display(subject_widget, main_out)
+
+    # Display the subject and classifications on change
+    def on_change(change):
+        with main_out:
+            a = view_subject(int(change["new"]), class_df, subject_type)
+            clear_output()
+            display(a)
+
+    subject_widget.observe(on_change, names="value")
+
+
+def explore_classifications_per_subject(class_df: pd.DataFrame, subject_type: str):
+    """
+    > This function takes a dataframe of processed classifications and a subject type (clip or frame) and displays
+    the classifications for a given subject
+
+    :param class_df: the dataframe of classifications
+    :type class_df: pd.DataFrame
+    :param subject_type: "clip" or "frame"
+    """
+
+    # Select the subject
+    subject_widget = widgets.Dropdown(
+        options=tuple(sorted(class_df.subject_ids.apply(int).apply(str).unique())),
+        description="Subject id:",
+        ensure_option=True,
+        disabled=False,
+    )
+
+    main_out = widgets.Output()
+    display(subject_widget, main_out)
+
+    # Display the subject and classifications on change
+    def on_change(change):
+        with main_out:
+            a = class_df[class_df.subject_ids == int(change["new"])]
+            if subject_type == "clip":
+                a = a[
+                    [
+                        "classification_id",
+                        "user_name",
+                        "label",
+                        "how_many",
+                        "first_seen",
+                    ]
+                ]
+            else:
+                a = a[
+                    [
+                        "x",
+                        "y",
+                        "w",
+                        "h",
+                        "label",
+                        "https_location",
+                        "subject_ids",
+                        "frame_number",
+                        "movie_id",
+                    ]
+                ]
+            clear_output()
+            display(a)
+
+    subject_widget.observe(on_change, names="value")
+
+
+def choose_test_prop():
+    """
+    > The function `choose_test_prop()` creates a slider widget that allows the user to choose the
+    proportion of the data to be used for testing
+    :return: A widget object
+    """
+
+    w = widgets.FloatSlider(
+        value=0.2,
+        min=0.0,
+        max=1.0,
+        step=0.1,
+        description="Test proportion:",
+        disabled=False,
+        continuous_update=False,
+        orientation="horizontal",
+        readout=True,
+        readout_format=".1f",
+        display="flex",
+        flex_flow="column",
+        align_items="stretch",
+        style={"description_width": "initial"},
+    )
+
+    display(w)
+    return w
+
+
+def choose_eval_params():
+    """
+    It creates one slider for confidence threshold
+    :return: the value of the slider.
+    """
+
+    z1 = widgets.FloatSlider(
+        value=0.5,
+        min=0.0,
+        max=1.0,
+        step=0.1,
+        description="Confidence threshold:",
+        disabled=False,
+        continuous_update=False,
+        orientation="horizontal",
+        readout=True,
+        readout_format=".1f",
+        display="flex",
+        flex_flow="column",
+        align_items="stretch",
+        style={"description_width": "initial"},
+    )
+
+    display(z1)
+    return z1
 
 
 def movie_viewer():

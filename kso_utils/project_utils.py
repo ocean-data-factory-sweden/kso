@@ -4,7 +4,7 @@ from pathlib import Path
 import logging
 import pandas as pd
 from dataclasses import dataclass
-from dataclass_csv import DataclassReader, DataclassWriter, exceptions
+from dataclass_csv import DataclassReader, exceptions
 
 # Logging
 logging.basicConfig()
