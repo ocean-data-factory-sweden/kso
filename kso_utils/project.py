@@ -292,7 +292,7 @@ class ProjectProcessor:
             # (choose_footage_source func is unavailable in tut#1 and #3 to ensure the use of db)
             self.source_footage = "Existing Footage"
 
-        elif self.source_footage.value is None:
+        elif self.source_footage_widget.value is None:
             logging.info(
                 "Select a valid option from the choose_footage_source function"
             )
@@ -301,12 +301,13 @@ class ProjectProcessor:
             self.source_footage = self.source_footage_widget.value
 
         # Check if the necessary available_movies_df attribute is available
-        if (
-            not hasattr(self, "available_movies_df")
-            and self.source_footage == "Existing Footage"
-        ):
-            logging.info("Creating the available_movies_df attribute")
-            self.get_movie_info()
+        if not hasattr(self, "available_movies_df"):
+            if self.source_footage == "Existing Footage":
+                logging.info("Creating the available_movies_df attribute")
+                self.get_movie_info()
+            else:
+                logging.info("Creating an empty available_movies_df for the new movies")
+                self.available_movies_df = pd.DataFrame()
 
         # Call the choose_footage function and save the widget to pp
         self.footage_selected_widget = kso_widgets.choose_footage(
@@ -1090,6 +1091,50 @@ class ProjectProcessor:
         :return: the value of the slider.
         """
         kso_widgets.choose_eval_params()
+        
+    def process_detections(
+        self,
+        project,
+        db_connection,
+        csv_paths,
+        annotations_csv_path,
+        model_registry,
+        model,
+        project_name,
+        team_name,
+    ):
+        """
+        > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+        and saves the results in different csv files.
+        """
+
+        from yolo_utils import process_detections
+
+        process_detections(
+            project=project,
+            db_connection=db_connection,
+            csv_paths=csv_paths,
+            annotations_csv_path=annotations_csv_path,
+            model_registry=model_registry,
+            movies_selected_id=self.selected_movies_id,
+            model=model,
+            project_name=project_name,
+            team_name=team_name,
+            source_movies=self.selected_movies_path,
+        )
+
+    def plot_processed_detections(df, thres, int_length):
+        """
+        > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+        and saves the results in different csv files.
+        """
+        from yolo_utils import plot_processed_detections
+
+        plot_processed_detections(
+            df=df,
+            thres=thres,
+            int_length=int_length,
+        )
 
 
 class MLProjectProcessor(ProjectProcessor):
@@ -1752,6 +1797,7 @@ class MLProjectProcessor(ProjectProcessor):
         self,
         project: str,
         name: str,
+        source: str,
         save_dir: str,
         conf_thres: float,
         artifact_dir: str,
@@ -1759,13 +1805,8 @@ class MLProjectProcessor(ProjectProcessor):
         img_size: int = 640,
         save_output: bool = True,
         test: bool = False,
-        latest: bool = True,
-    ):
-        # Ensure the selected footage and paths are loaded to the system
-        self.check_selected_movies()
-
-        # Get the paths of the movies selected
-        source = self.selected_movies_paths
+        latest: bool = True
+    ):               
 
         from yolov5.utils.general import increment_path
 
@@ -2300,49 +2341,7 @@ class MLProjectProcessor(ProjectProcessor):
             f"The detections organised by species cols have been downloaded to {csv_filename}"
         )
 
-    def process_detections(
-        self,
-        project,
-        db_connection,
-        csv_paths,
-        annotations_csv_path,
-        model_registry,
-        model,
-        project_name,
-        team_name,
-    ):
-        """
-        > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
-        and saves the results in different csv files.
-        """
-
-        from yolo_utils import process_detections
-
-        process_detections(
-            project=project,
-            db_connection=db_connection,
-            csv_paths=csv_paths,
-            annotations_csv_path=annotations_csv_path,
-            model_registry=model_registry,
-            movies_selected_id=self.selected_movies_id,
-            model=model,
-            project_name=project_name,
-            team_name=team_name,
-            source_movies=self.selected_movies_path,
-        )
-
-    def plot_processed_detections(df, thres, int_length):
-        """
-        > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
-        and saves the results in different csv files.
-        """
-        from yolo_utils import plot_processed_detections
-
-        plot_processed_detections(
-            df=df,
-            thres=thres,
-            int_length=int_length,
-        )
+    
 
 
 class Annotator:
