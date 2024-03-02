@@ -317,22 +317,29 @@ class ProjectProcessor:
             test=test,
         )
 
-    def check_selected_movies(self):
+    def check_selected_movies(self, test=False):
         """
         Function that loads the paths and other information of the selected footage to the ProjectProcessors
         """
-        (
-            self.selected_movies_paths,
-            self.selected_movies,
-            self.selected_movies_df,
-            self.selected_movies_ids,
-        ) = movie_utils.get_info_selected_movies(
-            selected_movies=self.footage_selected_widget.value,
-            footage_source=self.source_footage,
-            df=self.available_movies_df,
-            project=self.project,
-            server_connection=self.server_connection,
-        )
+        if test:
+            self.selected_movies = ["movie_1.mp4"]
+            self.selected_movies_paths = [
+                "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4"
+            ]
+
+        else:
+            (
+                self.selected_movies_paths,
+                self.selected_movies,
+                self.selected_movies_df,
+                self.selected_movies_ids,
+            ) = movie_utils.get_info_selected_movies(
+                selected_movies=self.footage_selected_widget.value,
+                footage_source=self.source_footage,
+                df=self.available_movies_df,
+                project=self.project,
+                server_connection=self.server_connection,
+            )
 
     def check_meta_sync(self, meta_key: str):
         """
@@ -582,7 +589,7 @@ class ProjectProcessor:
         """
 
         # Ensure the selected footage and paths are loaded to the system
-        self.check_selected_movies()
+        self.check_selected_movies(test)
 
         movies_selected = self.selected_movies
         movies_paths = self.selected_movies_paths

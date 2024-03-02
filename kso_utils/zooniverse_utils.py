@@ -152,12 +152,8 @@ def retrieve_zoo_info(
                 logging.error(f"ParserError occurred while reading CSV data: %s {e}")
                 # Optionally, provide a more specific error message or handle the error accordingly
                 export_df = None
-            except Exception as e:
-                # Handle other specific exceptions that may occur
-                logging.error(f"An error occurred while reading CSV data: %s {e}")
-                # Optionally, provide a more specific error message or handle the error accordingly
-                export_df = None
-        except panoptes.PanoptesAPIException:
+
+        except AttributeError:
             logging.info(
                 "No connection with Zooniverse, retrieving template info from google drive."
             )

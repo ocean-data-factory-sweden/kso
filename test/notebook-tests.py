@@ -158,7 +158,7 @@ def test_t4(zoo_user, zoo_pass):
     #    frames_skip=None,
     # )
     # Ensure that extracted and modified frames are of suitable size for upload to ZU
-    pp.check_frame_size(frame_paths=pp.modified_frames["modif_frame_path"].unique())
+    pp.check_frame_size()
     # Compare original vs modified frames (no interactivity tested)
     pp.compare_frames(df=pp.modified_frames)
     # Test that final generated frames contain 9 rows (representing a classification)
@@ -321,18 +321,9 @@ def test_t8(zoo_user, zoo_pass):
     # from workflows
     assert len(class_df) == 9
 
-    import kso_utils.zooniverse_utils as zoo_utils
-
     # Retrieve a subset of the subjects from the workflows of interest and
-    # populate the sql subjects table 
-    zoo_utils.process_zoo_classifications(
-        project=pp.project,
-        db_connection=pp.db_connection,
-        csv_paths=pp.csv_paths,
-        classifications_data=pp.zoo_info["classifications"],
-        subject_type=workflow_checks["Subject type: #0"],
-        selected_zoo_workflows=selected_zoo_workflows,
-    )
+    # populate the sql subjects table
+    pp.process_zoo_classifications(test=True)
 
     agg_params = kso_widgets.choose_agg_parameters(workflow_checks["Subject type: #0"])
 

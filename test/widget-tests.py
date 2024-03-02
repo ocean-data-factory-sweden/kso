@@ -54,21 +54,24 @@ def test_choose_folder():
     widget = kso_widgets.choose_folder("../test/test_output", "test_title")
     assert widget.title == "Choose location of test_title"
 
+
 def test_choose_footage_source():
     widget = kso_widgets.test_choose_footage_source()
     assert widget.value == "Existing Footage"
-    
+
+
 def test_choose_footage():
     widget = kso_widgets.choose_footage(
-        df=pd.DataFrame(),        
+        df=pd.DataFrame(),
         project=project,
         server_connection=pp.server_connection,
         footage_source="Existing Footage",
         preview_media=False,
-        test=True
+        test=True,
     )
-    assert widget.default_path == "../test/test_output"    
-    
+    assert widget.default_path == "../test/test_output"
+
+
 def test_choose_agg_parameters():
     widget = kso_widgets.choose_agg_parameters(subject_type="frame")
     assert len(widget) == 5
