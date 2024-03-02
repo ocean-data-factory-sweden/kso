@@ -1945,7 +1945,7 @@ def process_detections(
     csv_paths: dict,
     annotations_csv_path: str,
     model_registry: str,
-    movies_selected_id: dict = None,
+    selected_movies_id: dict = None,
     model: str = None,
     project_name: str = None,
     team_name: str = None,
@@ -1959,7 +1959,7 @@ def process_detections(
     :param db_connection: SQL connection object
     :param csv_paths: a dictionary with the paths of the csvs used to initiate the db
     :param annotations_csv_path: the path to the folder containing the annotations.csv file or the annotations.csv
-    :param movies_selected_id: the ids of the movies selected in earlier steps (note if the selection changes b, mlflow)
+    :param selected_movies_id: the ids of the movies selected in earlier steps (note if the selection changes b, mlflow)
     :param model_registry: the name of the model register (e.g wandb, mlflow)
     :param model: the name of the model in wandb used to obtain the detections
     :param project_name: name of the project in wandb
@@ -1992,10 +1992,10 @@ def process_detections(
     df = df.drop("filename", axis=1)
 
     # Add movie ids info from the movies selected in choose_footage
-    if movies_selected_id:
+    if selected_movies_id:
         # Create a new column with the mapped values
         df["movie_id"] = df["movie_filename"].apply(
-            lambda x: dict(movies_selected_id).get(x, None)
+            lambda x: dict(selected_movies_id).get(x, None)
         )
 
         # Define the movie col of interest

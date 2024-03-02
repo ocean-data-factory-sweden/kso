@@ -1285,14 +1285,14 @@ def populate_subjects(
 ##########################
 
 
-def check_movies_uploaded_zoo(project: Project, db_connection, movies_selected: list):
+def check_movies_uploaded_zoo(project: Project, db_connection, selected_movies: list):
     """
     This function takes in a movie name and a dictionary containing the path to the database and returns
     a boolean value indicating whether the movie has already been uploaded to Zooniverse
 
     :param project: the project object
-    :param movies_selected: the name of the movie(s) you want to check
-    :type movies_selected: list
+    :param selected_movies: the name of the movie(s) you want to check
+    :type selected_movies: list
     :param db_connection: SQL connection object
     """
     from kso_utils.db_utils import get_df_from_db_table
@@ -1318,12 +1318,12 @@ def check_movies_uploaded_zoo(project: Project, db_connection, movies_selected: 
     # Save the video filenames of the clips uploaded to Zooniverse
     clips_uploaded = subjects_df[
         subjects_df["filename"].apply(
-            lambda x: any(movie in x for movie in movies_selected)
+            lambda x: any(movie in x for movie in selected_movies)
         )
     ]
 
     if clips_uploaded.empty:
-        logging.info(f"{movies_selected} has not been uploaded to Zooniverse yet")
+        logging.info(f"{selected_movies} has not been uploaded to Zooniverse yet")
     else:
         logging.info(f"{clips_uploaded} clips have already been uploaded.")
 
@@ -1459,7 +1459,7 @@ def extract_clips(
 
 def create_clips(
     available_movies_df: pd.DataFrame,
-    movies_selected: str,
+    selected_movies: str,
     movies_paths: str,
     clip_selection,
     project: Project,
@@ -1472,7 +1472,7 @@ def create_clips(
     This function takes a movie and extracts clips from it
 
     :param available_movies_df: the dataframe with the movies that are available for the project
-    :param movies_selected: the name(s) of the movie(s) you want to extract clips from
+    :param selected_movies: the name(s) of the movie(s) you want to extract clips from
     :param movies_paths: the path(s) to the movie(s) you want to extract clips from
     :param clip_selection: a ClipSelection object
     :param project: the project object
@@ -1524,15 +1524,15 @@ def create_clips(
         list_clip_start = [clip_selection.result["clip_start_time"]]
 
     # Filter the df for the movie of interest
-    movies_selected_df = available_movies_df[
-        available_movies_df["filename"] == movies_selected
+    selected_movies_df = available_movies_df[
+        available_movies_df["filename"] == selected_movies
     ].reset_index(drop=True)
 
     # Add the list of starting seconds to the df
-    movies_selected_df["list_clip_start"] = list_clip_start
+    selected_movies_df["list_clip_start"] = list_clip_start
 
     # Use explode() to expand the list column
-    clips_start_df = movies_selected_df.explode("list_clip_start")
+    clips_start_df = selected_movies_df.explode("list_clip_start")
 
     # Rename the exploded column
     clips_start_df.rename(columns={"list_clip_start": "upl_seconds"}, inplace=True)
@@ -1551,11 +1551,11 @@ def create_clips(
             return
     else:
         temp_path = "."
-    clips_folder = str(Path(temp_path, movies_selected + "_zooniverseclips"))
+    clips_folder = str(Path(temp_path, selected_movies + "_zooniverseclips"))
 
     # Set the filename of the clips
     clips_start_df["clip_filename"] = clips_start_df.apply(
-        lambda row: f"{movies_selected}_clip_{row['upl_seconds']}_{clip_length}.mp4",
+        lambda row: f"{selected_movies}_clip_{row['upl_seconds']}_{clip_length}.mp4",
         axis=1,
     )
 
@@ -1588,7 +1588,7 @@ def create_clips(
     if modification_details.children[0].value > 0 and is_example:
         # Set the filename of the original clips to be compared against the modified
         clips_start_df["clip_example_original_filename"] = clips_start_df.apply(
-            lambda row: f"{movies_selected}_clip_example_original_{row['upl_seconds']}_{clip_length}.mp4",
+            lambda row: f"{selected_movies}_clip_example_original_{row['upl_seconds']}_{clip_length}.mp4",
             axis=1,
         )
 

@@ -46,7 +46,7 @@ class ProjectProcessor:
         self.classifications = pd.DataFrame()
         self.generated_clips = pd.DataFrame()
         self.species_of_interest = []
-        self.movies_selected_id = {}
+        self.selected_movies_id = {}
 
         # Import modules
         self.modules = g_utils.import_modules([])
@@ -557,8 +557,8 @@ class ProjectProcessor:
         """
         This function checks if a movie has been uploaded to Zooniverse
 
-        :param movies_selected: The name of the movie(s) you want to check if it's uploaded
-        :type movies_selected: list
+        :param selected_movies: The name of the movie(s) you want to check if it's uploaded
+        :type selected_movies: list
         """
         # Ensure the selected footage and paths are loaded to the system
         self.check_selected_movies()
@@ -566,7 +566,7 @@ class ProjectProcessor:
         zoo_utils.check_movies_uploaded_zoo(
             project=self.project,
             db_connection=self.db_connection,
-            movies_selected=self.selected_movies,
+            selected_movies=self.selected_movies,
         )
 
     def generate_zoo_clips(
@@ -591,26 +591,26 @@ class ProjectProcessor:
         # Ensure the selected footage and paths are loaded to the system
         self.check_selected_movies(test)
 
-        movies_selected = self.selected_movies
+        selected_movies = self.selected_movies
         movies_paths = self.selected_movies_paths
 
         # Roadblock to ensure only one movie has been selected
         # Option to generate clips from multiple movies is not available at this point
-        if len(movies_selected) > 1:
+        if len(selected_movies) > 1 or isinstance(selected_movies, list):
             logging.info(
                 "The option to generate clips from multiple movies is not available at this point. Please select only one movie to gerenate clips from"
             )
             return
 
         else:
-            movies_selected = str(movies_selected[0])
+            selected_movies = str(selected_movies[0])
             movies_paths = str(movies_paths[0])
 
         # Select the clips to be extracted
         clip_selection = kso_widgets.select_n_clips(
             project=self.project,
             db_connection=self.db_connection,
-            movies_selected=movies_selected,
+            selected_movies=selected_movies,
             is_example=is_example,
         )
         clip_modification = kso_widgets.clip_modification_widget()
@@ -627,7 +627,7 @@ class ProjectProcessor:
             def on_button_clicked(b):
                 self.generated_clips = zoo_utils.create_clips(
                     available_movies_df=self.available_movies_df,
-                    movies_selected=movies_selected,
+                    selected_movies=selected_movies,
                     movies_paths=movies_paths,
                     clip_selection=clip_selection,
                     project=self.project,
@@ -651,7 +651,7 @@ class ProjectProcessor:
             clip_selection.result["clip_start_time"] = [0]
             self.generated_clips = zoo_utils.create_clips(
                 available_movies_df=self.available_movies_df,
-                movies_selected=movies_selected,
+                selected_movies=selected_movies,
                 movies_paths=movies_paths,
                 clip_selection=clip_selection,
                 project=self.project,
@@ -1103,7 +1103,7 @@ class ProjectProcessor:
             csv_paths=csv_paths,
             annotations_csv_path=annotations_csv_path,
             model_registry=model_registry,
-            movies_selected_id=self.selected_movies_ids,
+            selected_movies_id=self.selected_movies_ids,
             model=model,
             project_name=project_name,
             team_name=team_name,

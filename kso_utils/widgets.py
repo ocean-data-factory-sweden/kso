@@ -281,7 +281,7 @@ def choose_footage(
     """
     > The function `choose_footage` is a function that takes in a `self` argument and returns a
     function `f` that takes in three arguments: `project`, `csv_paths`, and `available_movies_df`. The
-    function `f` is an asynchronous function that takes in the value of the `movies_selected` widget
+    function `f` is an asynchronous function that takes in the value of the `selected_movies` widget
     and previews the movies if specified
     :param df: the dataframe of available movies
     :param project: the project object
@@ -1143,7 +1143,7 @@ def to_clips(clip_length, clips_range, is_example: bool):
 def select_n_clips(
     project: Project,
     db_connection,
-    movies_selected: list,
+    selected_movies: list,
     is_example: bool,
 ):
     """
@@ -1159,7 +1159,7 @@ def select_n_clips(
 
     # Query info about the movie of interest
     movie_df = pd.read_sql_query(
-        f"SELECT filename, duration, sampling_start, sampling_end FROM movies WHERE filename='{movies_selected}'",
+        f"SELECT filename, duration, sampling_start, sampling_end FROM movies WHERE filename='{selected_movies}'",
         db_connection,
     )
 
