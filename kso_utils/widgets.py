@@ -256,6 +256,130 @@ def choose_folder(start_path: str = ".", folder_type: str = ""):
     return fc
 
 
+def choose_footage_source():
+    # Create radio buttons
+    source_widget = widgets.RadioButtons(
+        options=["Existing Footage", "New Footage"],
+        value=None,
+        description="Choose footage source:",
+    )
+
+    # Display the radio buttons
+    display(source_widget)
+
+    return source_widget
+
+
+def choose_footage(
+    df: pd.DataFrame,
+    project: Project,
+    server_connection: dict,
+    footage_source: str,
+    preview_media: bool,
+    test: bool,
+):
+    """
+    > The function `choose_footage` is a function that takes in a `self` argument and returns a
+    function `f` that takes in three arguments: `project`, `csv_paths`, and `available_movies_df`. The
+    function `f` is an asynchronous function that takes in the value of the `movies_selected` widget
+    and previews the movies if specified
+    :param df: the dataframe of available movies
+    :param project: the project object
+    :param server_connection: a dictionary with the connection to the server
+    :param footage_source: a string specifying whether the footage is already in the system or is new
+    :param preview_media: a boolean parameter to display or not the movie selected
+    :param test: a boolean parameter to specify if running the test scripts
+
+    """
+
+    if footage_source == "Existing Footage":
+        # Initiate and display the movie_widget output
+        movie_output = widgets.Output()
+        display(movie_output)
+
+        # Display the available movies
+        select_movie_widg = select_movie(df)
+
+        def update_movie(change):
+            selected_movies = change.new
+
+            # Get the df and paths of the selected movies
+            (
+                selected_movies_paths,
+                selected_movies,
+                selected_movies_df,
+                selected_movies_ids,
+            ) = movie_utils.get_info_selected_movies(
+                selected_movies=selected_movies,
+                footage_source=footage_source,
+                df=df,
+                project=project,
+                server_connection=server_connection,
+            )
+
+            # Display the movie
+            if preview_media:
+                clear_output()
+                display(select_movie_widg)
+                with movie_output:
+                    previews = []
+
+                    # Display/preview each selected movie
+                    for (
+                        index,
+                        movie_row,
+                    ) in selected_movies_df.iterrows():
+                        movie_path = selected_movies_paths[index]
+                        movie_metadata = pd.DataFrame(
+                            [movie_row.values], columns=movie_row.index
+                        )
+
+                        html = preview_movie(
+                            movie_path=movie_path,
+                            movie_metadata=movie_metadata,
+                        )
+
+                        previews.append(html)
+
+                display(*previews)
+
+        # Observe changes in the widget
+        select_movie_widg.observe(update_movie, "value")
+        display(select_movie_widg)
+
+        if test:
+            # For the test case, directly call the update_movie logic
+            select_movie_widg.options = (select_movie_widg.options[0],)
+            update_movie({"new": select_movie_widg.options[0]})
+
+    elif footage_source == "New Footage":
+
+        def on_folder_selected(change):
+            selected_folder = select_movie_widg.selected
+
+            if selected_folder is not None:
+                # Save the selected folder
+                movies_selected = selected_folder
+                print(f"Selected folder: {selected_folder}")
+
+            else:
+                print("No folder selected")
+
+        select_movie_widg = choose_folder(
+            start_path=project.movie_folder
+            if project.movie_folder not in [None, "None"]
+            else ".",
+            folder_type="new footage",
+        )
+
+        select_movie_widg.register_callback(on_folder_selected)
+
+    else:
+        logging.info("Select a valid option from the choose_footage_source function")
+
+    return select_movie_widg
+
+
 ######################################################################
 ###################Common ZOO widgets#################################
 ######################################################################
@@ -688,6 +812,43 @@ def display_ipysheet_changes(isheet: ipysheet.Sheet, df_filtered: pd.DataFrame):
         return highlight_changes, sheet_df
 
 
+# Function to preview underwater movies
+def preview_movie(
+    movie_path: str,
+    movie_metadata: pd.DataFrame,
+):
+    """
+    It takes a movie filename and its associated metadata and returns a widget object that can be displayed in the notebook
+
+    :param movie_path: the filename of the movie you want to preview
+    :param movie_metadata: the metadata of the movie you want to preview
+    :return: HTML object
+    """
+
+    # Adjust the width of the video and metadata sections based on your preference
+    video_width = "60%"  # Adjust as needed
+    metadata_width = "40%"  # Adjust as needed
+
+    if "http" in movie_path:
+        video_widget = widgets.Video.from_url(movie_path, width=video_width)
+    else:
+        video_widget = widgets.Video.from_file(movie_path, width=video_width)
+
+    metadata_html = movie_metadata.T.to_html()
+
+    metadata_widget = widgets.HTML(
+        value=metadata_html,
+        layout=widgets.Layout(width=metadata_width, overflow="auto"),
+    )
+
+    # Create a horizontal box layout to display video and metadata side by side
+    display_widget = widgets.HBox([video_widget, metadata_widget])
+
+    display(display_widget)
+
+    return display_widget
+
+
 def choose_movie_review():
     """
     This function creates a widget that allows the user to choose between two methods to review the
@@ -783,6 +944,8 @@ def update_meta(
 
     :param sheet_df: The dataframe of the sheet you want to update
     :param meta_name: the name of the metadata file (e.g. "movies")
+    :param server_connection: a dictionary with the connection to the server
+
     """
 
     from kso_utils.db_utils import process_test_csv
@@ -1115,7 +1278,7 @@ def select_modification():
 
 
 # Display the clips side-by-side
-def view_clips(example_clips: list, modified_clips:list, modified_clip_selected: str):
+def view_clips(example_clips: list, modified_clips: list, modified_clip_selected: str):
     """
     > This function takes in a list of example clips and a path to a modified clip, and returns a widget
     that displays the original and modified clips side-by-side
@@ -1126,8 +1289,10 @@ def view_clips(example_clips: list, modified_clips:list, modified_clip_selected:
     """
 
     # Get the path of the original clip based on the selected modified clip
-    example_clip_selected = example_clips[modified_clips.tolist().index(modified_clip_selected)]
-    
+    example_clip_selected = example_clips[
+        modified_clips.tolist().index(modified_clip_selected)
+    ]
+
     # Get the extension of the video
     extension = Path(example_clip_selected).suffix
 
@@ -1614,11 +1779,11 @@ def format_to_gbif(
         )
 
         # Correct for some weird zooniverse version behaviour
-#         work_df["workflow_version"] = work_df["workflow_version"] - 1
+        #         work_df["workflow_version"] = work_df["workflow_version"] - 1
 
         # Store df of all the common names and the labels into a list of df
         from kso_utils.zooniverse_utils import get_workflow_labels
-        
+
         commonName_labels_list = [
             get_workflow_labels(zoo_info_dict["workflows"], x, y)
             for x, y in zip(work_df["workflow_id"], work_df["workflow_version"])
@@ -2032,50 +2197,3 @@ def choose_eval_params():
 
     display(z1)
     return z1
-
-
-def choose_footage(
-    project: Project,
-    server_connection: dict,
-    db_connection,
-    start_path: str = ".",
-    folder_type: str = "",
-):
-    """
-    > This function enables users to select movies for ML purposes.
-
-    :param project: the project object
-    :param server_connection: a dictionary with the connection to the server
-    :param db_connection: SQL connection object
-    :param start_path: a string with the path of the origin for the folder
-    :param folder_type: a string with the names of the type of folder required
-    :return: A path of the folder of interest
-    """
-    if project.server == "AWS":
-        available_movies_df, _, _ = movie_utils.retrieve_movie_info_from_server(
-            project=project,
-            server_connection=server_connection,
-            db_connection=db_connection,
-        )
-        movie_dict = {
-            name: movie_utils.get_movie_path(f_path, project, server_connection)
-            for name, f_path in available_movies_df[0][["filename", "fpath"]].values
-        }
-        movie_widget = widgets.SelectMultiple(
-            options=[(name, movie) for name, movie in movie_dict.items()],
-            description="Select movie(s):",
-            ensure_option=False,
-            disabled=False,
-            layout=widgets.Layout(width="50%"),
-            style={"description_width": "initial"},
-        )
-
-        display(movie_widget)
-        return movie_widget
-
-    else:
-        # Specify the output folder
-        fc = FileChooser(start_path)
-        fc.title = f"Choose location of {folder_type}"
-        display(fc)
-        return fc

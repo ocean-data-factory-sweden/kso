@@ -226,80 +226,62 @@ def retrieve_movie_info_from_server(
     return available_movies_df, no_available_movies_df, no_info_movies_df
 
 
-# Function to preview underwater movies
-def preview_movie(
-    movie_path: str,
-    movie_metadata: pd.DataFrame,
+def get_info_selected_movies(
+    selected_movies: list,
+    footage_source: str,
+    df: pd.DataFrame,
+    project: Project,
+    server_connection: dict,
 ):
     """
-    It takes a movie filename and its associated metadata and returns a HTML object that can be displayed in the notebook
-
-    :param movie_path: the filename of the movie you want to preview
-    :param movie_metadata: the metadata of the movie you want to preview
-    :return: HTML object
-    """
-
-    # Adjust the width of the video and metadata sections based on your preference
-    video_width = "60%"  # Adjust as needed
-    metadata_width = "40%"  # Adjust as needed
-
-    html_code = f"""<html>
-            <div style="display: flex; align-items: center; width: 100%;">
-                <div style="width: {video_width}; padding-right: 10px;">
-                    <video width="100%" controls>
-                        <source src={movie_path}>
-                    </video>
-                </div>
-                <div style="width: {metadata_width}; overflow: auto;">
-                    {movie_metadata.T.to_html()}
-                </div>
-            </div>
-            </html>"""
-
-    return HTML(html_code)
-
-
-def check_movies_uploaded(project: Project, db_connection, movies_selected: list):
-    """
-    This function takes in a movie name and a dictionary containing the path to the database and returns
-    a boolean value indicating whether the movie has already been uploaded to Zooniverse
-
+    > This function takes the selected movies and source of the footage (already in the system or new) and return the df, paths and ids of the movies selected.
+    :param selected_movies: TBC
+    :param footage_source: a string specifying whether the footage is already in the system or is new
     :param project: the project object
-    :param movies_selected: the name of the movie(s) you want to check
-    :type movies_selected: list
-    :param db_connection: SQL connection object
+    :param server_connection: a dictionary with the connection to the server
+    :param df: the dataframe of available movies
     """
-    from kso_utils.db_utils import get_df_from_db_table
 
-    # Query info about the clip subjects uploaded to Zooniverse from the db
-    subjects_df = get_df_from_db_table(conn=db_connection, table_name="subjects")
-
-    # Select only columns of interest
-    subjects_df = subjects_df[
-        [
-            "id",
-            "subject_type",
-            "filename",
-            "clip_start_time",
-            "clip_end_time",
-            "movie_id",
-        ]
-    ]
-
-    # Select only clip subjects
-    subjects_df = subjects_df[subjects_df["subject_type"] == "clip"]
-
-    # Save the video filenames of the clips uploaded to Zooniverse
-    clips_uploaded = subjects_df[
-        subjects_df["filename"].apply(
-            lambda x: any(movie in x for movie in movies_selected)
+    if footage_source == "Existing Footage":
+        # Create a df with the selected movies
+        selected_movies_df = df[df["filename"].isin(selected_movies)].reset_index(
+            drop=True
         )
-    ]
 
-    if clips_uploaded.empty:
-        logging.info(f"{movies_selected} has not been uploaded to Zooniverse yet")
-    else:
-        logging.info(f"{clips_uploaded} clips have already been uploaded.")
+        # Retrieve the paths of the movies selected
+        selected_movies_paths = [
+            get_movie_path(
+                project=project,
+                f_path=f_path,
+                server_connection=server_connection,
+            )
+            for f_path in selected_movies_df["fpath"]
+        ]
+
+        # Remove movie extension to match yolo_format labels
+        selected_movies_no_ext = tuple(
+            filename.rsplit(".", 1)[0] for filename in selected_movies
+        )
+
+        selected_movies_ids = {
+            key: value
+            for key, value in zip(
+                selected_movies_no_ext,
+                selected_movies_df["movie_id"].to_list(),
+            )
+        }
+
+    elif footage_source == "New Footage":
+        selected_movies_paths = selected_movies
+        selected_movies_ids = {}
+        selected_movies_df = pd.DataFrame()
+
+    return (
+        selected_movies_paths,
+        selected_movies,
+        selected_movies_df,
+        selected_movies_ids,
+    )
 
 
 # Function to extract selected frames from videos

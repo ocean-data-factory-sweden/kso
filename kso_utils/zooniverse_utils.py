@@ -1290,6 +1290,49 @@ def populate_subjects(
 ##########################
 
 
+def check_movies_uploaded_zoo(project: Project, db_connection, movies_selected: list):
+    """
+    This function takes in a movie name and a dictionary containing the path to the database and returns
+    a boolean value indicating whether the movie has already been uploaded to Zooniverse
+
+    :param project: the project object
+    :param movies_selected: the name of the movie(s) you want to check
+    :type movies_selected: list
+    :param db_connection: SQL connection object
+    """
+    from kso_utils.db_utils import get_df_from_db_table
+
+    # Query info about the clip subjects uploaded to Zooniverse from the db
+    subjects_df = get_df_from_db_table(conn=db_connection, table_name="subjects")
+
+    # Select only columns of interest
+    subjects_df = subjects_df[
+        [
+            "id",
+            "subject_type",
+            "filename",
+            "clip_start_time",
+            "clip_end_time",
+            "movie_id",
+        ]
+    ]
+
+    # Select only clip subjects
+    subjects_df = subjects_df[subjects_df["subject_type"] == "clip"]
+
+    # Save the video filenames of the clips uploaded to Zooniverse
+    clips_uploaded = subjects_df[
+        subjects_df["filename"].apply(
+            lambda x: any(movie in x for movie in movies_selected)
+        )
+    ]
+
+    if clips_uploaded.empty:
+        logging.info(f"{movies_selected} has not been uploaded to Zooniverse yet")
+    else:
+        logging.info(f"{clips_uploaded} clips have already been uploaded.")
+
+
 # Func to expand seconds
 def expand_list(df: pd.DataFrame, list_column: str, new_column: str):
     """
@@ -2302,14 +2345,28 @@ def upload_frames_to_zooniverse(
             + created_on
         )
 
-    else:
-        sitename = upload_to_zoo["siteName"].unique()[0]
-        
+    elif project_name == "Spyfish_Aotearoa":
+        reserve = upload_to_zoo["!LinkToMarineReserve"].unique()[0]
+
         # Name the subject for frames from multiple sites/movies
         subject_set_name = (
             "frames_"
             + str(int(n_frames))
-            + "_"             
+            + "_"
+            + reserve
+            + "_"
+            + "_".join(species_list)
+            + datetime.date.today().strftime("_%d_%m_%Y")
+        )
+
+    else:
+        sitename = upload_to_zoo["siteName"].unique()[0]
+
+        # Name the subject for frames from multiple sites/movies
+        subject_set_name = (
+            "frames_"
+            + str(int(n_frames))
+            + "_"
             + sitename
             + "_"
             + "_".join(species_list)

@@ -109,16 +109,18 @@ def test_t3(zoo_user, zoo_pass):
     # Connect to zooniverse w/ Github credential
     pp.connect_zoo_project(zoo_cred=[zoo_user, zoo_pass])
     # Pre-selected test movie
-    pp.movies_selected = ["movie_1.mp4"]
-    pp.movies_paths = ["https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4"]
+    pp.selected_movies = ["movie_1.mp4"]
+    pp.selected_movies_paths = [
+        "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4"
+    ]
     # Check whether movie has been uploaded previously
-    pp.check_movies_uploaded(pp.movies_selected)
+    pp.check_movies_uploaded_zoo(pp.selected_movies)
     # Do not use GPU by default
     gpu_available = kso_widgets.gpu_select()
     # Generate a default number of clips for testing
     pp.generate_zoo_clips(
-        movies_selected=pp.movies_selected,
-        movies_paths=pp.movies_paths,
+        movies_selected=pp.selected_movies,
+        movies_paths=pp.selected_movies_paths,
         is_example=True,
         use_gpu=gpu_available.result,
         test=True,
@@ -170,7 +172,7 @@ def test_t4(zoo_user, zoo_pass):
 # """
 # ...
 # """
-def test_t5():    
+def test_t5():
     import kso_utils.yolo_utils as y_utils
     import kso_utils.server_utils as s_utils
 
