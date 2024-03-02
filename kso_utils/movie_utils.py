@@ -11,6 +11,10 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 from ultralytics.utils.downloads import is_url
+from urllib.request import pathname2url
+from urllib.parse import urlparse
+from IPython.display import HTML, display
+import ipywidgets as widgets
 
 # util imports
 from kso_utils.project_utils import Project
@@ -221,6 +225,41 @@ def retrieve_movie_info_from_server(
 
     return available_movies_df, no_available_movies_df, no_info_movies_df
 
+
+def preview_movie(
+    movie_path: str,
+    movie_metadata: pd.DataFrame,
+):
+    """
+    It takes a movie filename and its associated metadata and returns a widget object that can be displayed in the notebook
+
+    :param movie_path: the filename of the movie you want to preview
+    :param movie_metadata: the metadata of the movie you want to preview
+    :return: Widget object
+    """
+
+    # Adjust the width of the video and metadata sections based on your preference
+    video_width = "60%"  # Adjust as needed
+    metadata_width = "40%"  # Adjust as needed
+
+    if "http" in movie_path:
+        video_widget = widgets.Video.from_url(movie_path, width=video_width)
+    else:
+        video_widget = widgets.Video.from_file(movie_path, width=video_width)
+
+    metadata_html = movie_metadata.T.to_html()
+
+    metadata_widget = widgets.HTML(
+        value=metadata_html,
+        layout=widgets.Layout(width=metadata_width, overflow="auto"),
+    )
+
+    # Create a horizontal box layout to display video and metadata side by side
+    display_widget = widgets.HBox([video_widget, metadata_widget])
+
+    display(display_widget)
+
+    return display_widget
 
 def get_info_selected_movies(
     selected_movies: list,
