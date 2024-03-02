@@ -11,9 +11,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 from ultralytics.utils.downloads import is_url
-from urllib.request import pathname2url
-from urllib.parse import urlparse
-from IPython.display import HTML, display
+from IPython.display import display
 import ipywidgets as widgets
 
 # util imports
