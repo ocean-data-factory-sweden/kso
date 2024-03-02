@@ -319,11 +319,10 @@ def choose_footage(
 
             # Display the movie
             if preview_media:
-                clear_output()
-                display(select_movie_widg)
                 with movie_output:
-                    previews = []
-
+                    clear_output()
+                    previews = []                   
+                                        
                     # Display/preview each selected movie
                     for (
                         index,
