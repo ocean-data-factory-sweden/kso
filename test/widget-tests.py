@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 
-Single-widget test suite. 
+Single-widget test suite.
 
 """
-## Import Python packages
+# Import Python packages
 import os
 import sys
 
@@ -15,7 +15,6 @@ if "kso_utils" not in sys.modules:
     import kso_utils
 
 import kso_utils.widgets as kso_widgets
-import pytest
 import pandas as pd
 import kso_utils.project_utils as p_utils
 from kso_utils.project import ProjectProcessor, MLProjectProcessor

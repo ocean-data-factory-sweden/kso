@@ -1,24 +1,23 @@
 # -*- coding: utf-8 -*-
 """
 
-This auto-test does not test if everything displays what it should display. 
+This auto-test does not test if everything displays what it should display.
 It mainly tests if everything still runs without giving any errors.
 
 This collection of tests covers the following tutorial notebooks:
  - 1, 3, 4, 5, 6, 8
 
 All other tutorials are not tested automatically and care should be taken when
-making changes as these could break existing workflows. 
+making changes as these could break existing workflows.
 
 To run these tests manually, use pytest --disable-warnings test/notebook-tests.py
 
 """
 
 # --------------------The first 2 cells of every notebook-----------------------
-## Import Python packages
+# Import Python packages
 import os
 import sys
-import subprocess
 from pathlib import Path
 
 # Set environment variables
@@ -173,11 +172,10 @@ def test_t4(zoo_user, zoo_pass):
 # ...
 # """
 def test_t5():
-    import kso_utils.yolo_utils as y_utils
     import kso_utils.server_utils as s_utils
+    import kso_utils.widgets as kso_widgets
 
     # Generate current timestamp
-    import shutil
     from datetime import datetime
 
     dt = datetime.now()
@@ -209,7 +207,7 @@ def test_t5():
     assert len(list(Path(exp_path, "weights").glob("*"))) == 2
 
     # Model evaluation
-    conf_thres = widgets.choose_eval_params()
+    conf_thres = kso_widgets.choose_eval_params()
     # Evaluate YOLO Model on Unseen Test data
     mlp.eval_yolo(exp_name=exp_name, conf_thres=conf_thres.value)
 
@@ -234,9 +232,9 @@ def test_t5():
 
 def test_t6():
     import kso_utils.server_utils as s_utils
+    import kso_utils.widgets as kso_widgets
 
     # Generate current timestamp
-    import shutil
     from datetime import datetime
 
     dt = datetime.now()
@@ -244,7 +242,6 @@ def test_t6():
     # Create a unique experiment name
     exp_name = f"custom_{dt}".replace(" ", "_").replace(".", "_").replace(":", "-")
     project_path = str(Path(mlp.output_path, mlp.project_name))
-    exp_path = str(Path(project_path, exp_name))
 
     # Evaluation
     s_utils.get_ml_data(project, test=True)
@@ -253,7 +250,7 @@ def test_t6():
     artifact_dir = mlp.get_model(model, mlp.output_path)
     source = str(Path("../test/test_output", mlp.project.ml_folder, "images"))
     save_dir = project_path
-    conf_thres = widgets.choose_conf()
+    conf_thres = kso_widgets.choose_conf()
     mlp.detect_yolo(
         project=project_path,
         name=exp_name,
@@ -289,7 +286,7 @@ def test_t6():
 # #-------------Tutorial 7-------------------------------------------------------
 """
 This tutorial is still in a very early stage and mostly uses widgets directly from widgets.py and
-API functionality from Zenodo. Tests should be added in future as its capabilities expand. 
+API functionality from Zenodo. Tests should be added in future as its capabilities expand.
 """
 
 
