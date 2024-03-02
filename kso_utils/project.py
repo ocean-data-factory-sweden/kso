@@ -1,9 +1,7 @@
 # base imports
 import os
 import sys
-import re
 import logging
-import yaml
 import wandb
 import datetime
 import numpy as np
@@ -15,8 +13,7 @@ from itertools import chain
 from pathlib import Path
 import imagesize
 import ipysheet
-from IPython.display import display, clear_output, HTML
-from ipywidgets.widgets.interaction import interact
+from IPython.display import display, clear_output
 import mlflow
 
 # util imports
@@ -692,7 +689,7 @@ class ProjectProcessor:
                 if temp_clip_path.exists():
                     temp_clip_path.unlink()
 
-            logging.info(f"Clips temporarily stored locally has been removed")
+            logging.info("Clips temporarily stored locally has been removed")
 
         elif subject_type == "frame":
             upload_df = zoo_utils.set_zoo_frame_metadata(
@@ -1076,9 +1073,8 @@ class ProjectProcessor:
         )
         occurrence_df.to_csv(csv_filename, index=False)
 
-        logging.info(f"The occurences have been downloaded to {csv_filename}")    
+        logging.info(f"The occurences have been downloaded to {csv_filename}")
 
-    
     def process_detections(
         self,
         project,
@@ -1184,7 +1180,7 @@ class ProjectProcessor:
             transposed_df, df_to_merge, on=["movie_id", "second_in_movie"]
         )
 
-        ###### Sort columns into the expected order as specified by Leon
+        # Sort columns into the expected order as specified by Leon
         sp_list = df[sp_group_col].unique()
 
         # Separate columns with species_info and the rest
@@ -1256,7 +1252,7 @@ class MLProjectProcessor(ProjectProcessor):
         except OSError:
             pass
 
-        ## Set backend to MACOS to enable mp4 output
+        # Set backend to MACOS to enable mp4 output
         import platform
 
         # Define the fake system name
@@ -1567,15 +1563,22 @@ class MLProjectProcessor(ProjectProcessor):
             if active_run:
                 mlflow.end_run()
 
+            from mlflow.exceptions import MlflowException
+
             try:
                 experiment_id = mlflow.create_experiment(
                     self.project_name,
                 )
-            except:
-                current_experiment = dict(
-                    mlflow.get_experiment_by_name(self.project_name)
-                )
-                experiment_id = current_experiment["experiment_id"]
+            except MlflowException as e:
+                # Check if the experiment already exists
+                if "RESOURCE_ALREADY_EXISTS" in str(e):
+                    current_experiment = mlflow.get_experiment_by_name(
+                        self.project_name
+                    )
+                    experiment_id = current_experiment.experiment_id
+                else:
+                    # Handle other MlflowExceptions
+                    raise e
 
             mlflow.start_run(experiment_id=experiment_id, run_name=exp_name)
             mlflow.log_input(train_dataset, context="training")
@@ -1994,7 +1997,17 @@ class MLProjectProcessor(ProjectProcessor):
             try:
                 data_dict = read_yaml_file(self.data_path)
                 species_mapping = data_dict["names"]
-            except:
+            except FileNotFoundError:
+                # Handle the case when the file doesn't exist
+                logging.info(f"File not found: {self.data_path}")
+                species_mapping = {}
+            except KeyError:
+                # Handle the case when the "names" key is missing
+                logging.info("Key 'names' not found in the YAML file.")
+                species_mapping = {}
+            except Exception as e:
+                # Handle any other unexpected errors
+                logging.info(f"An unexpected error occurred: {e}")
                 species_mapping = {}
 
             self.modules["yolo_utils"].set_config(
@@ -2237,9 +2250,9 @@ class MLProjectProcessor(ProjectProcessor):
             best_run = self.run_history[0]
         else:
             self.download_project_runs()
-            try:
+            if self.run_history:
                 best_run = self.run_history[0]
-            except:
+            else:
                 best_run = None
         try:
             best_metric = best_run["metrics"][metric]

@@ -10,8 +10,6 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
-from urllib.request import pathname2url
-from IPython.display import HTML
 from ultralytics.utils.downloads import is_url
 
 # util imports
@@ -163,8 +161,6 @@ def retrieve_movie_info_from_server(
     movies_df = movies_df.rename(columns={"id": "movie_id"})
 
     if project.server == ServerType.SNIC:
-        # Find closest matching filename (may differ due to Swedish character encoding)
-        parsed_url = urllib.parse.urlparse(movies_df["fpath"].iloc[0])
 
         def get_match(string, string_options):
             normalized_string = unicodedata.normalize("NFC", string)
@@ -480,7 +476,7 @@ def standarise_movie_format(
     :type gpu_available: bool
     """
 
-    ##### Check movie format ######
+    # Check movie format ######
     ext = Path(movie_filename).suffix
 
     # Set video conversion to false as default
@@ -491,7 +487,7 @@ def standarise_movie_format(
         # Set conversion to True
         convert_video_T_F = True
 
-    ##### Check frame rate #######
+    # Check frame rate #######
     cap = cv2.VideoCapture(movie_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
 
@@ -502,7 +498,7 @@ def standarise_movie_format(
         # Set conversion to True
         convert_video_T_F = True
 
-    ##### Check codec info ########
+    # Check codec info ########
     def get_fourcc(cap: cv2.VideoCapture) -> str:
         """Return the 4-letter string of the codec of a video."""
         return (
@@ -513,15 +509,14 @@ def standarise_movie_format(
 
     codec = get_fourcc(cap)
 
-    if not codec in ["h264", "avc1"]:
+    if codec not in ["h264", "avc1"]:
         logging.info(
             f"The codecs of {movie_filename} are not supported (only h264 is supported)."
         )
         # Set conversion to True
         convert_video_T_F = True
 
-    ##### Check movie file #######
-    ##### (not needed in Spyfish) #####
+    #  Check movie file #######
     # Create a list of the project where movie compression is not needed
     project_no_compress = ["Spyfish_Aotearoa"]
 
@@ -770,7 +765,9 @@ def check_movies_meta(
 
             # Save the updated df locally
             df.to_csv(csv_paths["local_movies_csv"], index=False)
-            logging.info(f"The local movies.csv file has been updated")
+            logging.info(
+                f"The local movies.csv file {csv_paths['local_movies_csv']} has been updated"
+            )
 
             from kso_utils.server_utils import update_csv_server
 
@@ -800,9 +797,6 @@ def concatenate_local_movies(csv_paths):
 
     # Combine the path of the folder with the go_profiles inside the folder
     df["path_go_pros"] = df.apply(merge_paths, axis=1)
-
-    # Create an empty list to store the annotations
-    rows_list = []
 
     # Loop through each classification submitted by the users
     for index, row in tqdm(df.iterrows(), total=df.shape[0]):

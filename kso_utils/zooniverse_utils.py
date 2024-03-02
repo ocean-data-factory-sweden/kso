@@ -1,5 +1,3 @@
-## Zooniverse utils
-
 # base imports
 import io
 import re
@@ -29,7 +27,6 @@ import kso_utils.movie_utils as movie_utils
 import kso_utils.server_utils as server_utils
 
 # Widget imports
-from IPython.display import display
 import ipywidgets as widgets
 
 
@@ -55,15 +52,13 @@ class AuthenticationError(Exception):
 def connect_zoo_project(project: Project, zoo_cred=False):
     """
     It takes a project name as input, and returns a Zooniverse project object
-
     zoo_cred is an argument that can pass [username, password] to log in into zooniverse.
     This is used in the automatic tests in gitlab called autotests.py.
     when it is set to False, then the credentials are retrieved from the interacitve widget.
-
     :param project: the KSO project you are working
     :return: A Zooniverse project object.
     """
-    if zoo_cred == False:
+    if zoo_cred is False:
         # Save your Zooniverse user name and password.
         zoo_user, zoo_pass = zoo_credentials()
     else:
@@ -152,13 +147,17 @@ def retrieve_zoo_info(
                 export_df = pd.read_csv(
                     io.StringIO(export.content.decode("utf-8")), low_memory=False
                 )
-            except pd.errors.ParserError:
-                logging.error(
-                    "Export retrieval time out, please try again in 1 minute or so."
-                )
-                export_df = {}
-                return
-        except:
+            except pd.errors.ParserError as e:
+                # Handle the case where a ParserError occurs
+                logging.error("ParserError occurred while reading CSV data: %s", e)
+                # Optionally, provide a more specific error message or handle the error accordingly
+                export_df = None
+            except Exception as e:
+                # Handle other specific exceptions that may occur
+                logging.error("An error occurred while reading CSV data: %s", e)
+                # Optionally, provide a more specific error message or handle the error accordingly
+                export_df = None
+        except panoptes.PanoptesAPIException:
             logging.info(
                 "No connection with Zooniverse, retrieving template info from google drive."
             )
@@ -360,7 +359,7 @@ def get_workflow_labels(
 ##########################
 
 
-### Flatten the classifications provided the cit. scientists
+# Flatten the classifications provided the cit. scientists
 def process_zoo_classifications(
     project: Project,
     server_connection: dict,
@@ -402,7 +401,7 @@ def process_zoo_classifications(
     if not isinstance(selected_zoo_workflows, list):
         selected_zoo_workflows = literal_eval(selected_zoo_workflows)
 
-    ######Classifications selected##############
+    # Classifications selected##############
     # Select only classification from the workflows of interest
     classes_df = classifications_data[
         classifications_data["workflow_id"].isin(selected_zoo_workflows)
@@ -420,7 +419,7 @@ def process_zoo_classifications(
         f" from {number_of_unique_subjects:,} subjects"
     )
 
-    ########Subjects selected########################
+    # Subjects selected########################
     # Select only subjects from the workflows of interest
     subjects_series = subjects_df[
         subjects_df["subject_id"].isin(unique_subject_ids)
@@ -437,7 +436,7 @@ def process_zoo_classifications(
     else:
         logging.error("No subjects to populate database from the workflows selected.")
 
-    ########## Combine classifications and subject info#####
+    # Combine classifications and subject info#####
     # Combine the classifications and subjects dataframes
     classes_df = add_db_info_to_df(
         project,
@@ -448,7 +447,7 @@ def process_zoo_classifications(
         "id, subject_type, filename, clip_start_time, clip_end_time, frame_exp_sp_id, frame_number, subject_set_id, https_location, movie_id",
     )
 
-    ### Flatten the classifications provided the cit. scientists
+    # Flatten the classifications provided the cit. scientists
 
     # Create an empty list to store the annotations
     rows_list = []
@@ -516,7 +515,7 @@ def process_zoo_classifications(
                             rows_list.append(choice_i)
 
         else:
-            logging.error(f"The subject_type is not valid")
+            logging.error("The subject_type is not valid")
 
     # Specify the cols specific to each subject type
     if subject_type == "clip":
@@ -543,7 +542,7 @@ def process_zoo_classifications(
     # Ensure the subject type specific columns are numeric
     flat_annot_df[subject_cols] = flat_annot_df[subject_cols].astype("float64")
 
-    ### Combine the flatten the classifications with the subject information
+    # Combine the flatten the classifications with the subject information
 
     # Add subject information to each annotation
     annot_df = pd.merge(
@@ -1113,7 +1112,7 @@ def populate_subjects(
     # Rename columns to match the db format
     subjects = subjects.rename(columns=hash_columns)
 
-    ### Fix subject_type missing info and non-standard format
+    # Fix subject_type missing info and non-standard format
     # Fix weird bug where Subject_type is used instead of subject_type for the column name for some clips
     if "Subject_type" in subjects.columns and "subject_type" in subjects.columns:
         subjects["subject_type"] = subjects[["subject_type", "Subject_type"]].apply(
@@ -1207,7 +1206,7 @@ def populate_subjects(
     if "movie_id" not in subjects.columns:
         from kso_utils.db_utils import get_df_from_db_table
 
-        ##### Match site code to name from movies sql and get movie_id to save it as "movie_id"
+        # Match site code to name from movies sql and get movie_id to save it as "movie_id"
         # Query id and filenames from the movies table
         movies_df = get_df_from_db_table(db_connection, "movies")[["id", "filename"]]
 
@@ -1276,7 +1275,7 @@ def populate_subjects(
         num_fields=11,
     )
 
-    ##### log how many subjects are in the db
+    # log how many subjects are in the db
     # Query id and subject type from the subjects table
     subjects_df = get_df_from_db_table(db_connection, "subjects")
 
@@ -1331,6 +1330,7 @@ def check_movies_uploaded_zoo(project: Project, db_connection, movies_selected: 
         logging.info(f"{movies_selected} has not been uploaded to Zooniverse yet")
     else:
         logging.info(f"{clips_uploaded} clips have already been uploaded.")
+
 
 # Function to extract the videos
 def extract_clips(
@@ -1534,7 +1534,7 @@ def create_clips(
 
     # Add the list of starting seconds to the df
     movies_selected_df["list_clip_start"] = list_clip_start
-        
+
     # Use explode() to expand the list column
     clips_start_df = movies_selected_df.explode("list_clip_start")
 
@@ -1813,7 +1813,7 @@ def upload_clips_to_zooniverse(
     # Upload the clips to Zooniverse (with metadata)
     new_subjects = []
 
-    logging.info(f"Uploading subjects to Zooniverse")
+    logging.info("Uploading subjects to Zooniverse")
     for clip_path, metadata in tqdm(
         subject_metadata.items(), total=len(subject_metadata)
     ):
@@ -1836,7 +1836,7 @@ def upload_clips_to_zooniverse(
     # Upload all subjects
     subject_set.add(new_subjects)
 
-    logging.info(f"Subjects uploaded to Zooniverse")
+    logging.info("Subjects uploaded to Zooniverse")
 
 
 ##########################
@@ -1970,8 +1970,8 @@ def extract_frames_for_zoo(
         frames_folder = str(Path(folder_name, temp_frames_folder))
     else:
         frames_folder = temp_frames_folder
-        if hasattr(project, "output_path"):
-            mod_frames_folder = project.output_path + frames_folder
+    #         if hasattr(project, "output_path"):
+    #             mod_frames_folder = project.output_path + frames_folder
 
     # Extract the frames from the videos, store them in the temp location
     # and save the df with information about the frames in the projectprocessor
@@ -2043,7 +2043,7 @@ def check_frames_uploaded(
     species_df = species_df.rename(columns={"id": "frame_exp_sp_id"})
 
     # Reference the expected species on the uploaded subjects
-    subjects = pd.merge(
+    subjects_df = pd.merge(
         subjects_df,
         species_df,
         how="left",
@@ -2085,7 +2085,7 @@ def check_frames_uploaded(
 
         # Exclude frames that have already been uploaded
         # trunk-ignore(flake8/E712)
-        frames_df = frames_df[merge_df == False]
+        frames_df = frames_df[~merge_df]
         if len(frames_df) == 0:
             logging.error("All of the frames you have selected are already uploaded.")
         else:
@@ -2148,7 +2148,7 @@ def modify_frames(
             # Recursively add permissions to folders created
             [os.chmod(root, 0o777) for root, _, _ in os.walk(mod_frames_folder)]
 
-        #### Modify the clips###
+        # Modify the clips###
         # Read each clip and modify them (showing a progress bar)
         for index, row in tqdm(
             frames_to_upload_df.iterrows(), total=frames_to_upload_df.shape[0]

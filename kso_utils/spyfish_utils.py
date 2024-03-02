@@ -6,8 +6,6 @@ from pathlib import Path
 
 from kso_utils.server_utils import get_matching_s3_keys, download_object_from_s3
 
-
-
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
@@ -69,7 +67,7 @@ def process_spyfish_subjects(
 
     # Merge columns and drop redundant ones
     if "Subject_type" in subjects.columns:
-        if not "subject_type" in subjects.columns:
+        if "subject_type" not in subjects.columns:
             subjects.rename(columns={"Subject_type": "subject_type"}, inplace=True)
 
         else:

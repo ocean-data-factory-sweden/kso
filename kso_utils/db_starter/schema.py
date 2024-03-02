@@ -33,7 +33,7 @@ PhotoPosition int NULL,
 siteName text NULL,
 SurveyID int NULL,
 UNIQUE (filename)
-); 
+);
 
 CREATE TABLE IF NOT EXISTS subjects
 (

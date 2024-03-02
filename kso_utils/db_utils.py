@@ -394,8 +394,7 @@ def process_test_csv(
     # Rename id columns using the dictionary
     local_df = local_df.rename(columns=id_lookup)
 
-    ##################
-    ##Roadblock to ensure cols match schema
+    # Roadblock to ensure cols match schema
     ##################
     # Get the "standard" schema column names of the table of interest
     col_names_dic = get_column_names_db(conn, init_key)

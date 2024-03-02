@@ -1,12 +1,10 @@
 # base imports
 import os
-import pandas as pd
 import getpass
 import gdown
 import zipfile
 import boto3
 import logging
-import sys
 from tqdm import tqdm
 from pathlib import Path
 
@@ -451,9 +449,9 @@ def delete_file_from_s3(client: boto3.client, *, bucket: str, key: str):
     client.delete_object(Bucket=bucket, Key=key)
 
 
-###################################
-########Google Drive functions#####
-###################################
+#####################
+# ## Google Drive functions ###
+# ####################
 
 
 def download_gdrive(gdrive_id: str, folder_name: str, fix_encoding: bool = True):

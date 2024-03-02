@@ -20,7 +20,7 @@ from ipywidgets import interactive, Layout
 from folium.plugins import MiniMap
 from pathlib import Path
 import asyncio
-from PIL import Image as PILImage, ImageDraw
+from PIL import Image as PILImage
 
 # util imports
 from kso_utils.video_reader import VideoReader
@@ -31,9 +31,9 @@ import kso_utils.movie_utils as movie_utils
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-######################################################################
-############Functions for interactive widgets#########################
-######################################################################
+######################################
+# ###### Functions for interactive widgets ###########
+# #####################################
 
 
 # Function to update widget based on user interaction (eg. click)
@@ -61,9 +61,9 @@ def single_wait_for_change(widget, value):
     return future
 
 
-######################################################################
-#####################Common widgets###################################
-######################################################################
+######################################
+# ###### Common widgets ###########
+# #####################################
 
 
 def choose_species(db_connection, species_list=None):
@@ -357,10 +357,7 @@ def choose_footage(
             selected_folder = select_movie_widg.selected
 
             if selected_folder is not None:
-                # Save the selected folder
-                movies_selected = selected_folder
                 print(f"Selected folder: {selected_folder}")
-
             else:
                 print("No folder selected")
 
@@ -379,9 +376,9 @@ def choose_footage(
     return select_movie_widg
 
 
-######################################################################
-###################Common ZOO widgets#################################
-######################################################################
+######################################
+# ###### Common ZOO widgets ###########
+# #####################################
 
 
 def request_latest_zoo_info():
@@ -653,9 +650,9 @@ def choose_workflows(workflows_df: pd.DataFrame):
     return workflow_name, subj_type, workflow_version
 
 
-######################################################################
-#####################Tutorial 1 widgets###############################
-######################################################################
+######################################
+# ###### TUT 1 widgets ###########
+# #####################################
 
 
 def map_sites(project: Project, csv_paths: dict):
@@ -991,7 +988,7 @@ def update_meta(
             df_orig.reset_index(drop=False, inplace=True)
 
             # Process the csv of interest and tests for compatibility with sql table
-            df_to_db = process_test_csv(
+            process_test_csv(
                 conn=conn, project=project, local_df=df_orig, init_key=meta_name
             )
 
@@ -1067,9 +1064,9 @@ def open_csv(
     return df_filtered, sheet
 
 
-######################################################################
-#####################Tutorial 2 widgets###############################
-######################################################################
+######################################
+# ###### Tut 2 widgets ###########
+# #####################################
 
 
 def choose_new_videos_to_upload():
@@ -1123,9 +1120,9 @@ def choose_new_videos_to_upload():
     return movie_list
 
 
-######################################################################
-#####################Tutorial 3 widgets###############################
-######################################################################
+######################################
+# ###### Tut 3 widgets ###########
+# #####################################
 
 
 # Display the number of clips to generate based on the user's selection
@@ -1346,9 +1343,9 @@ def compare_clips(example_clips: list, modified_clips: list):
     clip_path_widget.observe(on_change, names="value")
 
 
-######################################################################
-#####################Tutorial 4 widgets###############################
-######################################################################
+######################################
+# ###### Tut 4 widgets ###########
+# #####################################
 
 
 def extract_custom_frames(
@@ -1522,9 +1519,9 @@ def compare_frames(df):
     clip_path_widget.observe(on_change, names="value")
 
 
-######################################################################
-#####################Tutorial 5 widgets###############################
-######################################################################
+######################################
+# ###### Tut 5 widgets ###########
+# #####################################
 
 
 def choose_train_params(model_type: str):
@@ -1620,6 +1617,7 @@ def choose_entity():
     )
     display(entity)
     return entity
+
 
 def choose_conf():
     w = widgets.FloatSlider(
@@ -1736,7 +1734,7 @@ def format_to_gbif(
 
     # If classifications have been created by citizen scientists
     if classified_by == "citizen_scientists":
-        #### Retrieve species/labels information #####
+        # Retrieve species/labels information #####
         # Create a df with unique workflow ids and versions of interest
         work_df = (
             df[["workflow_id", "workflow_version"]].drop_duplicates().astype("int")
@@ -1890,9 +1888,9 @@ def format_to_gbif(
         )
 
 
-######################################################################
-#####################Tutorial 8 widgets###############################
-######################################################################
+######################################
+# ###### Tut 8 widgets ###########
+# #####################################
 
 
 def view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
@@ -1953,15 +1951,20 @@ def view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
             with open("test.txt", "w") as temp_file:
                 temp_file.write("Testing write access.")
             temp_image_path = "temp.jpg"
-        except:
-            # Specify volume allocated by SNIC
+
+        except Exception as e:
+            # Handle the case when file creation fails
+            logging.error(f"Failed to create temporary file: {e}")
+
+            # Specify volume allocated by SNIC if available
             if Path("/mimer").exists():
                 snic_tmp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir"
-            elif Path("/tmp").exists() and not Path("/mimer").exists():
+            elif Path("/tmp").exists():
                 snic_tmp_path = "/tmp"
             else:
                 logging.error("No suitable writable path found.")
                 return
+
             temp_image_path = str(Path(snic_tmp_path, "temp.jpg"))
 
         finally:

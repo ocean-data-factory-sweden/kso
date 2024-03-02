@@ -29,6 +29,7 @@ from tqdm import tqdm
 from pathlib import Path
 from collections.abc import Callable
 from natsort import index_natsorted
+from IPython import get_ipython
 
 # util imports
 from kso_utils.project_utils import Project
@@ -214,7 +215,7 @@ def prepare(data_path, percentage_test, out_path):
     latest_movie = ""
     for pathAndFilename in Path(dataset_path).rglob("*.jpg"):
         file_path = Path(pathAndFilename)
-        title, ext = file_path.name, file_path.suffix
+        title, _ = file_path.name, file_path.suffix
         movie_name = title.replace("_frame_*", "", regex=True)
 
         if counter == index_test + 1:
@@ -276,7 +277,7 @@ def split_frames(data_path: str, perc_test: float):
     latest_movie = ""
     for pathAndFilename in list(images_path.rglob("*.jpg")):
         file_path = Path(pathAndFilename)
-        title, ext = file_path.name, file_path.suffix
+        title, _ = file_path.name, file_path.suffix
         movie_name = title.replace("_frame_*", "")
 
         if counter >= index_test + 1:
@@ -731,10 +732,17 @@ def frame_aggregation(
 
             if link_bool:
                 try:
-                    s1, s2 = PIL.Image.open(
-                        requests.get(filename, stream=True).raw
-                    ).size
-                except:
+                    # Attempt to open the image and get its size
+                    response = requests.get(filename, stream=True)
+                    if response.status_code == 200:
+                        image = PIL.Image.open(response.raw)
+                        s1, s2 = image.size
+                    else:
+                        # If the request was unsuccessful, use the fallback size
+                        s1, s2 = img_size
+                except (IOError, PIL.UnidentifiedImageError) as e:
+                    # Handle specific exceptions for image loading failures
+                    logging.error(f"Failed to load image: {e}")
                     s1, s2 = img_size
             else:
                 s1, s2 = PIL.Image.open(filename).size
@@ -750,7 +758,7 @@ def frame_aggregation(
                     + box
                 )
 
-    ### Final export step
+    # Final export step
     if movie_bool:
         # Export full rows
         full_rows = pd.DataFrame(
@@ -803,12 +811,12 @@ def frame_aggregation(
     ):
         if movie_bool:
             file_path = Path(name[1])
-            file, ext = file_path.stem, file_path.suffix
+            file, _ = file_path.stem, file_path.suffix
             file_out = Path(out_path, "labels", f"{file}_frame_{name[0]}.txt")
             img_out = Path(out_path, "images", f"{file}_frame_{name[0]}.jpg")
         else:
             file_path = Path(name)
-            file, ext = file_path.stem, file_path.suffix
+            file, _ = file_path.stem, file_path.suffix
             file_out = Path(out_path, "labels", f"{file}.txt")
             img_out = Path(out_path, "images", f"{file}.jpg")
 
@@ -1799,19 +1807,25 @@ def adjust_tracking(
     import torch
 
     try:
-        model = torch.load(
-            Path(
-                [
-                    f
-                    for f in Path(tracking_folder).parent.iterdir()
-                    if f.is_file() and "best.pt" in str(f)
-                ][-1]
-            )
-        )
-        names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
+        # Find the latest model file named "best.pt" in the directory
+        model_files = [
+            f
+            for f in Path(tracking_folder).parent.iterdir()
+            if f.is_file() and "best.pt" in str(f)
+        ]
+        if model_files:
+            latest_model_file = sorted(model_files)[-1]
+            model = torch.load(latest_model_file)
+            names = {
+                i: model["model"].names[i] for i in range(len(model["model"].names))
+            }
+        else:
+            raise FileNotFoundError("No model file found")
 
-    except:
-        logging.error("Model not found, using class_id.")
+    except (FileNotFoundError, IndexError) as e:
+        # Handle specific exceptions for file not found or index errors
+        logging.error(f"Error loading model: {e}")
+        logging.error("Using class_id.")
         names = {}
 
     if plot_result:
@@ -1904,12 +1918,19 @@ def get_species_mapping(model, project_name, team_name="koster"):
 
     # Read species mapping into data dictionary
     try:
+        # Attempt to directly read species mapping from the configuration
         data_dict = run.rawconfig["data_dict"]
         species_mapping = data_dict["names"]
-    except:
-        data_dict = read_yaml_file(run.rawconfig["data"])
-        species_mapping = data_dict["names"]
-        species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
+    except KeyError:
+        try:
+            # Attempt to read species mapping from a YAML file specified in the configuration
+            data_dict = read_yaml_file(run.rawconfig["data"])
+            species_mapping = data_dict["names"]
+            species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
+        except (FileNotFoundError, KeyError):
+            # Handle the case where species mapping cannot be found in either location
+            logging.error("Error reading species mapping from config or file.")
+            species_mapping = {}
 
     return species_mapping
 
@@ -2087,7 +2108,7 @@ def plot_processed_detections(
 
     """
 
-    if not "second_in_movie" in df.columns:
+    if "second_in_movie" not in df.columns:
         logging.error("Aggregation plot not currently supported on this film.")
 
     # Convert 'second_in_movie' to seconds since 0 (e.g. the start of the movie)
@@ -2112,9 +2133,14 @@ def plot_processed_detections(
 
     # Enable plotting of matplotlib
     try:
+        # Enable inline plotting for Matplotlib
         get_ipython().magic("matplotlib inline")
-    except:
+    except ImportError:
+        # Handle the case where IPython is not available
         pass
+    except Exception as e:
+        # Handle other specific exceptions that may occur
+        print(f"Error occurred while enabling inline plotting: {e}")
 
     import matplotlib.pyplot as plt
 

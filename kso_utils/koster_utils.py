@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
 # base imports
-import sys
 import logging
 import sqlite3
 import ftfy
 import pandas as pd
-import numpy as np
 from pathlib import Path
-
-# util imports
-from kso_utils.project_utils import Project
 
 # Logging
 logging.basicConfig()
@@ -234,19 +229,16 @@ def process_koster_subjects(subjects: pd.DataFrame, conn: sqlite3.Connection):
     :return: A dataframe with all the subjects that have been uploaded to the database.
     """
 
-    ## Set the date when the metadata of subjects uploaded matches/doesn't match schema.py requirements
+    # Set the date when the metadata of subjects uploaded matches/doesn't match schema.py requirements
     # Specify the date when the metadata of subjects uploaded matches schema.py
     auto_date = "2020-05-29 00:00:00 UTC"
 
     # Specify the starting date when clips were manually uploaded
     manual_date = "2019-11-17 00:00:00 UTC"
 
-    ## Update subjects automatically uploaded
-
     # Select automatically uploaded subjects
     auto_subjects_df = auto_subjects(subjects, auto_date=auto_date)
 
-    ## Update subjects manually uploaded
     # Select manually uploaded subjects
     manual_subjects_df = manual_subjects(
         subjects, manual_date=manual_date, auto_date=auto_date
