@@ -261,6 +261,7 @@ def preview_movie(
 
     return display_widget
 
+
 def get_info_selected_movies(
     selected_movies: list,
     footage_source: str,

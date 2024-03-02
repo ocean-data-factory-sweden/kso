@@ -2165,6 +2165,7 @@ def choose_eval_params():
     display(z1)
     return z1
 
+
 def movie_viewer():
     def check_movie(change):
         filepath = file_chooser.selected

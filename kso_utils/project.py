@@ -1263,7 +1263,7 @@ class MLProjectProcessor(ProjectProcessor):
 
         # Replace cv2.VideoWriter with the patched version
         cv2.VideoWriter = CustomVideoWriter
-        
+
         self.modules = g_utils.import_modules([])
         self.modules.update(g_utils.import_modules(["yolo_utils"], utils=True))
         self.modules.update(
