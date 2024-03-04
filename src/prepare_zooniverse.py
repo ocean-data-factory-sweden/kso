@@ -391,9 +391,11 @@ def frame_aggregation(
                         "\n".join(
                             [
                                 "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
-                                    0
-                                    if len(class_list) == 1
-                                    else sp_id2mod_id[i[speciesid_pos]],
+                                    (
+                                        0
+                                        if len(class_list) == 1
+                                        else sp_id2mod_id[i[speciesid_pos]]
+                                    ),
                                     min((i[x_pos] + i[w_pos] / 2) / i[fw_pos], 1.0),
                                     min((i[y_pos] + i[h_pos] / 2) / i[fh_pos], 1.0),
                                     min(i[w_pos] / i[fw_pos], 1.0),
