@@ -472,9 +472,11 @@ def frame_aggregation(
             # Allow for both cases where commonName or scientificName was used for annotation
             try:
                 train_rows["species_id"] = train_rows["label"].apply(
-                    lambda x: species_df[species_df.commonName == x].id.values[0]
-                    if x != "empty"
-                    else "empty",
+                    lambda x: (
+                        species_df[species_df.commonName == x].id.values[0]
+                        if x != "empty"
+                        else "empty"
+                    ),
                     1,
                 )
                 species_df["clean_label"] = species_df.commonName.apply(
@@ -831,11 +833,11 @@ def frame_aggregation(
                     "\n".join(
                         [
                             "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
-                                0
-                                if len(class_list) == 1
-                                else sp_id2mod_id[
-                                    i[speciesid_pos]
-                                ],  # single class vs multiple classes
+                                (
+                                    0
+                                    if len(class_list) == 1
+                                    else sp_id2mod_id[i[speciesid_pos]]
+                                ),  # single class vs multiple classes
                                 min((i[x_pos] + i[w_pos] / 2) / i[fw_pos], 1.0),
                                 min((i[y_pos] + i[h_pos] / 2) / i[fh_pos], 1.0),
                                 min(i[w_pos] / i[fw_pos], 1.0),

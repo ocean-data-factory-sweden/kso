@@ -504,9 +504,9 @@ def process_zoo_classifications(
                                 "y": int(i["y"]) if "y" in i else None,
                                 "w": int(i["width"]) if "width" in i else None,
                                 "h": int(i["height"]) if "height" in i else None,
-                                "label": str(i["tool_label"])
-                                if "tool_label" in i
-                                else None,
+                                "label": (
+                                    str(i["tool_label"]) if "tool_label" in i else None
+                                ),
                             }
                             rows_list.append(choice_i)
 
@@ -1179,9 +1179,11 @@ def populate_subjects(
         ] = subjects[
             subjects["subject_type"].isna()
         ]["https_location"].apply(
-            lambda url: "clip"
-            if any(url.endswith(ext) for ext in get_movie_extensions())
-            else "frame"
+            lambda url: (
+                "clip"
+                if any(url.endswith(ext) for ext in get_movie_extensions())
+                else "frame"
+            )
         )
         logging.info(
             f"Updated {num_updated_empty} empty rows with subject_type based on extension."

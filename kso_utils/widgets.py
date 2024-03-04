@@ -362,9 +362,11 @@ def choose_footage(
                 print("No folder selected")
 
         select_movie_widg = choose_folder(
-            start_path=project.movie_folder
-            if project.movie_folder not in [None, "None"]
-            else ".",
+            start_path=(
+                project.movie_folder
+                if project.movie_folder not in [None, "None"]
+                else "."
+            ),
             folder_type="new footage",
         )
 
