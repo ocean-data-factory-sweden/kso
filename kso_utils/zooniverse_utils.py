@@ -1,5 +1,3 @@
-## Zooniverse utils
-
 # base imports
 import io
 import re
@@ -8,6 +6,7 @@ import getpass
 import pandas as pd
 import json
 import logging
+import math
 import numpy as np
 import gdown
 import datetime
@@ -26,10 +25,8 @@ from kso_utils.db_utils import add_db_info_to_df
 import kso_utils.db_utils as db_utils
 import kso_utils.movie_utils as movie_utils
 import kso_utils.server_utils as server_utils
-from kso_utils.tutorials_utils import WidgetMaker
 
 # Widget imports
-from IPython.display import display
 import ipywidgets as widgets
 
 
@@ -55,15 +52,13 @@ class AuthenticationError(Exception):
 def connect_zoo_project(project: Project, zoo_cred=False):
     """
     It takes a project name as input, and returns a Zooniverse project object
-
     zoo_cred is an argument that can pass [username, password] to log in into zooniverse.
     This is used in the automatic tests in gitlab called autotests.py.
     when it is set to False, then the credentials are retrieved from the interacitve widget.
-
     :param project: the KSO project you are working
     :return: A Zooniverse project object.
     """
-    if zoo_cred == False:
+    if zoo_cred is False:
         # Save your Zooniverse user name and password.
         zoo_user, zoo_pass = zoo_credentials()
     else:
@@ -152,13 +147,13 @@ def retrieve_zoo_info(
                 export_df = pd.read_csv(
                     io.StringIO(export.content.decode("utf-8")), low_memory=False
                 )
-            except pd.errors.ParserError:
-                logging.error(
-                    "Export retrieval time out, please try again in 1 minute or so."
-                )
-                export_df = {}
-                return
-        except:
+            except pd.errors.ParserError as e:
+                # Handle the case where a ParserError occurs
+                logging.error(f"ParserError occurred while reading CSV data: %s {e}")
+                # Optionally, provide a more specific error message or handle the error accordingly
+                export_df = None
+
+        except AttributeError:
             logging.info(
                 "No connection with Zooniverse, retrieving template info from google drive."
             )
@@ -172,20 +167,11 @@ def retrieve_zoo_info(
             export_df = pd.read_csv(export)
 
         if len(export_df) > 0:
-            # If KSO deal with duplicated subjects
-            if project.Project_name == "Koster_Seafloor_Obs":
-                from kso_utils.koster_utils import (
-                    clean_duplicated_subjects,
-                    combine_annot_from_duplicates,
-                )
-
-                # Clear duplicated subjects
-                if info_n == "subjects":
-                    export_df = clean_duplicated_subjects(export_df, project)
-
-                # Combine classifications from duplicated subjects to unique subject id
-                if info_n == "classifications":
-                    export_df = combine_annot_from_duplicates(export_df, project)
+            # Clear duplicated subjects
+            if info_n == "subjects":
+                # Select info from each unique subject to avoid loading subject info
+                # multiple times (because the subject has been classified in multiple workflows)
+                export_df = export_df.drop_duplicates(subset="subject_id", keep="first")
 
         else:
             raise ValueError(
@@ -196,12 +182,6 @@ def retrieve_zoo_info(
         # Ensure subject_ids and workflow_ids match db format
         if info_n == "classifications":
             export_df["subject_ids"] = export_df["subject_ids"].astype(np.int64)
-
-        if info_n == "subjects":
-            # Ensure workflow_id is stored as an integer
-            export_df["workflow_id"] = (
-                export_df["workflow_id"].fillna(0).astype(np.int64)
-            )
 
         # Add df to dictionary
         info_df[info_n] = export_df
@@ -374,56 +354,96 @@ def get_workflow_labels(
 # Classification-specific functions
 ##########################
 
-### Flatten the classifications provided the cit. scientists
 
-
+# Flatten the classifications provided the cit. scientists
 def process_zoo_classifications(
     project: Project,
+    server_connection: dict,
     db_connection,
+    workflow_widget_checks,
+    workflows_df: pd.DataFrame,
+    subjects_df: pd.DataFrame,
     csv_paths: dict,
     classifications_data: pd.DataFrame,
     subject_type: str,
-    selected_zoo_workflows: list,
 ):
     """
-    This function takes in a dataframe of classifications and returns a dataframe of annotations.
+    This function select subjects from the workflows of interest, populates the sql subjects table, process the classifications received and returns a dataframe of annotations.
 
     :param project: the project object
+    :param server_connection: A dictionary with the client and sftp_client
     :param db_connection: SQL connection object
+    :param workflow_widget_checks: the widget with information of the selected workflows
+    :param workflows_df: dataframe with the project workflows information (retrieved from Zooniverse)
+    :param subjects_df: dataframe with the project subjects information (retrieved from Zooniverse)
     :param csv_paths: a dictionary with the paths of the csvs used to initiate the db
     :param classifications_data: the dataframe of classifications from the Zooniverse API
     :param subject_type: This is the type of subject you want to retrieve classifications for. This
            can be either "clip" or "frame"
     """
 
-    ### Make sure all the classifications have existing subjects
+    # Store the names of the workflows and their versions
+    workflow_names, workflow_versions = [], []
+    for i in range(0, len(workflow_widget_checks), 3):
+        workflow_names.append(list(workflow_widget_checks.values())[i])
+        workflow_versions.append(list(workflow_widget_checks.values())[i + 2])
+
+    # Get the ids of the workflows of interest
+    selected_zoo_workflows = [
+        workflows_df[workflows_df.display_name == wf_name].workflow_id.unique()[0]
+        for wf_name in workflow_names
+    ]
+
+    if not isinstance(selected_zoo_workflows, list):
+        selected_zoo_workflows = literal_eval(selected_zoo_workflows)
+
+    # Classifications selected##############
+    # Select only classification from the workflows of interest
+    classes_df = classifications_data[
+        classifications_data["workflow_id"].isin(selected_zoo_workflows)
+    ].copy()
+
+    # Get the unique subject IDs from the classes DataFrame
+    unique_subject_ids = classes_df["subject_ids"].unique()
+
+    # Count the number of unique subject IDs
+    number_of_unique_subjects = len(unique_subject_ids)
+
+    # Report the number of classifications retrieved
+    logging.info(
+        f"{classes_df.shape[0]:,} Zooniverse classifications have been retrieved"
+        f" from {number_of_unique_subjects:,} subjects"
+    )
+
+    # Subjects selected########################
+    # Select only subjects from the workflows of interest
+    subjects_series = subjects_df[
+        subjects_df["subject_id"].isin(unique_subject_ids)
+    ].copy()
+
+    from kso_utils.db_utils import drop_table
+
+    # Safely remove subjects table
+    drop_table(conn=db_connection, table_name="subjects")
+
+    if len(subjects_series) > 0:
+        # Fill or re-fill subjects table
+        populate_subjects(project, server_connection, db_connection, subjects_series)
+    else:
+        logging.error("No subjects to populate database from the workflows selected.")
+
+    # Combine classifications and subject info#####
     # Combine the classifications and subjects dataframes
     classes_df = add_db_info_to_df(
         project,
         db_connection,
         csv_paths,
-        classifications_data,
+        classes_df,
         "subjects",
-        "id, subject_type, filename, clip_start_time, clip_end_time, frame_exp_sp_id, frame_number, subject_set_id, classifications_count, retired_at, retirement_reason, https_location, movie_id",
+        "id, subject_type, filename, clip_start_time, clip_end_time, frame_exp_sp_id, frame_number, subject_set_id, https_location, movie_id",
     )
 
-    # Exclude classifications with missing subjects
-    # (often leaving only classifications from the
-    # workflow of interest)
-    classes_df = classes_df.dropna(subset=["subject_type"], how="any").reset_index(
-        drop=True
-    )
-
-    # Select only classification from the workflows of interest
-    classes_df = classes_df[classes_df.workflow_id.isin(selected_zoo_workflows)].copy()
-
-    # Report the number of classifications retrieved
-    logging.info(
-        f"{classes_df.shape[0]:,} Zooniverse classifications have been retrieved"
-        f" from {classes_df.subject_ids.nunique():,} subjects"
-    )
-
-    ### Flatten the classifications provided the cit. scientists
+    # Flatten the classifications provided the cit. scientists
 
     # Create an empty list to store the annotations
     rows_list = []
@@ -484,14 +504,14 @@ def process_zoo_classifications(
                                 "y": int(i["y"]) if "y" in i else None,
                                 "w": int(i["width"]) if "width" in i else None,
                                 "h": int(i["height"]) if "height" in i else None,
-                                "label": str(i["tool_label"])
-                                if "tool_label" in i
-                                else None,
+                                "label": (
+                                    str(i["tool_label"]) if "tool_label" in i else None
+                                ),
                             }
                             rows_list.append(choice_i)
 
         else:
-            logging.error(f"The subject_type is not valid")
+            logging.error("The subject_type is not valid")
 
     # Specify the cols specific to each subject type
     if subject_type == "clip":
@@ -518,7 +538,7 @@ def process_zoo_classifications(
     # Ensure the subject type specific columns are numeric
     flat_annot_df[subject_cols] = flat_annot_df[subject_cols].astype("float64")
 
-    ### Combine the flatten the classifications with the subject information
+    # Combine the flatten the classifications with the subject information
 
     # Add subject information to each annotation
     annot_df = pd.merge(
@@ -544,9 +564,6 @@ def process_zoo_classifications(
             "frame_exp_sp_id",
             "frame_number",
             "movie_id",
-            "classifications_count",
-            "retired_at",
-            "retirement_reason",
         ]
     )
 
@@ -901,6 +918,22 @@ def add_subject_site_movie_info_to_class(
     return class_df
 
 
+def launch_classifications_table(agg_class_df: pd.DataFrame, subject_type: str):
+    """
+    It takes in a dataframe of aggregated classifications and a subject type, and returns a dataframe
+    with the columns "subject_ids", "label", "how_many", and "first_seen"
+
+    :param agg_class_df: the dataframe that you want to launch
+    :param subject_type: "clip" or "subject"
+    """
+    if subject_type == "clip":
+        a = agg_class_df[["subject_ids", "label", "how_many", "first_seen"]]
+    else:
+        a = agg_class_df
+
+    return a
+
+
 ##########################
 # Subject-specific functions
 ##########################
@@ -1038,60 +1071,32 @@ def populate_subjects(
     Populate the subjects table with the subject metadata
     :param project: the project object
     :param server_connection: A dictionary with the client and sftp_client
-    :param subjects: the subjects dataframe
+    :param subjects: a dataframe of the subset of subjects from the workflows of interest
     :param db_connection: SQL connection object
 
     """
 
     # Check if the Zooniverse project is the KSO
-    if not project.Project_name == "Koster_Seafloor_Obs":
+    if project.Project_name == "Koster_Seafloor_Obs":
+        from kso_utils.koster_utils import process_koster_subjects
+
+        subjects = process_koster_subjects(subjects, db_connection)
+
+    else:
         # Extract metadata from uploaded subjects
         subjects_df, subjects_meta = extract_metadata(subjects)
 
         # Combine metadata info with the subjects df
         subjects = pd.concat([subjects_df, subjects_meta], axis=1)
 
-    else:
-        from kso_utils.koster_utils import process_koster_subjects
+        # Check if the Zooniverse project is the Spyfish
+        if project.Project_name == "Spyfish_Aotearoa":
+            from kso_utils.spyfish_utils import process_spyfish_subjects
 
-        subjects = process_koster_subjects(subjects, db_connection)
-        # Fix weird bug where Subject_type is used instead of subject_type for the column name for some clips
-    #     if "Subject_type" in subjects.columns:
-    #         subjects["subject_type"] = subjects[
-    #             ["subject_type", "Subject_type"]
-    #         ].apply(lambda x: x[1] if isinstance(x[1], str) else x[0], 1)
-    #         subjects.drop(columns=["Subject_type"], inplace=True)
-
-    #     # Create columns to match schema if they don't exist
-    #     missing_cols = ["upl_seconds","#VideoFilename","#frame_number","#clip_length","movie_id"]
-    #     for i in missing_cols:
-    #         subjects[i] = subjects.get(i, np.nan)
-
-    #     # Add a subject type if it is missing
-    #     subjects["subject_type"] = subjects[["clip_start_time", "subject_type"]].apply(
-    #         lambda x: "frame" if np.isnan(x[0]) else "clip", 1
-    #     )
-    #     # Remove clip subjects with no clip_start_time info (from different projects)
-    #     subjects = subjects[
-    #         ~(
-    #             (subjects["subject_type"] == "clip")
-    #             & (subjects["clip_start_time"].isna())
-    #         )
-    #     ]
-    #     # Fix subjects where clip_start_time is not provided but upl_seconds is
-    #     if "clip_start_time" in subjects.columns and "upl_seconds" in subjects.columns:
-    #         subjects["clip_start_time"] = subjects[
-    #             ["clip_start_time", "upl_seconds"]
-    #         ].apply(lambda x: x[0] if not np.isnan(x[0]) else x[1], 1)
-
-    # Check if the Zooniverse project is the Spyfish
-    if project.Project_name == "Spyfish_Aotearoa":
-        from kso_utils.spyfish_utils import process_spyfish_subjects
-
-        # Process the spyfish movies
-        subjects = process_spyfish_subjects(
-            project, server_connection, subjects, db_connection
-        )
+            # Process the spyfish movies
+            subjects = process_spyfish_subjects(
+                project, server_connection, subjects, db_connection
+            )
 
     # Ensure that subject_ids are not duplicated by workflow
     subjects = subjects.drop_duplicates(subset="subject_id")
@@ -1102,6 +1107,7 @@ def populate_subjects(
     # Rename columns to match the db format
     subjects = subjects.rename(columns=hash_columns)
 
+    # Fix subject_type missing info and non-standard format
     # Fix weird bug where Subject_type is used instead of subject_type for the column name for some clips
     if "Subject_type" in subjects.columns and "subject_type" in subjects.columns:
         subjects["subject_type"] = subjects[["subject_type", "Subject_type"]].apply(
@@ -1134,22 +1140,56 @@ def populate_subjects(
     # Rename columns to match the db format
     subjects = subjects.rename(columns=rename_cols)
 
-    if "movie_id" not in subjects.columns:
-        from kso_utils.db_utils import get_df_from_db_table
+    if hasattr(subjects["subject_type"], "columns"):
+        # Avoid having two subject_type columns (one from Zoo one from the db)
+        subjects["subject_type0"] = subjects["subject_type"].iloc[:, 0]
+        subjects["subject_type1"] = subjects["subject_type"].iloc[:, 1]
 
-        ##### Match site code to name from movies sql and get movie_id to save it as "movie_id"
-        # Query id and filenames from the movies table
-        movies_df = get_df_from_db_table(db_connection, "movies")[["id", "filename"]]
+        # Update with non-empty values
+        subjects["combined_subject_type"] = subjects["subject_type0"].combine_first(
+            subjects["subject_type1"]
+        )
 
-        # Rename columns to match subject df
-        movies_df = movies_df.rename(columns={"id": "movie_id"})
+        # Drop unnecesary cols
+        subjects.drop(
+            columns=["subject_type", "subject_type0", "subject_type1"], inplace=True
+        )
 
-        # Reference the movienames with the id movies table
-        subjects = pd.merge(subjects, movies_df, how="left", on="filename")
+        # Rename the combined subject type
+        subjects = subjects.rename(columns={"combined_subject_type": "subject_type"})
+
+    # Extract the html location of the subjects
+    subjects["https_location"] = subjects["locations"].apply(
+        lambda x: literal_eval(x)["0"]
+    )
+
+    # Check for empty values in subject_type
+    if subjects["subject_type"].isna().any():
+        # Manually write the subject type based on the extension of the subject location (link in Zooniverse)
+        from kso_utils.movie_utils import get_movie_extensions
+
+        # Calculate the number of subjects with empty subject type info
+        num_updated_empty = subjects[subjects["subject_type"].isna()].shape[0]
+
+        # Update empty values with "clip" based on https_location extension
+        subjects.loc[
+            subjects["subject_type"].isna(),
+            "subject_type",
+        ] = subjects[
+            subjects["subject_type"].isna()
+        ]["https_location"].apply(
+            lambda url: (
+                "clip"
+                if any(url.endswith(ext) for ext in get_movie_extensions())
+                else "frame"
+            )
+        )
+        logging.info(
+            f"Updated {num_updated_empty} empty rows with subject_type based on extension."
+        )
 
     # Ensure only subjects with the right format get populated
     right_types = ["frame", "clip"]
-
     if subjects[subjects.subject_type.isin(right_types)].all().all():
         # Count the number of rows to be excluded
         logging.info(
@@ -1160,25 +1200,18 @@ def populate_subjects(
         # Select only rows with the right subject_type info
         subjects = subjects[subjects["subject_type"].isin(right_types)]
 
-    if subjects["subject_type"].value_counts().idxmax() == "clip":
-        # Calculate the clip_end_time
-        subjects["clip_end_time"] = (
-            subjects["clip_start_time"] + subjects["clip_length"]
-        )
+    if "movie_id" not in subjects.columns:
+        from kso_utils.db_utils import get_df_from_db_table
 
-    if subjects["subject_type"].value_counts().idxmax() == "frame":
-        # Ensure only one value per expected species id
-        # this value is not crucial as we use the labels
-        # to process the actual classifications
-        # Modify the DataFrame to retain only the first value from each list
-        subjects["frame_exp_sp_id"] = subjects["frame_exp_sp_id"].apply(
-            lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x
-        )
+        # Match site code to name from movies sql and get movie_id to save it as "movie_id"
+        # Query id and filenames from the movies table
+        movies_df = get_df_from_db_table(db_connection, "movies")[["id", "filename"]]
 
-    # Extract the html location of the subjects
-    subjects["https_location"] = subjects["locations"].apply(
-        lambda x: literal_eval(x)["0"]
-    )
+        # Rename columns to match subject df
+        movies_df = movies_df.rename(columns={"id": "movie_id"})
+
+        # Reference the movienames with the id movies table
+        subjects = pd.merge(subjects, movies_df, how="left", on="filename")
 
     # Warn users if original movies can't be traced
     # back using the subject information
@@ -1193,6 +1226,21 @@ def populate_subjects(
             f" related to the orignal movie matches the information in the movies.csv,"
             #             f" The trouble subjects are: {movie_missing.id.unique()}"
             f" The trouble filename of the movies are: {movie_missing.filename.unique()}"
+        )
+
+    if subjects["subject_type"].value_counts().idxmax() == "clip":
+        # Calculate the clip_end_time
+        subjects["clip_end_time"] = (
+            subjects["clip_start_time"] + subjects["clip_length"]
+        )
+
+    if subjects["subject_type"].value_counts().idxmax() == "frame":
+        # Ensure only one value per expected species id
+        # this value is not crucial as we use the labels
+        # to process the actual classifications
+        # Modify the DataFrame to retain only the first value from each list
+        subjects["frame_exp_sp_id"] = subjects["frame_exp_sp_id"].apply(
+            lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x
         )
 
     # Get the names required for the subject table
@@ -1221,10 +1269,10 @@ def populate_subjects(
         conn=db_connection,
         table_name="subjects",
         values=[tuple(i) for i in subjects.values],
-        num_fields=15,
+        num_fields=11,
     )
 
-    ##### log how many subjects are in the db
+    # log how many subjects are in the db
     # Query id and subject type from the subjects table
     subjects_df = get_df_from_db_table(db_connection, "subjects")
 
@@ -1233,64 +1281,379 @@ def populate_subjects(
     )
 
 
-def sample_subjects_from_workflows(
-    project: Project,
-    server_connection: dict,
-    db_connection,
-    workflow_widget_checks,
-    workflows_df: pd.DataFrame,
-    subjects_df: pd.DataFrame,
-):
-    """
-    Retrieve a subset of the subjects from the workflows of interest and
-    populate the sql subjects table
-
-    :param project: the project object
-    :param server_connection: A dictionary with the client and sftp_client
-    :param db_connection: SQL connection object
-    :param workflow_widget_checks: the widget with information of the selected workflows
-    :param workflows_df: dataframe with the project workflows information (retrieved from Zooniverse)
-    :param subjects_df: dataframe with the project subjects information (retrieved from Zooniverse)
-
-    """
-
-    # Store the names of the workflows and their versions
-    workflow_names, workflow_versions = [], []
-    for i in range(0, len(workflow_widget_checks), 3):
-        workflow_names.append(list(workflow_widget_checks.values())[i])
-        workflow_versions.append(list(workflow_widget_checks.values())[i + 2])
-
-    # Get the ids of the workflows of interest
-    selected_zoo_workflows = [
-        workflows_df[workflows_df.display_name == wf_name].workflow_id.unique()[0]
-        for wf_name in workflow_names
-    ]
-
-    if not isinstance(selected_zoo_workflows, list):
-        selected_zoo_workflows = literal_eval(selected_zoo_workflows)
-
-    # Select only subjects from the workflows of interest
-    subjects_series = subjects_df[
-        subjects_df.workflow_id.isin(selected_zoo_workflows)
-    ].copy()
-
-    from kso_utils.db_utils import drop_table
-
-    # Safely remove subjects table
-    drop_table(conn=db_connection, table_name="subjects")
-
-    if len(subjects_series) > 0:
-        # Fill or re-fill subjects table
-        populate_subjects(project, server_connection, db_connection, subjects_series)
-    else:
-        logging.error("No subjects to populate database from the workflows selected.")
-
-    return selected_zoo_workflows
-
-
 ##########################
 # Upload clips functions
 ##########################
+
+
+def check_movies_uploaded_zoo(project: Project, db_connection, selected_movies: list):
+    """
+    This function takes in a movie name and a dictionary containing the path to the database and returns
+    a boolean value indicating whether the movie has already been uploaded to Zooniverse
+
+    :param project: the project object
+    :param selected_movies: the name of the movie(s) you want to check
+    :type selected_movies: list
+    :param db_connection: SQL connection object
+    """
+    from kso_utils.db_utils import get_df_from_db_table
+
+    # Query info about the clip subjects uploaded to Zooniverse from the db
+    subjects_df = get_df_from_db_table(conn=db_connection, table_name="subjects")
+
+    # Select only columns of interest
+    subjects_df = subjects_df[
+        [
+            "id",
+            "subject_type",
+            "filename",
+            "clip_start_time",
+            "clip_end_time",
+            "movie_id",
+        ]
+    ]
+
+    # Select only clip subjects
+    subjects_df = subjects_df[subjects_df["subject_type"] == "clip"]
+
+    # Save the video filenames of the clips uploaded to Zooniverse
+    clips_uploaded = subjects_df[
+        subjects_df["filename"].apply(
+            lambda x: any(movie in x for movie in selected_movies)
+        )
+    ]
+
+    if clips_uploaded.empty:
+        logging.info(f"{selected_movies} has not been uploaded to Zooniverse yet")
+    else:
+        logging.info(f"{clips_uploaded} clips have already been uploaded.")
+
+
+# Function to extract the videos
+def extract_clips(
+    movie_path: str,
+    clip_length: int,
+    upl_second_i: int,
+    output_clip_path: str,
+    modification_details: dict,
+    gpu_available: bool,
+    remove_audio: bool = True,
+):
+    """
+    This function takes in a movie path, a clip length, a starting second index, an output clip path, a
+    dictionary of modification details, and a boolean indicating whether a GPU is available. It then
+    extracts a clip from the movie, and applies the modifications specified in the dictionary.
+
+    The function is written in such a way that it can be used to extract clips from a movie, and apply
+    modifications to the clips.
+
+    :param movie_path: The path to the movie file
+    :param clip_length: The length of the clip in seconds
+    :param upl_second_i: The second in the video to start the clip
+    :param output_clip_path: The path to the output clip
+    :param modification_details: a dictionary of dictionaries, where each dictionary contains the
+           details of a modification to be made to the video. The keys of the dictionary are the names of the
+           modifications, and the values are dictionaries containing the details of the modification.
+    :param gpu_available: If you have a GPU, set this to True. If you don't, set it to False
+    :param remove_audio: Boolen parameter specifying if remove the audio or not
+    """
+    # Ensure the clip doesn't already exist
+    output_clip_path_check = Path(output_clip_path)
+
+    if output_clip_path_check.exists():
+        logging.info(
+            f"The clip {output_clip_path} already exists, please remove it and run the code again."
+        )
+        pass
+
+    from kso_utils.movie_utils import check_ffmpeg_availability
+
+    # Ensure ffmpeg is installed
+    if not check_ffmpeg_availability():
+        raise FileNotFoundError(
+            "ffmpeg is not found in your system's PATH. Please install or add its path to the PATH environment variable."
+        )
+
+    # Set up input and output default prompts
+    input_path = movie_path
+    output_path = str(output_clip_path)
+
+    input_options = {}
+    output_options = {}
+
+    # Add GPU-related options if available
+    if gpu_available:
+        input_options["hwaccel"] = "cuda"
+        output_options["c"] = "copy"
+
+    # Add audio-related options if needed
+    if remove_audio:
+        output_options["an"] = None
+
+    # Access modifications from clip_modification_widget
+    if modification_details.checks:
+        # Set up modification
+        for (
+            modif_number,
+            modification_details_dict,
+        ) in modification_details.checks.items():
+            if "filter" in modification_details_dict:
+                output_options["vf"] = modification_details_dict["filter"]
+            elif "crf" in modification_details_dict:
+                crf = modification_details_dict["crf"]
+                # add the cuda-compatible vcodec
+                if gpu_available:
+                    del output_options["c"]
+                    if int(crf) < 27:
+                        # small compression
+                        output_options["c:v"] = "h264_nvenc"
+                        output_options["b:v"] = "10M"
+                        logging.info("Compressing using h264_nvenc 10M")
+                    elif int(crf) == 27:
+                        # medium compression
+                        output_options["c:v"] = "h264_nvenc"
+                        output_options["b:v"] = "5M"
+                        logging.info("Compressing using h264_nvenc 5M")
+                    elif int(crf) > 27:
+                        # high compression
+                        output_options["c:v"] = "h264_nvenc"
+                        output_options["b:v"] = "3M"
+                        logging.info("Compressing using h264_nvenc 3M")
+
+                else:
+                    output_options["crf"] = crf
+                    # Add standard pix_format and preset values
+                    output_options.update(
+                        {
+                            "movflags": "+faststart",
+                            "preset": "veryfast",
+                            "pix_fmt": "yuv420p",
+                        }
+                    )
+
+    input_options["ss"] = upl_second_i
+    input_options["t"] = clip_length
+
+    # Run the ffmpeg clip extraction code
+    try:
+        ffmpeg.input(input_path, **input_options).output(
+            output_path, **output_options
+        ).run(overwrite_output=True)
+
+    except ffmpeg.Error as e:
+        logging.error("ffmpeg error occurred.")
+        logging.error(f"stderr: {e}")
+        if e.stdout is not None:
+            logging.error(f"stdout: {e.stdout.decode('utf8')}")
+        if e.stderr is not None:
+            logging.error(f"stderr: {e.stderr.decode('utf8')}")
+        raise e
+
+    # Ensure the clip was extracted
+    if not os.path.exists(output_clip_path):
+        raise FileNotFoundError("The clip wasn't extracted")
+
+    else:
+        os.chmod(output_clip_path, 0o777)
+        logging.info("Clip extracted successfully")
+
+
+def create_clips(
+    available_movies_df: pd.DataFrame,
+    selected_movies: str,
+    movies_paths: str,
+    clip_selection,
+    project: Project,
+    modification_details: dict,
+    gpu_available: bool,
+    is_example: bool,
+    pool_size: int = 4,
+):
+    """
+    This function takes a movie and extracts clips from it
+
+    :param available_movies_df: the dataframe with the movies that are available for the project
+    :param selected_movies: the name(s) of the movie(s) you want to extract clips from
+    :param movies_paths: the path(s) to the movie(s) you want to extract clips from
+    :param clip_selection: a ClipSelection object
+    :param project: the project object
+    :param modification_details: a dictionary with the following keys:
+    :param gpu_available: True or False, depending on whether you have a GPU available to use
+    :param is_example: If True and there are clip modifications, two clips will be generated (original and modified).
+    :param pool_size: the number of threads to use to extract the clips, defaults to 4 (optional)
+    :return: A dataframe with the clip_path, clip_filename, clip_length, upl_seconds, and clip_modification_details
+    """
+
+    # Store the desired length of the clips
+    clip_length = clip_selection.kwargs["clip_length"]
+
+    # Store the starting seconds of the clips
+    if isinstance(clip_selection.result, int):
+        # Clipping video from a range of seconds (e.g. 10-180)
+        # Store the starting and ending of the range
+        start_trim = clip_selection.kwargs["clips_range"][0]
+        end_trim = clip_selection.kwargs["clips_range"][1]
+
+        # Create a list with the starting seconds of the clips
+        list_clip_start = [
+            list(
+                range(
+                    start_trim,
+                    start_trim
+                    + math.floor((end_trim - start_trim) / clip_length) * clip_length,
+                    clip_length,
+                )
+            )
+        ]
+
+        if not clip_selection.result == len(list_clip_start[0]):
+            if clip_selection.result < len(list_clip_start[0]):
+                # Choose random starting points based on the number of samples (example clips, by default this is 3)
+                list_clip_start = [
+                    np.random.choice(
+                        list_clip_start[0], size=clip_selection.result, replace=False
+                    )
+                ]
+            else:
+                logging.info(
+                    "There was an issue estimating the starting seconds for the clips."
+                )
+
+    else:
+        # Clipping specific sections of a video at random (e.g. starting at 10, 20, 180)
+        # Store the starting seconds of the clips
+        list_clip_start = [clip_selection.result["clip_start_time"]]
+
+    # Filter the df for the movie of interest
+    selected_movies_df = available_movies_df[
+        available_movies_df["filename"] == selected_movies
+    ].reset_index(drop=True)
+
+    # Add the list of starting seconds to the df
+    selected_movies_df["list_clip_start"] = list_clip_start
+
+    # Use explode() to expand the list column
+    clips_start_df = selected_movies_df.explode("list_clip_start")
+
+    # Rename the exploded column
+    clips_start_df.rename(columns={"list_clip_start": "upl_seconds"}, inplace=True)
+
+    # Add the length of the clips to df (to keep track of the length of each uploaded clip)
+    clips_start_df["clip_length"] = clip_length
+
+    # Specify output path for zooniverse clip extraction
+    if project.server == "SNIC":
+        if Path("/mimer").exists():
+            temp_path = "/mimer/NOBACKUP/groups/snic2021-6-9/tmp_dir"
+        elif Path("/tmp").exists() and not Path("/mimer").exists():
+            temp_path = "/tmp"
+        else:
+            logging.error("No suitable writable path found.")
+            return
+    else:
+        temp_path = "."
+    clips_folder = str(Path(temp_path, selected_movies + "_zooniverseclips"))
+
+    # Set the filename of the clips
+    clips_start_df["clip_filename"] = clips_start_df.apply(
+        lambda row: f"{selected_movies}_clip_{row['upl_seconds']}_{clip_length}.mp4",
+        axis=1,
+    )
+
+    # Set the path of the clips
+    clips_start_df["clip_path"] = clips_start_df["clip_filename"].apply(
+        lambda x: str(Path(clips_folder, x))
+    )
+
+    # Create the folder to store the videos if not exist
+    if os.path.exists(clips_folder):
+        shutil.rmtree(clips_folder)
+    Path(clips_folder).mkdir(parents=True, exist_ok=True)
+    # Recursively add permissions to folders created
+    [os.chmod(root, 0o777) for root, dirs, files in os.walk(clips_folder)]
+
+    logging.info("Extracting clips")
+
+    # Read each movie and extract the clips
+    for index, row in tqdm(clips_start_df.iterrows(), total=clips_start_df.shape[0]):
+        # Extract the videos and store them in the folder
+        extract_clips(
+            movie_path=movies_paths,
+            clip_length=clip_length,
+            upl_second_i=row["upl_seconds"],
+            output_clip_path=row["clip_path"],
+            modification_details=modification_details,
+            gpu_available=gpu_available,
+        )
+
+    if modification_details.children[0].value > 0 and is_example:
+        # Set the filename of the original clips to be compared against the modified
+        clips_start_df["clip_example_original_filename"] = clips_start_df.apply(
+            lambda row: f"{selected_movies}_clip_example_original_{row['upl_seconds']}_{clip_length}.mp4",
+            axis=1,
+        )
+
+        # Set the path of the clips
+        clips_start_df["clip_example_original_path"] = clips_start_df[
+            "clip_example_original_filename"
+        ].apply(lambda x: str(Path(clips_folder, x)))
+
+        logging.info("Extracting original clips")
+        # Read each movie and extract the original clips
+        for index, row in tqdm(
+            clips_start_df.iterrows(), total=clips_start_df.shape[0]
+        ):
+            # Set modification details to 0 to extract clips that are copies of the original movie
+            modification_details.bool_widget_holder.children = ()
+
+            # Extract the videos and store them in the folder
+            extract_clips(
+                movie_path=movies_paths,
+                clip_length=clip_length,
+                upl_second_i=row["upl_seconds"],
+                output_clip_path=row["clip_example_original_path"],
+                modification_details=modification_details,
+                gpu_available=gpu_available,
+            )
+    # Add information on the modification of the clips
+    clips_start_df["clip_modification_details"] = str(modification_details)
+
+    logging.info("All the clips were extracted successfully")
+
+    return clips_start_df
+
+
+def check_clip_size(clips_list: list):
+    """
+    > This function takes a list of file paths and returns a dataframe with the file path and size of
+    each file. If the size is too large, we suggest compressing them as a first step.
+
+    :param clips_list: list of file paths to the clips you want to check
+    :type clips_list: list
+    :return: A dataframe with the file path and size of each clip
+    """
+
+    # Get list of files with size
+    if clips_list is None:
+        logging.error("No clips found.")
+        return None
+    files_with_size = [
+        (file_path, Path(file_path).stat().st_size / float(1 << 20))
+        for file_path in clips_list
+    ]
+
+    df = pd.DataFrame(files_with_size, columns=["File_path", "Size"])
+
+    if df["Size"].ge(8).any():
+        logging.info(
+            "Clips are too large (over 8 MB) to be uploaded to Zooniverse. Compress them!"
+        )
+        return df
+    else:
+        logging.info(
+            "Clips are a good size (below 8 MB). Ready to be uploaded to Zooniverse"
+        )
+        return df
 
 
 def set_zoo_clip_metadata(
@@ -1447,7 +1810,7 @@ def upload_clips_to_zooniverse(
     # Upload the clips to Zooniverse (with metadata)
     new_subjects = []
 
-    logging.info(f"Uploading subjects to Zooniverse")
+    logging.info("Uploading subjects to Zooniverse")
     for clip_path, metadata in tqdm(
         subject_metadata.items(), total=len(subject_metadata)
     ):
@@ -1470,7 +1833,7 @@ def upload_clips_to_zooniverse(
     # Upload all subjects
     subject_set.add(new_subjects)
 
-    logging.info(f"Subjects uploaded to Zooniverse")
+    logging.info("Subjects uploaded to Zooniverse")
 
 
 ##########################
@@ -1604,8 +1967,8 @@ def extract_frames_for_zoo(
         frames_folder = str(Path(folder_name, temp_frames_folder))
     else:
         frames_folder = temp_frames_folder
-        if hasattr(project, "output_path"):
-            mod_frames_folder = project.output_path + frames_folder
+    #         if hasattr(project, "output_path"):
+    #             mod_frames_folder = project.output_path + frames_folder
 
     # Extract the frames from the videos, store them in the temp location
     # and save the df with information about the frames in the projectprocessor
@@ -1616,6 +1979,37 @@ def extract_frames_for_zoo(
         frames_folder=frames_folder,
     )
     return generated_frames
+
+
+def check_frame_size(frame_paths: list):
+    """
+    It takes a list of file paths, gets the size of each file, and returns a dataframe with the file
+    path and size of each file
+
+    :param frame_paths: a list of paths to the frames you want to check
+    :return: A dataframe with the file path and size of each frame.
+    """
+
+    # Get list of files with size
+    files_with_size = [
+        (file_path, os.stat(file_path).st_size) for file_path in frame_paths
+    ]
+
+    df = pd.DataFrame(files_with_size, columns=["File_path", "Size"])
+
+    # Change bytes to MB
+    df["Size"] = df["Size"] / 1000000
+
+    if df["Size"].ge(1).any():
+        logging.info(
+            "Frames are too large (over 1 MB) to be uploaded to Zooniverse. Compress them!"
+        )
+        return df
+    else:
+        logging.info(
+            "Frames are a good size (below 1 MB). Ready to be uploaded to Zooniverse"
+        )
+        return df
 
 
 # Function to gather information of frames already uploaded to Zooniverse
@@ -1646,7 +2040,7 @@ def check_frames_uploaded(
     species_df = species_df.rename(columns={"id": "frame_exp_sp_id"})
 
     # Reference the expected species on the uploaded subjects
-    subjects = pd.merge(
+    subjects_df = pd.merge(
         subjects_df,
         species_df,
         how="left",
@@ -1688,7 +2082,7 @@ def check_frames_uploaded(
 
         # Exclude frames that have already been uploaded
         # trunk-ignore(flake8/E712)
-        frames_df = frames_df[merge_df == False]
+        frames_df = frames_df[~merge_df]
         if len(frames_df) == 0:
             logging.error("All of the frames you have selected are already uploaded.")
         else:
@@ -1734,7 +2128,7 @@ def modify_frames(
 
     # Specify the path of the modified frames
     frames_to_upload_df["modif_frame_path"] = frames_to_upload_df["frame_path"].apply(
-        lambda x: mod_frames_folder / Path(x).name
+        lambda x: str(mod_frames_folder / Path(x).name)
     )
 
     # Remove existing modified clips
@@ -1749,9 +2143,9 @@ def modify_frames(
         if not mod_frames_folder.exists():
             mod_frames_folder.mkdir(parents=True, exist_ok=True)
             # Recursively add permissions to folders created
-            [root.chmod(0o777) for root, _, _ in os.walk(mod_frames_folder)]
+            [os.chmod(root, 0o777) for root, _, _ in os.walk(mod_frames_folder)]
 
-        #### Modify the clips###
+        # Modify the clips###
         # Read each clip and modify them (showing a progress bar)
         for index, row in tqdm(
             frames_to_upload_df.iterrows(), total=frames_to_upload_df.shape[0]
@@ -1825,7 +2219,7 @@ def set_zoo_frame_metadata(
         "modif_frame_path" in df.columns
         and "no_modification" not in df["modif_frame_path"].values
     ):
-        df["frame_path"] = df["modif_frame_path"]
+        df["frame_path"] = df["modif_frame_path"].apply(str)
 
     # Roadblock to prevent uploading frames to template project:
     if project.Zooniverse_number == 9754:
@@ -1929,11 +2323,29 @@ def upload_frames_to_zooniverse(
             + created_on
         )
 
-    else:
+    elif project_name == "Spyfish_Aotearoa":
+        reserve = upload_to_zoo["!LinkToMarineReserve"].unique()[0]
+
         # Name the subject for frames from multiple sites/movies
         subject_set_name = (
             "frames_"
             + str(int(n_frames))
+            + "_"
+            + reserve
+            + "_"
+            + "_".join(species_list)
+            + datetime.date.today().strftime("_%d_%m_%Y")
+        )
+
+    else:
+        sitename = upload_to_zoo["siteName"].unique()[0]
+
+        # Name the subject for frames from multiple sites/movies
+        subject_set_name = (
+            "frames_"
+            + str(int(n_frames))
+            + "_"
+            + sitename
             + "_"
             + "_".join(species_list)
             + datetime.date.today().strftime("_%d_%m_%Y")

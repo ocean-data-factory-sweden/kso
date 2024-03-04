@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
 # base imports
-import sys
 import logging
 import sqlite3
 import ftfy
 import pandas as pd
-import numpy as np
 from pathlib import Path
-
-# util imports
-from kso_utils.project_utils import Project
 
 # Logging
 logging.basicConfig()
@@ -184,73 +179,6 @@ def process_manual_clips(meta_df: pd.DataFrame):
     return meta_df
 
 
-# Function to get the list of duplicated subjects
-def get_duplicatesdf(project: Project):
-    """
-    This function reads a CSV file containing information about duplicated subjects and returns a pandas
-    dataframe.
-
-    :param project: The "project" parameter is an object of the "Project" class, which likely contains
-    information about a specific project or dataset being worked on. The function is likely part of a
-    larger program or script that uses the "project" object to access relevant information or data
-    :type project: Project
-    :return: a pandas DataFrame containing information about duplicated subjects in a project.
-    """
-    # Define the path to the csv files with initial info to build the db
-    db_csv_info = project.csv_folder
-
-    # Define the path to the csv file with ids of the duplicated subjects
-    for file in Path(db_csv_info).rglob("*.csv"):
-        if "duplicat" in file.name:
-            duplicates_csv = file
-
-    # Load the csv with information about duplicated subjects
-    duplicatesdf = pd.read_csv(duplicates_csv)
-
-    return duplicatesdf
-
-
-# Function to select the first subject of those that are duplicated
-def clean_duplicated_subjects(subjects: pd.DataFrame, project: Project):
-    """
-    This function takes a dataframe of subjects and a project, identifies and removes duplicated
-    subjects, and returns a cleaned dataframe of unique subjects.
-
-    :param subjects: A pandas DataFrame containing information about subjects in a project
-    :type subjects: pd.DataFrame
-    :param project: The `project` parameter is an instance of the `Project` class, which is not defined
-    in the code snippet provided. It is likely that this class is defined elsewhere in the codebase and
-    contains information about the project being worked on, such as project name, project ID, and
-    project data
-    :type project: Project
-    :return: a cleaned dataframe of subjects with duplicated subjects removed and replaced with the id
-    of the first subject.
-    """
-    # Get the duplicates df
-    duplicatesdf = get_duplicatesdf(project)
-
-    # Include a column with unique ids for duplicated subjects
-    subjects = pd.merge(
-        subjects,
-        duplicatesdf,
-        how="left",
-        left_on="subject_id",
-        right_on="dupl_subject_id",
-    )
-
-    # Replace the id of duplicated subjects for the id of the first subject
-    subjects.subject_id = np.where(
-        subjects.single_subject_id.isnull(),
-        subjects.subject_id,
-        subjects.single_subject_id,
-    )
-
-    # Select only unique subjects
-    subjects = subjects.drop_duplicates(subset="subject_id", keep="first")
-
-    return subjects
-
-
 def get_movies_id(df: pd.DataFrame, conn: sqlite3.Connection):
     """
     This function retrieves movie IDs based on movie filenames from a database and merges them with a
@@ -301,19 +229,16 @@ def process_koster_subjects(subjects: pd.DataFrame, conn: sqlite3.Connection):
     :return: A dataframe with all the subjects that have been uploaded to the database.
     """
 
-    ## Set the date when the metadata of subjects uploaded matches/doesn't match schema.py requirements
+    # Set the date when the metadata of subjects uploaded matches/doesn't match schema.py requirements
     # Specify the date when the metadata of subjects uploaded matches schema.py
     auto_date = "2020-05-29 00:00:00 UTC"
 
     # Specify the starting date when clips were manually uploaded
     manual_date = "2019-11-17 00:00:00 UTC"
 
-    ## Update subjects automatically uploaded
-
     # Select automatically uploaded subjects
     auto_subjects_df = auto_subjects(subjects, auto_date=auto_date)
 
-    ## Update subjects manually uploaded
     # Select manually uploaded subjects
     manual_subjects_df = manual_subjects(
         subjects, manual_date=manual_date, auto_date=auto_date
@@ -330,44 +255,6 @@ def process_koster_subjects(subjects: pd.DataFrame, conn: sqlite3.Connection):
         subjects = auto_subjects_df
 
     return subjects
-
-
-# Function to combine classifications received on duplicated subjects
-def combine_annot_from_duplicates(annot_df: pd.DataFrame, project: Project):
-    """
-    This function combines annotations from duplicate subjects in a DataFrame by replacing the IDs of
-    duplicated subjects with the ID of the first subject.
-
-    :param annot_df: a pandas DataFrame containing annotations for subjects in a project
-    :type annot_df: pd.DataFrame
-    :param project: Unfortunately, the parameter "project" is not defined in the code snippet provided.
-    It is likely a custom object or variable specific to the project this code is being used for
-    :type project: Project
-    :return: a pandas DataFrame with the annotations from the input DataFrame `annot_df`, where the
-    subject IDs of duplicated subjects have been replaced with the ID of the first subject. The function
-    takes two arguments: `annot_df`, which is a pandas DataFrame with the annotations, and `project`,
-    which is an instance of a Project class.
-    """
-    # Get the duplicates df
-    duplicatesdf = get_duplicatesdf(project)
-
-    # Include a column with unique ids for duplicated subjects
-    annot_df = pd.merge(
-        annot_df,
-        duplicatesdf,
-        how="left",
-        left_on="subject_ids",
-        right_on="dupl_subject_id",
-    )
-
-    # Replace the id of duplicated subjects for the id of the first subject
-    annot_df["subject_ids"] = np.where(
-        annot_df.single_subject_id.isnull(),
-        annot_df.subject_ids,
-        annot_df.single_subject_id,
-    )
-
-    return annot_df
 
 
 def process_clips_koster(annotations, row_class_id: str, rows_list: list):
@@ -448,7 +335,9 @@ def process_koster_movies_csv(movies_df: pd.DataFrame):
     movies_df["filename"] = movies_df["filename"].apply(lambda x: fix_text_encoding(x))
 
     # TO DO Include server's path to the movie files
-    movies_df["fpath"] = movies_df["filename"]
+    movies_df["fpath"] = (
+        movies_df["filename"].replace(".MP4", ".mp4").replace(".mov", ".mp4")
+    )
 
     # Rename relevant fields
     movies_df = movies_df.rename(

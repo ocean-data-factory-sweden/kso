@@ -10,9 +10,9 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
-from urllib.request import pathname2url
-from urllib.parse import urlparse
-from IPython.display import HTML
+from ultralytics.utils.downloads import is_url
+from IPython.display import display
+import ipywidgets as widgets
 
 # util imports
 from kso_utils.project_utils import Project
@@ -26,12 +26,14 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 
-# Function to check if an url is valid or not
-def is_url(url):
+# Function to check if ffmpeg is available in the system's PATH.
+def check_ffmpeg_availability():
     try:
-        result = urlparse(url)
-        return all([result.scheme, result.netloc])
-    except ValueError:
+        # Try to import the ffmpeg module from ffmpeg-python
+        import ffmpeg
+
+        return True
+    except ImportError:
         return False
 
 
@@ -161,8 +163,6 @@ def retrieve_movie_info_from_server(
     movies_df = movies_df.rename(columns={"id": "movie_id"})
 
     if project.server == ServerType.SNIC:
-        # Find closest matching filename (may differ due to Swedish character encoding)
-        parsed_url = urllib.parse.urlparse(movies_df["fpath"].iloc[0])
 
         def get_match(string, string_options):
             normalized_string = unicodedata.normalize("NFC", string)
@@ -224,80 +224,98 @@ def retrieve_movie_info_from_server(
     return available_movies_df, no_available_movies_df, no_info_movies_df
 
 
-# Function to preview underwater movies
 def preview_movie(
     movie_path: str,
     movie_metadata: pd.DataFrame,
 ):
     """
-    It takes a movie filename and its associated metadata and returns a HTML object that can be displayed in the notebook
+    It takes a movie filename and its associated metadata and returns a widget object that can be displayed in the notebook
 
     :param movie_path: the filename of the movie you want to preview
     :param movie_metadata: the metadata of the movie you want to preview
-    :return: HTML object
+    :return: Widget object
     """
 
     # Adjust the width of the video and metadata sections based on your preference
     video_width = "60%"  # Adjust as needed
     metadata_width = "40%"  # Adjust as needed
 
-    html_code = f"""<html>
-            <div style="display: flex; align-items: center; width: 100%;">
-                <div style="width: {video_width}; padding-right: 10px;">
-                    <video width="100%" controls>
-                        <source src={movie_path}>
-                    </video>
-                </div>
-                <div style="width: {metadata_width}; overflow: auto;">
-                    {movie_metadata.T.to_html()}
-                </div>
-            </div>
-            </html>"""
-
-    return HTML(html_code)
-
-
-def check_movies_uploaded(project: Project, db_connection, movies_selected: list):
-    """
-    This function takes in a movie name and a dictionary containing the path to the database and returns
-    a boolean value indicating whether the movie has already been uploaded to Zooniverse
-
-    :param project: the project object
-    :param movies_selected: the name of the movie(s) you want to check
-    :type movies_selected: list
-    :param db_connection: SQL connection object
-    """
-    from kso_utils.db_utils import get_df_from_db_table
-
-    # Query info about the clip subjects uploaded to Zooniverse from the db
-    subjects_df = get_df_from_db_table(conn=db_connection, table_name="subjects")
-
-    # Select only columns of interest
-    subjects_df = subjects_df[
-        [
-            "id",
-            "subject_type",
-            "filename",
-            "clip_start_time",
-            "clip_end_time",
-            "movie_id",
-        ]
-    ]
-
-    # Select only clip subjects
-    subjects_df = subjects_df[subjects_df["subject_type"] == "clip"]
-
-    # Save the video filenames of the clips uploaded to Zooniverse
-    clips_uploaded = subjects_df[
-        subjects_df["filename"].apply(
-            lambda x: any(movie in x for movie in movies_selected)
-        )
-    ]
-
-    if clips_uploaded.empty:
-        logging.info(f"{movies_selected} has not been uploaded to Zooniverse yet")
+    if "http" in movie_path:
+        video_widget = widgets.Video.from_url(movie_path, width=video_width)
     else:
-        logging.info(f"{clips_uploaded} clips have already been uploaded.")
+        video_widget = widgets.Video.from_file(movie_path, width=video_width)
+
+    metadata_html = movie_metadata.T.to_html()
+
+    metadata_widget = widgets.HTML(
+        value=metadata_html,
+        layout=widgets.Layout(width=metadata_width, overflow="auto"),
+    )
+
+    # Create a horizontal box layout to display video and metadata side by side
+    display_widget = widgets.HBox([video_widget, metadata_widget])
+
+    display(display_widget)
+
+    return display_widget
+
+
+def get_info_selected_movies(
+    selected_movies: list,
+    footage_source: str,
+    df: pd.DataFrame,
+    project: Project,
+    server_connection: dict,
+):
+    """
+    > This function takes the selected movies and source of the footage (already in the system or new) and return the df, paths and ids of the movies selected.
+    :param selected_movies: TBC
+    :param footage_source: a string specifying whether the footage is already in the system or is new
+    :param project: the project object
+    :param server_connection: a dictionary with the connection to the server
+    :param df: the dataframe of available movies
+    """
+
+    if footage_source == "Existing Footage":
+        # Create a df with the selected movies
+        selected_movies_df = df[df["filename"].isin(selected_movies)].reset_index(
+            drop=True
+        )
+
+        # Retrieve the paths of the movies selected
+        selected_movies_paths = [
+            get_movie_path(
+                project=project,
+                f_path=f_path,
+                server_connection=server_connection,
+            )
+            for f_path in selected_movies_df["fpath"]
+        ]
+
+        # Remove movie extension to match yolo_format labels
+        selected_movies_no_ext = tuple(
+            filename.rsplit(".", 1)[0] for filename in selected_movies
+        )
+
+        selected_movies_ids = {
+            key: value
+            for key, value in zip(
+                selected_movies_no_ext,
+                selected_movies_df["movie_id"].to_list(),
+            )
+        }
+
+    elif footage_source == "New Footage":
+        selected_movies_paths = selected_movies
+        selected_movies_ids = {}
+        selected_movies_df = pd.DataFrame()
+
+    return (
+        selected_movies_paths,
+        selected_movies,
+        selected_movies_df,
+        selected_movies_ids,
+    )
 
 
 # Function to extract selected frames from videos
@@ -496,7 +514,7 @@ def standarise_movie_format(
     :type gpu_available: bool
     """
 
-    ##### Check movie format ######
+    # Check movie format ######
     ext = Path(movie_filename).suffix
 
     # Set video conversion to false as default
@@ -507,7 +525,7 @@ def standarise_movie_format(
         # Set conversion to True
         convert_video_T_F = True
 
-    ##### Check frame rate #######
+    # Check frame rate #######
     cap = cv2.VideoCapture(movie_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
 
@@ -518,7 +536,7 @@ def standarise_movie_format(
         # Set conversion to True
         convert_video_T_F = True
 
-    ##### Check codec info ########
+    # Check codec info ########
     def get_fourcc(cap: cv2.VideoCapture) -> str:
         """Return the 4-letter string of the codec of a video."""
         return (
@@ -529,15 +547,14 @@ def standarise_movie_format(
 
     codec = get_fourcc(cap)
 
-    if not codec in ["h264", "avc1"]:
+    if codec not in ["h264", "avc1"]:
         logging.info(
             f"The codecs of {movie_filename} are not supported (only h264 is supported)."
         )
         # Set conversion to True
         convert_video_T_F = True
 
-    ##### Check movie file #######
-    ##### (not needed in Spyfish) #####
+    #  Check movie file #######
     # Create a list of the project where movie compression is not needed
     project_no_compress = ["Spyfish_Aotearoa"]
 
@@ -786,7 +803,9 @@ def check_movies_meta(
 
             # Save the updated df locally
             df.to_csv(csv_paths["local_movies_csv"], index=False)
-            logging.info(f"The local movies.csv file has been updated")
+            logging.info(
+                f"The local movies.csv file {csv_paths['local_movies_csv']} has been updated"
+            )
 
             from kso_utils.server_utils import update_csv_server
 
@@ -816,9 +835,6 @@ def concatenate_local_movies(csv_paths):
 
     # Combine the path of the folder with the go_profiles inside the folder
     df["path_go_pros"] = df.apply(merge_paths, axis=1)
-
-    # Create an empty list to store the annotations
-    rows_list = []
 
     # Loop through each classification submitted by the users
     for index, row in tqdm(df.iterrows(), total=df.shape[0]):

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 
-Single-widget test suite. 
+Single-widget test suite.
 
 """
-## Import Python packages
+# Import Python packages
 import os
 import sys
 
@@ -15,7 +15,6 @@ if "kso_utils" not in sys.modules:
     import kso_utils
 
 import kso_utils.widgets as kso_widgets
-import pytest
 import pandas as pd
 import kso_utils.project_utils as p_utils
 from kso_utils.project import ProjectProcessor, MLProjectProcessor
@@ -56,15 +55,9 @@ def test_choose_folder():
     assert widget.title == "Choose location of test_title"
 
 
-def test_choose_footage():
-    widget = kso_widgets.choose_footage(
-        start_path="../test/test_output",
-        project=project,
-        server_connection=pp.server_connection,
-        db_connection=pp.db_connection,
-        folder_type="test_title",
-    )
-    assert widget.default_path == "../test/test_output"
+def test_choose_footage_source():
+    widget = kso_widgets.choose_footage_source()
+    assert widget.value == "Existing Footage"
 
 
 def test_choose_agg_parameters():

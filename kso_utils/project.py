@@ -1,9 +1,7 @@
 # base imports
 import os
 import sys
-import re
 import logging
-import yaml
 import wandb
 import datetime
 import numpy as np
@@ -15,12 +13,10 @@ from itertools import chain
 from pathlib import Path
 import imagesize
 import ipysheet
-from IPython.display import display, clear_output, HTML
-from ipywidgets.widgets.interaction import interact
+from IPython.display import display, clear_output
 import mlflow
 
 # util imports
-import kso_utils.tutorials_utils as t_utils
 import kso_utils.project_utils as project_utils
 import kso_utils.db_utils as db_utils
 import kso_utils.movie_utils as movie_utils
@@ -28,6 +24,7 @@ import kso_utils.server_utils as server_utils
 import kso_utils.zooniverse_utils as zoo_utils
 import kso_utils.general as g_utils
 import kso_utils.widgets as kso_widgets
+import kso_utils.yolo_utils as yolo_utils
 
 # Logging
 logging.basicConfig()
@@ -49,7 +46,7 @@ class ProjectProcessor:
         self.classifications = pd.DataFrame()
         self.generated_clips = pd.DataFrame()
         self.species_of_interest = []
-        self.movies_selected_id = {}
+        self.selected_movies_id = {}
 
         # Import modules
         self.modules = g_utils.import_modules([])
@@ -274,155 +271,75 @@ class ProjectProcessor:
         """
         return movie_utils.get_movie_path(filepath, self)
 
+    def choose_footage_source(self):
+        """
+        Enables users to select exisiting (already uploaded)
+        or new (local) footage
+        """
+        # Choose the source of the footage
+        self.source_footage_widget = kso_widgets.choose_footage_source()
+
     def choose_footage(self, preview_media: bool = False, test: bool = False):
         """
-        > The function `choose_footage` is a function that takes in a `self` argument and returns a
-        function `f` that takes in three arguments: `project`, `csv_paths`, and `available_movies_df`. The
-        function `f` is an asynchronous function that takes in the value of the `movies_selected` widget
-        and previews the movies if specified
+        Function that enables users to select footage to upload/process/classify and previews the movies if specified
         """
 
-        # Check if the necessary attribute is available
-        if not hasattr(self, "available_movies_df") or self.available_movies_df is None:
-            self.get_movie_info()
+        # Check if the source_footage is available and has the right format
+        if not hasattr(self, "source_footage_widget"):
+            # Set the source footage as "existing footage"
+            # (choose_footage_source func is unavailable in tut#1 and #3 to ensure the use of db)
+            self.source_footage = "Existing Footage"
 
-        # Select the movie(s) of interest
-        import ipywidgets as widgets
-        from IPython.display import display
+        elif self.source_footage_widget.value is None:
+            logging.info(
+                "Select a valid option from the choose_footage_source function"
+            )
 
-        output = widgets.Output()
-        movie_output = widgets.Output()
+        else:
+            self.source_footage = self.source_footage_widget.value
 
-        display(output, movie_output)
+        # Check if the necessary available_movies_df attribute is available
+        if not hasattr(self, "available_movies_df"):
+            if self.source_footage == "Existing Footage":
+                logging.info("Creating the available_movies_df attribute")
+                self.get_movie_info()
+            else:
+                logging.info("Creating an empty available_movies_df for the new movies")
+                self.available_movies_df = pd.DataFrame()
 
-        def on_radio_button_change(change):
-            if change["type"] == "change" and change["name"] == "value":
-                selected_option = change["new"]
-
-                # Perform actions based on the selected radio button
-                if selected_option == "Uploaded Footage":
-                    clear_output()
-                    # Code for "Uploaded Footage" option
-                    print("Uploaded Footage selected")
-                    select_movie_widg = kso_widgets.select_movie(
-                        self.available_movies_df
-                    )
-                    output.append_display_data(select_movie_widg)
-                    # with output:
-                    #    display(select_movie_widg)
-
-                    def update_movie(change):
-                        movie_output.clear_output(wait=True)
-                        selected_movies = change.new
-                        # Create a df with the selected movies
-                        selected_movies_df = self.available_movies_df[
-                            self.available_movies_df["filename"].isin(selected_movies)
-                        ].reset_index(drop=True)
-
-                        # Retrieve the paths of the movies selected
-                        movies_paths = [
-                            movie_utils.get_movie_path(
-                                project=self.project,
-                                f_path=f_path,
-                                server_connection=self.server_connection,
-                            )
-                            for f_path in selected_movies_df["fpath"]
-                        ]
-
-                        # Display the movie
-                        if preview_media:
-                            clear_output()
-                            display(select_movie_widg)
-                            with movie_output:
-                                previews = []
-
-                                # Display/preview each selected movie
-                                for (
-                                    index,
-                                    movie_row,
-                                ) in selected_movies_df.iterrows():
-                                    movie_path = movies_paths[index]
-                                    movie_metadata = pd.DataFrame(
-                                        [movie_row.values], columns=movie_row.index
-                                    )
-
-                                    html = movie_utils.preview_movie(
-                                        movie_path=movie_path,
-                                        movie_metadata=movie_metadata,
-                                    )
-
-                                    previews.append(html)
-
-                            display(*previews, movie_output)
-                        # Store the ids, names and paths of the selected movies
-                        self.movies_selected = selected_movies
-                        self.movies_paths = movies_paths
-
-                        # Remove movie extension to match yolo_format labels
-                        selected_movies_no_ext = tuple(
-                            filename.rsplit(".", 1)[0] for filename in selected_movies
-                        )
-                        self.movies_selected_id = {
-                            key: value
-                            for key, value in zip(
-                                selected_movies_no_ext,
-                                selected_movies_df["movie_id"].to_list(),
-                            )
-                        }
-
-                    select_movie_widg.observe(update_movie, "value")
-                    display(select_movie_widg, output, movie_output)
-
-                    if test:
-                        # For the test case, directly call the update_movie logic
-                        select_movie_widg.options = (select_movie_widg.options[0],)
-                        update_movie({"new": select_movie_widg.options[0]})
-
-                elif selected_option == "Custom Footage":
-                    clear_output()
-                    # Code for "Custom Footage" option
-                    print("Custom Footage selected")
-
-                    # Define a callback function for folder selection
-                    def on_folder_selected(change):
-                        selected_folder = select_movie_widg.selected
-
-                        # Check if a folder is selected
-                        if selected_folder is not None:
-                            self.movies_paths = selected_folder
-                            print(f"Selected folder: {selected_folder}")
-                            self.movies_selected = selected_folder
-                            # Add your code here to use the selected folder
-                        else:
-                            print("No folder selected")
-
-                    # Create a folder selection widget (replace this with your folder selection widget)
-                    select_movie_widg = kso_widgets.choose_footage(
-                        project=self.project,
-                        server_connection=self.server_connection,
-                        db_connection=self.db_connection,
-                        start_path=self.project.movie_folder
-                        if self.project.movie_folder not in [None, "None"]
-                        else ".",
-                        folder_type="custom footage",
-                    )
-
-                    # Register the callback function
-                    select_movie_widg.register_callback(on_folder_selected)
-                    output.append_display_data(select_movie_widg)
-
-        # Create radio buttons
-        radio_buttons = widgets.RadioButtons(
-            options=["Uploaded Footage", "Custom Footage"],
-            value=None,
-            description="Choose footage source:",
+        # Call the choose_footage function and save the widget to pp
+        self.footage_selected_widget = kso_widgets.choose_footage(
+            df=self.available_movies_df,
+            project=self.project,
+            footage_source=self.source_footage,
+            server_connection=self.server_connection,
+            preview_media=preview_media,
+            test=test,
         )
 
-        # Register the callback function
-        radio_buttons.observe(on_radio_button_change)
+    def check_selected_movies(self, test=False):
+        """
+        Function that loads the paths and other information of the selected footage to the ProjectProcessors
+        """
+        if test:
+            self.selected_movies = ["movie_1.mp4"]
+            self.selected_movies_paths = [
+                "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4"
+            ]
 
-        # Display the radio buttons
-        display(radio_buttons)
+        else:
+            (
+                self.selected_movies_paths,
+                self.selected_movies,
+                self.selected_movies_df,
+                self.selected_movies_ids,
+            ) = movie_utils.get_info_selected_movies(
+                selected_movies=self.footage_selected_widget.value,
+                footage_source=self.source_footage,
+                df=self.available_movies_df,
+                project=self.project,
+                server_connection=self.server_connection,
+            )
 
     def check_meta_sync(self, meta_key: str):
         """
@@ -602,25 +519,6 @@ class ProjectProcessor:
     def add_species(self):
         pass
 
-    def view_annotations(self, folder_path: str, annotation_classes: list):
-        """
-        > This function takes in a folder path and a list of annotation classes and returns a widget that
-        allows you to view the annotations in the folder
-
-        :param folder_path: The path to the folder containing the images you want to annotate
-        :type folder_path: str
-        :param annotation_classes: list of strings
-        :type annotation_classes: list
-        :return: A list of dictionaries, each dictionary containing the following keys
-                 - 'image_path': the path to the image
-                 - 'annotations': a list of dictionaries, each dictionary containing the following keys:
-                 - 'class': the class of the annotation
-                 - 'bbox': the bounding box of the annotation
-        """
-        return t_utils.get_annotations_viewer(
-            folder_path, species_list=annotation_classes
-        )
-
     #############
     # t3
     #############
@@ -655,59 +553,57 @@ class ProjectProcessor:
             generate_export=generate_export,
         )
 
-    def check_movies_uploaded(self, movies_selected: list):
+    def check_movies_uploaded_zoo(self):
         """
         This function checks if a movie has been uploaded to Zooniverse
 
-        :param movies_selected: The name of the movie(s) you want to check if it's uploaded
-        :type movies_selected: list
+        :param selected_movies: The name of the movie(s) you want to check if it's uploaded
+        :type selected_movies: list
         """
-        movie_utils.check_movies_uploaded(
+        # Ensure the selected footage and paths are loaded to the system
+        self.check_selected_movies()
+
+        zoo_utils.check_movies_uploaded_zoo(
             project=self.project,
             db_connection=self.db_connection,
-            movies_selected=movies_selected,
+            selected_movies=self.selected_movies,
         )
 
     def generate_zoo_clips(
         self,
-        movies_selected: list,
-        movies_paths: list,
         use_gpu: bool = False,
         pool_size: int = 4,
         is_example: bool = False,
         test: bool = False,
     ):
         """
-        > This function takes a movie name and path, and returns a list of clips from that movie
+         > This function takes a movie name and path, and returns a list of clips from that movie
 
-        :param movies_selected: The name(s) of the movie(s) you want to extract clips from
-        :param movies_paths: The path(s) to the movie(s) you want to extract clips from
         :param use_gpu: If you have a GPU, set this to True, defaults to False
-        :type use_gpu: bool (optional)
-        :param pool_size: number of threads to use for clip extraction, defaults to 4
-        :type pool_size: int (optional)
-        :param is_example: If True, the clips will be selected randomly. If False, the clips will be
-               selected based on the number of clips and the length of each clip, defaults to False
-        :type is_example: bool (optional)
+         :type use_gpu: bool (optional)
+         :param pool_size: number of threads to use for clip extraction, defaults to 4
+         :type pool_size: int (optional)
+         :param is_example: If True, the clips will be selected randomly. If False, the clips will be
+                selected based on the number of clips and the length of each clip, defaults to False
+         :type is_example: bool (optional)
         """
+
+        # Ensure the selected footage and paths are loaded to the system
+        self.check_selected_movies(test)
 
         # Roadblock to ensure only one movie has been selected
         # Option to generate clips from multiple movies is not available at this point
-        if len(movies_selected) > 1:
-            logging.info(
-                "The option to generate clips from multiple movies is not available at this point. Please select only one movie to gerenate clips from"
+        if len(self.selected_movies) > 1 or isinstance(self.selected_movies, list):
+            logging.error(
+                "The option to generate clips from multiple movies is not available at this point. Please select only one movie to generate clips from"
             )
-            return
-
-        else:
-            movies_selected = str(movies_selected[0])
-            movies_paths = str(movies_paths[0])
+            return None
 
         # Select the clips to be extracted
         clip_selection = kso_widgets.select_n_clips(
             project=self.project,
             db_connection=self.db_connection,
-            movies_selected=movies_selected,
+            selected_movies=str(self.selected_movies[0]),
             is_example=is_example,
         )
         clip_modification = kso_widgets.clip_modification_widget()
@@ -722,10 +618,10 @@ class ProjectProcessor:
             )
 
             def on_button_clicked(b):
-                self.generated_clips = t_utils.create_clips(
+                self.generated_clips = zoo_utils.create_clips(
                     available_movies_df=self.available_movies_df,
-                    movies_selected=movies_selected,
-                    movies_paths=movies_paths,
+                    selected_movies=str(self.selected_movies[0]),
+                    movies_paths=str(self.selected_movies_paths[0]),
                     clip_selection=clip_selection,
                     project=self.project,
                     modification_details=clip_modification,
@@ -746,10 +642,10 @@ class ProjectProcessor:
             clip_selection.kwargs = {"clip_length": 5, "clips_range": [0, 10]}
             clip_selection.result = {}
             clip_selection.result["clip_start_time"] = [0]
-            self.generated_clips = t_utils.create_clips(
+            self.generated_clips = zoo_utils.create_clips(
                 available_movies_df=self.available_movies_df,
-                movies_selected=movies_selected,
-                movies_paths=movies_paths,
+                selected_movies=str(self.selected_movies[0]),
+                movies_paths=str(self.selected_movies_paths[0]),
                 clip_selection=clip_selection,
                 project=self.project,
                 modification_details=clip_modification,
@@ -757,6 +653,13 @@ class ProjectProcessor:
                 pool_size=pool_size,
                 is_example=False,
             )
+
+    def check_clip_size(self):
+        """
+        > This function takes a list of file paths and returns a dataframe with the file path and size of
+        each file. If the size is too large, we suggest compressing them as a first step.
+        """
+        return zoo_utils.check_clip_size(clips_list=self.generated_clips.clip_path)
 
     def upload_zoo_subjects(self, subject_type: str):
         """
@@ -786,7 +689,7 @@ class ProjectProcessor:
                 if temp_clip_path.exists():
                     temp_clip_path.unlink()
 
-            logging.info(f"Clips temporarily stored locally has been removed")
+            logging.info("Clips temporarily stored locally has been removed")
 
         elif subject_type == "frame":
             upload_df = zoo_utils.set_zoo_frame_metadata(
@@ -838,25 +741,17 @@ class ProjectProcessor:
             workflow_checks = self.workflow_widget.checks
 
         # Retrieve a subset of the subjects from the workflows of interest and
-        # populate the sql subjects table
-        selected_zoo_workflows = zoo_utils.sample_subjects_from_workflows(
+        # populate the sql subjects table and flatten the classifications provided the cit. scientists
+        self.processed_zoo_classifications = zoo_utils.process_zoo_classifications(
             project=self.project,
             server_connection=self.server_connection,
             db_connection=self.db_connection,
             workflow_widget_checks=workflow_checks,
             workflows_df=self.zoo_info["workflows"],
             subjects_df=self.zoo_info["subjects"],
-        )
-
-        # Make sure all the classifications have existing subjects,
-        # Flatten the classifications provided the cit. scientists
-        self.processed_zoo_classifications = zoo_utils.process_zoo_classifications(
-            project=self.project,
-            db_connection=self.db_connection,
             csv_paths=self.csv_paths,
             classifications_data=self.zoo_info["classifications"],
             subject_type=workflow_checks["Subject type: #0"],
-            selected_zoo_workflows=selected_zoo_workflows,
         )
 
     def aggregate_zoo_classifications(
@@ -1055,6 +950,24 @@ class ProjectProcessor:
         display(frame_modification)
         display(button)
 
+    def check_frame_size(self):
+        """
+        It takes a list of file paths, gets the size of each file, and returns a dataframe with the file
+        path and size of each file
+
+        :param frame_paths: a list of paths to the frames you want to check
+        :return: A dataframe with the file path and size of each frame.
+        """
+        # Check the size of the frames
+        return zoo_utils.check_frame_size(
+            frame_paths=self.generated_frames["frame_path"].unique()
+        )
+
+    # Function to compare original to modified frames
+    def compare_frames(self, df):
+        # Function to compare original to modified frames
+        kso_widgets.compare_frames(df)
+
     #############
     # t8
     #############
@@ -1064,9 +977,9 @@ class ProjectProcessor:
 
         """
         # Display the displays the processed classifications for a given subject
-        t_utils.explore_classifications_per_subject(
-            self.processed_zoo_classifications,
-            self.workflow_widget.checks["Subject type: #0"],
+        kso_widgets.explore_classifications_per_subject(
+            class_df=self.processed_zoo_classifications,
+            subject_type=self.workflow_widget.checks["Subject type: #0"],
         )
 
     def get_classifications(
@@ -1083,6 +996,29 @@ class ProjectProcessor:
             workflows_df=workflows_df,
             subj_type=subj_type,
             class_df=class_df,
+        )
+
+    def launch_classifications_table(self):
+        """
+        It takes in a dataframe of aggregated classifications and a subject type, and returns a dataframe
+        with the columns "subject_ids", "label", "how_many", and "first_seen"
+        """
+        agg_class_df = zoo_utils.launch_classifications_table(
+            agg_class_df=self.aggregated_zoo_classifications,
+            subject_type=self.workflow_widget.checks["Subject type: #0"],
+        )
+
+        return agg_class_df
+
+    def launch_classifications_viewer(self):
+        """
+        > This function takes a dataframe of classifications and a subject type (frame or video) and
+        displays a dropdown menu of subjects of that type. When a subject is selected, it displays the
+        subject and the classifications for that subject
+        """
+        kso_widgets.launch_classifications_viewer(
+            class_df=self.aggregated_zoo_classifications,
+            subject_type=self.workflow_widget.checks["Subject type: #0"],
         )
 
     def download_classications_csv(self, class_df):
@@ -1102,6 +1038,25 @@ class ProjectProcessor:
 
         logging.info(f"The classications have been downloaded to {csv_filename}")
 
+    def get_annotations_viewer(self, folder_path: str, annotation_classes: list):
+        """
+        > This function takes in a folder path and a list of annotation classes and returns a widget that
+        allows you to view the annotations in the folder
+
+        :param folder_path: The path to the folder containing the images you want to annotate
+        :type folder_path: str
+        :param annotation_classes: list of strings
+        :type annotation_classes: list
+        :return: A list of dictionaries, each dictionary containing the following keys
+                 - 'image_path': the path to the image
+                 - 'annotations': a list of dictionaries, each dictionary containing the following keys:
+                 - 'class': the class of the annotation
+                 - 'bbox': the bounding box of the annotation
+        """
+        return yolo_utils.get_annotations_viewer(
+            folder_path, species_list=annotation_classes
+        )
+
     def download_gbif_occurrences(self, classified_by, df):
         if classified_by == "citizen_scientists":
             # Add the site and movie information to the classifications based on the subject information
@@ -1113,7 +1068,7 @@ class ProjectProcessor:
             )
 
         # Format the classifications to Darwin Core Standard occurrences
-        occurrence_df = t_utils.format_to_gbif(
+        occurrence_df = kso_widgets.format_to_gbif(
             self.project,
             self.db_connection,
             df,
@@ -1132,6 +1087,45 @@ class ProjectProcessor:
         occurrence_df.to_csv(csv_filename, index=False)
 
         logging.info(f"The occurences have been downloaded to {csv_filename}")
+
+    def process_detections(
+        self,
+        project,
+        db_connection,
+        csv_paths,
+        annotations_csv_path,
+        model_registry,
+        model,
+        project_name,
+        team_name,
+    ):
+        """
+        > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+        and saves the results in different csv files.
+        """
+        return yolo_utils.process_detections(
+            project=project,
+            db_connection=db_connection,
+            csv_paths=csv_paths,
+            annotations_csv_path=annotations_csv_path,
+            model_registry=model_registry,
+            selected_movies_id=self.selected_movies_ids,
+            model=model,
+            project_name=project_name,
+            team_name=team_name,
+            source_movies=self.selected_movies_paths,
+        )
+
+    def plot_processed_detections(self, df, thres, int_length):
+        """
+        > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+        and saves the results in different csv files.
+        """
+        yolo_utils.plot_processed_detections(
+            df=df,
+            thres=thres,
+            int_length=int_length,
+        )
 
     #############
     # t9
@@ -1199,7 +1193,7 @@ class ProjectProcessor:
             transposed_df, df_to_merge, on=["movie_id", "second_in_movie"]
         )
 
-        ###### Sort columns into the expected order as specified by Leon
+        # Sort columns into the expected order as specified by Leon
         sp_list = df[sp_group_col].unique()
 
         # Separate columns with species_info and the rest
@@ -1270,12 +1264,24 @@ class MLProjectProcessor(ProjectProcessor):
                 path_to_val.unlink()
         except OSError:
             pass
+        import cv2
+
+        # Monkey-patch the cv2.VideoWriter class to use the default codec
+        class CustomVideoWriter(cv2.VideoWriter):
+            def __init__(self, *args, **kwargs):
+                args = list(args)
+                args[0] = args[0].replace(".avi", ".mp4")
+                args[1] = cv2.VideoWriter_fourcc(*"avc1")
+                super().__init__(*args, **kwargs)
+
+        # Replace cv2.VideoWriter with the patched version
+        cv2.VideoWriter = CustomVideoWriter
 
         self.modules = g_utils.import_modules([])
         self.modules.update(g_utils.import_modules(["yolo_utils"], utils=True))
         self.modules.update(
             g_utils.import_modules(
-                ["torch", "wandb", "yaml", "ultralytics"],
+                ["wandb", "yaml", "ultralytics"],
                 utils=False,
             )
         )
@@ -1512,7 +1518,7 @@ class MLProjectProcessor(ProjectProcessor):
 
     def choose_entity(self, alt_name: bool = False):
         if self.team_name is None:
-            return t_utils.choose_entity()
+            return widgets.choose_entity()
         else:
             if not alt_name:
                 logging.info(
@@ -1521,7 +1527,7 @@ class MLProjectProcessor(ProjectProcessor):
                     " set the argument alt_name to True"
                 )
             else:
-                return t_utils.choose_entity()
+                return widgets.choose_entity()
 
     def setup_paths(self, test: bool = False):
         if not isinstance(self.output_path, str) and self.output_path is not None:
@@ -1536,7 +1542,7 @@ class MLProjectProcessor(ProjectProcessor):
             )
 
     def choose_train_params(self):
-        return t_utils.choose_train_params(self.model_type)
+        return widgets.choose_train_params(self.model_type)
 
     def train_yolo(
         self,
@@ -1569,15 +1575,22 @@ class MLProjectProcessor(ProjectProcessor):
             if active_run:
                 mlflow.end_run()
 
+            from mlflow.exceptions import MlflowException
+
             try:
                 experiment_id = mlflow.create_experiment(
                     self.project_name,
                 )
-            except:
-                current_experiment = dict(
-                    mlflow.get_experiment_by_name(self.project_name)
-                )
-                experiment_id = current_experiment["experiment_id"]
+            except MlflowException as e:
+                # Check if the experiment already exists
+                if "RESOURCE_ALREADY_EXISTS" in str(e):
+                    current_experiment = mlflow.get_experiment_by_name(
+                        self.project_name
+                    )
+                    experiment_id = current_experiment.experiment_id
+                else:
+                    # Handle other MlflowExceptions
+                    raise e
 
             mlflow.start_run(experiment_id=experiment_id, run_name=exp_name)
             mlflow.log_input(train_dataset, context="training")
@@ -1924,21 +1937,8 @@ class MLProjectProcessor(ProjectProcessor):
         else:
             logging.info("No trained model found, using yolov8 base model...")
             best_model = "yolov8s.pt"
+
         model = self.modules["ultralytics"].YOLO(best_model)
-
-        # Set backend to MACOS to enable mp4 output
-        import platform
-
-        # Define the fake system name
-        fake_system_name = "Darwin"
-
-        # Define a function to return the fake system name
-        def fake_system():
-            return fake_system_name
-
-        # Monkey patch platform.system() with the fake_system function
-        platform.system = fake_system
-
         project = str(Path(save_dir))
         self.eval_dir = str(increment_path(Path(project) / name, exist_ok=False))
         if latest:
@@ -1956,7 +1956,7 @@ class MLProjectProcessor(ProjectProcessor):
                         stream=True,
                     )
                     for i in results:
-                        print(i.speed)
+                        logging.debug(i.speed)
             else:
                 results = model.predict(
                     project=project,
@@ -1970,7 +1970,7 @@ class MLProjectProcessor(ProjectProcessor):
                     stream=True,
                 )
                 for i in results:
-                    print(i.speed)
+                    logging.debug(i.speed)
         else:
             if isinstance(source, list):
                 for src in source:
@@ -2010,7 +2010,17 @@ class MLProjectProcessor(ProjectProcessor):
             try:
                 data_dict = read_yaml_file(self.data_path)
                 species_mapping = data_dict["names"]
-            except:
+            except FileNotFoundError:
+                # Handle the case when the file doesn't exist
+                logging.info(f"File not found: {self.data_path}")
+                species_mapping = {}
+            except KeyError:
+                # Handle the case when the "names" key is missing
+                logging.info("Key 'names' not found in the YAML file.")
+                species_mapping = {}
+            except Exception as e:
+                # Handle any other unexpected errors
+                logging.info(f"An unexpected error occurred: {e}")
                 species_mapping = {}
 
             self.modules["yolo_utils"].set_config(
@@ -2023,7 +2033,13 @@ class MLProjectProcessor(ProjectProcessor):
                 eval_dir, self.run, log=True, registry=self.registry
             )
             self.modules["yolo_utils"].add_data(
-                eval_dir, "detection_output", self.registry, self.run
+                Path(eval_dir, "annotations.csv"),
+                "detection_output",
+                self.registry,
+                self.run,
+            )
+            self.modules["yolo_utils"].add_data(
+                Path(eval_dir, "labels"), "detection_output", self.registry, self.run
             )
         elif self.registry == "mlflow":
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
@@ -2033,7 +2049,13 @@ class MLProjectProcessor(ProjectProcessor):
                 registry=self.registry,
             )
             self.modules["yolo_utils"].add_data(
-                path=eval_dir,
+                path=Path(eval_dir, "annotations.csv"),
+                name="detection_output",
+                registry=self.registry,
+                run=self.run,
+            )
+            self.modules["yolo_utils"].add_data(
+                path=Path(eval_dir, "labels"),
                 name="detection_output",
                 registry=self.registry,
                 run=self.run,
@@ -2044,10 +2066,19 @@ class MLProjectProcessor(ProjectProcessor):
             conf=conf_thres, model_name=model, evaluation_directory=eval_dir
         )
         self.modules["yolo_utils"].add_data(
-            path=eval_dir, name="detection_output", registry=self.registry, run=self.run
+            path=Path(eval_dir, "labels"),
+            name="detection_output",
+            registry=self.registry,
+            run=self.run,
         )
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
             eval_dir, self.run, log=True
+        )
+        self.modules["yolo_utils"].add_data(
+            path=Path(eval_dir, "annotations.csv"),
+            name="detection_output",
+            registry=self.registry,
+            run=self.run,
         )
 
     def segment_footage(self, source: str):
@@ -2253,9 +2284,9 @@ class MLProjectProcessor(ProjectProcessor):
             best_run = self.run_history[0]
         else:
             self.download_project_runs()
-            try:
+            if self.run_history:
                 best_run = self.run_history[0]
-            except:
+            else:
                 best_run = None
         try:
             best_metric = best_run["metrics"][metric]

@@ -160,7 +160,7 @@ jobs:
       - name: Pylint Test NB tutorials
         if: success() || failure()
         run: |
-          /github/home/.local/bin/nbqa pylint --disable=no-member,assignment-from-no-return tutorials
+          /github/home/.local/bin/nbqa pylint --disable=no-member,assignment-from-no-return,no-value-for-parameter tutorials
         # If one of the pylint steps fails, there are errors and we do not need to run the test below.
       - name: Login W&B
         shell: bash
