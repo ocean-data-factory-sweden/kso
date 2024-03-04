@@ -19,5 +19,5 @@ jobs:
         with:
           options: "--check --verbose"
           jupyter: true
-          version: "~= 22.0"
+          version: "~= 24.0"
 
