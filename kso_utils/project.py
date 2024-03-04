@@ -591,26 +591,19 @@ class ProjectProcessor:
         # Ensure the selected footage and paths are loaded to the system
         self.check_selected_movies(test)
 
-        selected_movies = self.selected_movies
-        movies_paths = self.selected_movies_paths
-
         # Roadblock to ensure only one movie has been selected
         # Option to generate clips from multiple movies is not available at this point
-        if len(selected_movies) > 1 or isinstance(selected_movies, list):
-            logging.info(
-                "The option to generate clips from multiple movies is not available at this point. Please select only one movie to gerenate clips from"
+        if len(self.selected_movies) > 1 or isinstance(self.selected_movies, list):
+            logging.error(
+                "The option to generate clips from multiple movies is not available at this point. Please select only one movie to generate clips from"
             )
-            return
-
-        else:
-            selected_movies = str(selected_movies[0])
-            movies_paths = str(movies_paths[0])
+            return None
 
         # Select the clips to be extracted
         clip_selection = kso_widgets.select_n_clips(
             project=self.project,
             db_connection=self.db_connection,
-            selected_movies=selected_movies,
+            selected_movies=str(self.selected_movies[0]),
             is_example=is_example,
         )
         clip_modification = kso_widgets.clip_modification_widget()
@@ -627,8 +620,8 @@ class ProjectProcessor:
             def on_button_clicked(b):
                 self.generated_clips = zoo_utils.create_clips(
                     available_movies_df=self.available_movies_df,
-                    selected_movies=selected_movies,
-                    movies_paths=movies_paths,
+                    selected_movies=str(self.selected_movies[0]),
+                    movies_paths=str(self.selected_movies_paths[0]),
                     clip_selection=clip_selection,
                     project=self.project,
                     modification_details=clip_modification,
@@ -651,8 +644,8 @@ class ProjectProcessor:
             clip_selection.result["clip_start_time"] = [0]
             self.generated_clips = zoo_utils.create_clips(
                 available_movies_df=self.available_movies_df,
-                selected_movies=selected_movies,
-                movies_paths=movies_paths,
+                selected_movies=str(self.selected_movies[0]),
+                movies_paths=str(self.selected_movies_paths[0]),
                 clip_selection=clip_selection,
                 project=self.project,
                 modification_details=clip_modification,
