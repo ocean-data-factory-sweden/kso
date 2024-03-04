@@ -56,7 +56,7 @@ def test_choose_folder():
 
 
 def test_choose_footage_source():
-    widget = kso_widgets.test_choose_footage_source()
+    widget = kso_widgets.choose_footage_source()
     assert widget.value == "Existing Footage"
 
 
