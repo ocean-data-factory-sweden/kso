@@ -62,7 +62,7 @@ def test_choose_footage_source():
 
 def test_choose_footage():
     widget = kso_widgets.choose_footage(
-        df=pd.DataFrame(),
+        df=pd.DataFrame(columns=["filename"]),
         project=project,
         server_connection=pp.server_connection,
         footage_source="Existing Footage",

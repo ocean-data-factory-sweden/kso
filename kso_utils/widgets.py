@@ -260,7 +260,7 @@ def choose_footage_source():
     # Create radio buttons
     source_widget = widgets.RadioButtons(
         options=["Existing Footage", "New Footage"],
-        value=None,
+        value="Existing Footage",
         description="Choose footage source:",
     )
 
