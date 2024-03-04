@@ -29,6 +29,7 @@ from tqdm import tqdm
 from pathlib import Path
 from collections.abc import Callable
 from natsort import index_natsorted
+from IPython import get_ipython
 
 # util imports
 from kso_utils.project_utils import Project
@@ -214,7 +215,7 @@ def prepare(data_path, percentage_test, out_path):
     latest_movie = ""
     for pathAndFilename in Path(dataset_path).rglob("*.jpg"):
         file_path = Path(pathAndFilename)
-        title, ext = file_path.name, file_path.suffix
+        title, _ = file_path.name, file_path.suffix
         movie_name = title.replace("_frame_*", "", regex=True)
 
         if counter == index_test + 1:
@@ -276,7 +277,7 @@ def split_frames(data_path: str, perc_test: float):
     latest_movie = ""
     for pathAndFilename in list(images_path.rglob("*.jpg")):
         file_path = Path(pathAndFilename)
-        title, ext = file_path.name, file_path.suffix
+        title, _ = file_path.name, file_path.suffix
         movie_name = title.replace("_frame_*", "")
 
         if counter >= index_test + 1:
@@ -406,7 +407,7 @@ def frame_aggregation(
     with open(
         Path(
             out_path,
-            f"{project.Project_name+'_'+datetime.datetime.now().strftime('%H:%M:%S')}.yaml",
+            f"{project.Project_name+'_'+datetime.datetime.now().strftime('%H_%M_%S')}.yaml",
         ),
         "w",
     ) as outfile:
@@ -731,10 +732,17 @@ def frame_aggregation(
 
             if link_bool:
                 try:
-                    s1, s2 = PIL.Image.open(
-                        requests.get(filename, stream=True).raw
-                    ).size
-                except:
+                    # Attempt to open the image and get its size
+                    response = requests.get(filename, stream=True)
+                    if response.status_code == 200:
+                        image = PIL.Image.open(response.raw)
+                        s1, s2 = image.size
+                    else:
+                        # If the request was unsuccessful, use the fallback size
+                        s1, s2 = img_size
+                except (IOError, PIL.UnidentifiedImageError) as e:
+                    # Handle specific exceptions for image loading failures
+                    logging.error(f"Failed to load image: {e}")
                     s1, s2 = img_size
             else:
                 s1, s2 = PIL.Image.open(filename).size
@@ -750,7 +758,7 @@ def frame_aggregation(
                     + box
                 )
 
-    ### Final export step
+    # Final export step
     if movie_bool:
         # Export full rows
         full_rows = pd.DataFrame(
@@ -803,12 +811,12 @@ def frame_aggregation(
     ):
         if movie_bool:
             file_path = Path(name[1])
-            file, ext = file_path.stem, file_path.suffix
+            file, _ = file_path.stem, file_path.suffix
             file_out = Path(out_path, "labels", f"{file}_frame_{name[0]}.txt")
             img_out = Path(out_path, "images", f"{file}_frame_{name[0]}.jpg")
         else:
             file_path = Path(name)
-            file, ext = file_path.stem, file_path.suffix
+            file, _ = file_path.stem, file_path.suffix
             file_out = Path(out_path, "labels", f"{file}.txt")
             img_out = Path(out_path, "images", f"{file}.jpg")
 
@@ -1803,19 +1811,25 @@ def adjust_tracking(
     import torch
 
     try:
-        model = torch.load(
-            Path(
-                [
-                    f
-                    for f in Path(tracking_folder).parent.iterdir()
-                    if f.is_file() and "best.pt" in str(f)
-                ][-1]
-            )
-        )
-        names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
+        # Find the latest model file named "best.pt" in the directory
+        model_files = [
+            f
+            for f in Path(tracking_folder).parent.iterdir()
+            if f.is_file() and "best.pt" in str(f)
+        ]
+        if model_files:
+            latest_model_file = sorted(model_files)[-1]
+            model = torch.load(latest_model_file)
+            names = {
+                i: model["model"].names[i] for i in range(len(model["model"].names))
+            }
+        else:
+            raise FileNotFoundError("No model file found")
 
-    except:
-        logging.error("Model not found, using class_id.")
+    except (FileNotFoundError, IndexError) as e:
+        # Handle specific exceptions for file not found or index errors
+        logging.error(f"Error loading model: {e}")
+        logging.error("Using class_id.")
         names = {}
 
     if plot_result:
@@ -1884,6 +1898,281 @@ def adjust_tracking(
     else:
         logging.info(filtered_df["class_id"].value_counts())
     return filtered_df.to_csv(str(Path(tracking_folder, "tracking_clean.csv")))
+
+
+# Auxiliary function to obtain a dictionary with the mapping between the class ids used by the detection model and the species names
+def get_species_mapping(model, project_name, team_name="koster"):
+    import wandb
+
+    api = wandb.Api()
+
+    full_path = f"{team_name}/{project_name}"
+    runs = api.runs(full_path)  # Get all runs in the project
+    for r in runs:
+        # Choose the run corresponding to the model given as parameter
+        if r.id == model.split("_")[1]:
+            run = api.run(project_name + "/" + r.id)
+
+    import yaml
+
+    def read_yaml_file(file_path):
+        with open(file_path, "r") as file:
+            yaml_data = yaml.safe_load(file)
+        return yaml_data
+
+    # Read species mapping into data dictionary
+    try:
+        # Attempt to directly read species mapping from the configuration
+        data_dict = run.rawconfig["data_dict"]
+        species_mapping = data_dict["names"]
+    except KeyError:
+        try:
+            # Attempt to read species mapping from a YAML file specified in the configuration
+            data_dict = read_yaml_file(run.rawconfig["data"])
+            species_mapping = data_dict["names"]
+            species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
+        except (FileNotFoundError, KeyError):
+            # Handle the case where species mapping cannot be found in either location
+            logging.error("Error reading species mapping from config or file.")
+            species_mapping = {}
+
+    return species_mapping
+
+
+def process_detections(
+    project: Project,
+    db_connection,
+    csv_paths: dict,
+    annotations_csv_path: str,
+    model_registry: str,
+    selected_movies_id: dict = None,
+    model: str = None,
+    project_name: str = None,
+    team_name: str = None,
+    source_movies: str = None,
+):
+    """
+    > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+    and saves the results in different csv files.
+
+    :param project: the project object
+    :param db_connection: SQL connection object
+    :param csv_paths: a dictionary with the paths of the csvs used to initiate the db
+    :param annotations_csv_path: the path to the folder containing the annotations.csv file or the annotations.csv
+    :param selected_movies_id: the ids of the movies selected in earlier steps (note if the selection changes b, mlflow)
+    :param model_registry: the name of the model register (e.g wandb, mlflow)
+    :param model: the name of the model in wandb used to obtain the detections
+    :param project_name: name of the project in wandb
+    :param team_name: name of the team in wandb.
+    :param source_movies: A string with the path to the movies where the model ran inferences from
+    """
+
+    # Read the annotations.csv file
+    df = pd.read_csv(Path(annotations_csv_path, "annotations.csv"))
+
+    # Check if the DataFrame is not empty
+    if df.empty:
+        raise ValueError(
+            "There are no labels to aggregate, run the model again with a lower threshold or try a different model."
+        )
+
+    # Extract the actual filenames using pathlib
+    df["filename"] = df["filename"].apply(lambda path: Path(path).name)
+
+    # Remove frame number and txt extension from filename to represent individual movies
+    if project_name == "template_project":
+        # Extract unique movie names using regular expression
+        df["movie_filename"] = df["filename"].str.rsplit("_", n=1).str[0]
+    else:
+        df["movie_filename"] = (
+            df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
+        )
+
+    # Drop the filename column to avoid confusion
+    df = df.drop("filename", axis=1)
+
+    # Add movie ids info from the movies selected in choose_footage
+    if selected_movies_id:
+        # Create a new column with the mapped values
+        df["movie_id"] = df["movie_filename"].apply(
+            lambda x: dict(selected_movies_id).get(x, None)
+        )
+
+        # Define the movie col of interest
+        movie_group_col = "movie_id"
+
+    else:
+        # Define the movie col of interest
+        movie_group_col = "movie_filename"
+
+    # Map the class id to species labels
+    if model_registry == "wandb":
+        # Set the name of the template project
+        if project_name == "template_project":
+            project_name = "spyfish_aotearoa"
+
+        # Obtain a dictionary with the mapping between the class ids and the species names
+        species_mapping = get_species_mapping(model, project_name, team_name)
+
+        # Add a column with the species name corresponding to each class id
+        df["commonName"] = df["class_id"].astype(str).map(species_mapping)
+
+        # Define the movie col of interest
+        sp_group_col = "commonName"
+
+    else:
+        # Define the movie col of interest
+        sp_group_col = "class_id"
+
+    # Get max_n per class detected in each movie per frame
+    df["max_n"] = df.groupby([movie_group_col, "frame_no"])[sp_group_col].transform(
+        "count"
+    )
+
+    # Specify the columns for which we want unique confidence values
+    columns_conf = [movie_group_col, "frame_no", sp_group_col]
+
+    # Get the confidence range of each detection per frame and add three columns
+    df["min_conf"] = df.groupby(columns_conf)["conf"].transform("min")
+    df["mean_conf"] = df.groupby(columns_conf)["conf"].transform("mean")
+    df["max_conf"] = df.groupby(columns_conf)["conf"].transform("max")
+
+    # Create a boolean mask for duplicated rows based on the specified columns
+    mask_duplicates = df.duplicated(subset=columns_conf, keep=False)
+
+    # Keep only unique rows based on grouped columns
+    df = df[~mask_duplicates]
+
+    # Retrieve the max counts and conf.levels of uploaded footage
+    if all(column_name in df.columns for column_name in ["movie_id", "commonName"]):
+        from kso_utils.db_utils import add_db_info_to_df
+
+        # Combine the movie info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="movies",
+        )
+
+        # Combine the site info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="sites",
+        )
+
+        # Combine the species info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="species",
+        )
+
+    # Set the fps information for movies without info in the sql db
+    if "fps" not in df.columns:
+        from kso_utils.movie_utils import get_fps_duration
+
+        # Get the fps of the movie
+        df["fps"], _ = get_fps_duration(movie_path=source_movies)
+
+        # Set the movie id to 0
+        df["movie_id"] = 0
+
+    # Calculate the corresponding second of the frame in the movie
+    df["second_in_movie"] = (df["frame_no"] / df["fps"]).astype(int)
+
+    # Report the function ran without issues.
+    logging.info(
+        f"Detections processed. The dataframe has a total of {df.shape[0]} rows and {df.shape[1]} columns",
+    )
+
+    return df
+
+
+def plot_processed_detections(
+    df,
+    thres: int = 5,  # number of seconds for thresholding in interval
+    int_length: int = 10,
+):
+    """
+    > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+    and saves the results in different csv files.
+    :param df: df of the aggregated detections
+    :param thres: The `thres` parameter is used to filter out columns in the `result_df`
+    DataFrame where the corresponding `frame_count` column has a value less than `thres`. This
+    means that only columns with a minimum number of frames per interval greater than or equal to
+    `thres, defaults to 5
+    :param int_length: An integer value specifying the length in seconds of interval for filtering
+
+    """
+
+    if "second_in_movie" not in df.columns:
+        logging.error("Aggregation plot not currently supported on this film.")
+
+    # Convert 'second_in_movie' to seconds since 0 (e.g. the start of the movie)
+    reference_time = pd.to_datetime("1970-01-01 00:00:00", format="%Y-%m-%d %H:%M:%S")
+
+    df["seconds_since_reference"] = (
+        pd.to_datetime(df["second_in_movie"], unit="s") - reference_time
+    ).dt.total_seconds()
+
+    # Ensure 'seconds_since_reference' is in datetime format
+    df["seconds_since_reference"] = pd.to_datetime(
+        df["seconds_since_reference"], unit="s"
+    )
+
+    # Group by n-second intervals
+    interval = pd.Grouper(key="seconds_since_reference", freq=str(int_length) + "S")
+
+    # Group by species and minute, calculate the count
+    max_count_per_species = (
+        df.groupby(["movie_id", "commonName", interval])["max_n"].max().reset_index()
+    )
+
+    # Enable plotting of matplotlib
+    try:
+        # Enable inline plotting for Matplotlib
+        get_ipython().magic("matplotlib inline")
+    except ImportError:
+        # Handle the case where IPython is not available
+        pass
+    except Exception as e:
+        # Handle other specific exceptions that may occur
+        print(f"Error occurred while enabling inline plotting: {e}")
+
+    import matplotlib.pyplot as plt
+
+    # Plot each movie separately
+    movies = max_count_per_species["movie_id"].unique()
+
+    for movie_id in movies:
+        movie_data = max_count_per_species[
+            max_count_per_species["movie_id"] == movie_id
+        ]
+
+        # Create a separate line plot for each species
+        species_list = movie_data["commonName"].unique()
+        plt.figure(figsize=(10, 6))
+
+        for species in species_list:
+            species_data = movie_data[movie_data["commonName"] == species]
+            plt.plot(
+                species_data["seconds_since_reference"],
+                species_data["max_n"],
+                label=species,
+            )
+
+            plt.xlabel("Timestamp (seconds)")
+        plt.ylabel("Max Individuals Recorded in a Minute")
+        plt.title(f"Max Individuals Recorded Every Minute for Movie {movie_id}")
+        plt.legend()
+        plt.show()
 
 
 def main():
