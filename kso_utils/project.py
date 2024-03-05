@@ -593,7 +593,7 @@ class ProjectProcessor:
 
         # Roadblock to ensure only one movie has been selected
         # Option to generate clips from multiple movies is not available at this point
-        if len(self.selected_movies) > 1 or isinstance(self.selected_movies, list):
+        if len(self.selected_movies) > 1 and isinstance(self.selected_movies, list):
             logging.error(
                 "The option to generate clips from multiple movies is not available at this point. Please select only one movie to generate clips from"
             )
