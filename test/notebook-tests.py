@@ -113,7 +113,7 @@ def test_t3(zoo_user, zoo_pass):
         "https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4"
     ]
     # Check whether movie has been uploaded previously
-    pp.check_movies_uploaded_zoo()
+    pp.check_movies_uploaded_zoo(test=True)
     # Do not use GPU by default
     gpu_available = kso_widgets.gpu_select()
     # Generate a default number of clips for testing

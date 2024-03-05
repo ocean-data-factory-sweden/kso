@@ -553,7 +553,7 @@ class ProjectProcessor:
             generate_export=generate_export,
         )
 
-    def check_movies_uploaded_zoo(self):
+    def check_movies_uploaded_zoo(self, test):
         """
         This function checks if a movie has been uploaded to Zooniverse
 
@@ -561,7 +561,7 @@ class ProjectProcessor:
         :type selected_movies: list
         """
         # Ensure the selected footage and paths are loaded to the system
-        self.check_selected_movies()
+        self.check_selected_movies(test)
 
         zoo_utils.check_movies_uploaded_zoo(
             project=self.project,
@@ -1268,7 +1268,7 @@ class MLProjectProcessor(ProjectProcessor):
         self.modules.update(g_utils.import_modules(["yolo_utils"], utils=True))
         self.modules.update(
             g_utils.import_modules(
-                ["wandb", "yaml", "ultralytics"],
+                ["torch", "wandb", "yaml", "ultralytics"],
                 utils=False,
             )
         )
@@ -1505,7 +1505,7 @@ class MLProjectProcessor(ProjectProcessor):
 
     def choose_entity(self, alt_name: bool = False):
         if self.team_name is None:
-            return widgets.choose_entity()
+            return kso_widgets.choose_entity()
         else:
             if not alt_name:
                 logging.info(
@@ -1514,7 +1514,7 @@ class MLProjectProcessor(ProjectProcessor):
                     " set the argument alt_name to True"
                 )
             else:
-                return widgets.choose_entity()
+                return kso_widgets.choose_entity()
 
     def setup_paths(self, test: bool = False):
         if not isinstance(self.output_path, str) and self.output_path is not None:
@@ -1529,7 +1529,7 @@ class MLProjectProcessor(ProjectProcessor):
             )
 
     def choose_train_params(self):
-        return widgets.choose_train_params(self.model_type)
+        return kso_widgets.choose_train_params(self.model_type)
 
     def train_yolo(
         self,
