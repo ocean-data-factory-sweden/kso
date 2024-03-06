@@ -5,7 +5,7 @@ csv_diff==1.1
 dataclass_csv==1.4.0
 fiftyone==0.22.3
 ffmpeg_python==0.2.0
-gdown==4.7.3
+gdown==5.1.0
 ipysheet==0.7.0
 jupyter_bbox_widget==0.5.0
 lida==0.0.10
