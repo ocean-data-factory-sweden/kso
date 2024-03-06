@@ -766,15 +766,23 @@ class ProjectProcessor:
         else:
             workflow_checks = self.workflow_widget.checks
 
-        # If users is not an empty list
-        if users != []:
-            # Obtain classifications only from the selected users
-            users = list(users)
-            classifications_filtered = self.processed_zoo_classifications[
-                self.processed_zoo_classifications["user_name"].isin(users)
-            ]
-        else:
+        if isinstance(users, list):
+            # If users is already a list, select all user classifications
             classifications_filtered = self.processed_zoo_classifications
+        else:
+            # Convert users widget to a list
+            users_list = list(users.value) if users else None
+
+            if users_list:
+                # Obtain classifications only from the selected users
+                classifications_filtered = self.processed_zoo_classifications[
+                    self.processed_zoo_classifications["user_name"].isin(users_list)
+                ].copy()
+            else:
+                logging.warning(
+                    "Processing the classifications of all users as no user was selected."
+                )
+                classifications_filtered = self.processed_zoo_classifications
 
         self.aggregated_zoo_classifications = zoo_utils.aggregate_classifications(
             self.project,
