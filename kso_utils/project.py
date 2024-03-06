@@ -1959,29 +1959,34 @@ class MLProjectProcessor(ProjectProcessor):
                 for i in results:
                     logging.debug(i.speed)
         else:
-            if isinstance(source, list):
-                for src in source:
-                    self.modules["detect"].run(
-                        weights=best_model,
-                        source=src,
-                        conf_thres=conf_thres,
-                        save_txt=True,
-                        save_conf=True,
-                        project=save_dir,
-                        name=name,
-                        nosave=not save_output,
-                    )
-            else:
-                self.modules["detect"].run(
-                    weights=best_model,
-                    source=source,
-                    conf_thres=conf_thres,
-                    save_txt=True,
-                    save_conf=True,
-                    project=save_dir,
-                    name=name,
-                    nosave=not save_output,
-                )
+            logging.error(
+                "We do not currently support running YoloV5 models. Please re-train models "
+                "using the latest model version available"
+            )
+            return
+            # if isinstance(source, list):
+            #     for src in source:
+            #         self.modules["detect"].run(
+            #             weights=best_model,
+            #             source=src,
+            #             conf_thres=conf_thres,
+            #             save_txt=True,
+            #             save_conf=True,
+            #             project=save_dir,
+            #             name=name,
+            #             nosave=not save_output,
+            #         )
+            # else:
+            #     self.modules["detect"].run(
+            #         weights=best_model,
+            #         source=source,
+            #         conf_thres=conf_thres,
+            #         save_txt=True,
+            #         save_conf=True,
+            #         project=save_dir,
+            #         name=name,
+            #         nosave=not save_output,
+            #     )
         self.save_detections(conf_thres, model.ckpt_path, self.eval_dir)
 
     def save_detections(self, conf_thres: float, model: str, eval_dir: str):
@@ -2017,7 +2022,11 @@ class MLProjectProcessor(ProjectProcessor):
                 species_map=species_mapping,
             )
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-                eval_dir, self.run, log=True, registry=self.registry
+                evaluation_path=eval_dir,
+                run=self.run,
+                log=True,
+                registry=self.registry,
+                movie_csv_df=self.local_movies_csv,
             )
             self.modules["yolo_utils"].add_data(
                 Path(eval_dir, "annotations.csv"),
@@ -2030,10 +2039,11 @@ class MLProjectProcessor(ProjectProcessor):
             )
         elif self.registry == "mlflow":
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-                eval_dir,
-                self.run,
+                evaluation_path=eval_dir,
+                run=self.run,
                 log=True,
                 registry=self.registry,
+                movie_csv_df=self.local_movies_csv,
             )
             self.modules["yolo_utils"].add_data(
                 path=Path(eval_dir, "annotations.csv"),
@@ -2059,7 +2069,11 @@ class MLProjectProcessor(ProjectProcessor):
             run=self.run,
         )
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
-            eval_dir, self.run, log=True
+            eval_dir,
+            self.run,
+            log=True,
+            registry=self.registry,
+            movie_csv_df=self.local_movies_csv,
         )
         self.modules["yolo_utils"].add_data(
             path=Path(eval_dir, "annotations.csv"),
