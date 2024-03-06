@@ -294,7 +294,7 @@ def get_info_selected_movies(
 
         # Remove movie extension to match yolo_format labels
         selected_movies_no_ext = tuple(
-            filename.rsplit(".", 1)[0] for filename in selected_movies
+            Path(filename[0]).stem for filename in selected_movies
         )
 
         selected_movies_ids = {
