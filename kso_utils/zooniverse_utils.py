@@ -666,7 +666,6 @@ def aggregate_classifications(
     if subject_type == "frame":
         # Get the aggregation parameters
         agg_users, min_users, agg_obj, agg_iou, agg_iua = [i.value for i in agg_params]
-
         # Report selected parameters
         logging.info(
             f"Aggregation parameters are: Agg. threshold "

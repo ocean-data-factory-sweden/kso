@@ -754,7 +754,9 @@ class ProjectProcessor:
             subject_type=workflow_checks["Subject type: #0"],
         )
 
-    def aggregate_zoo_classifications(self, agg_params, test: bool = False):
+    def aggregate_zoo_classifications(
+        self, agg_params, users: list, test: bool = False
+    ):
         if test:
             workflow_checks = {
                 "Workflow name: #0": "Development workflow",
@@ -763,9 +765,28 @@ class ProjectProcessor:
             }
         else:
             workflow_checks = self.workflow_widget.checks
+
+        if isinstance(users, list):
+            # If users is already a list, select all user classifications
+            classifications_filtered = self.processed_zoo_classifications
+        else:
+            # Convert users widget to a list
+            users_list = list(users.value) if users else None
+
+            if users_list:
+                # Obtain classifications only from the selected users
+                classifications_filtered = self.processed_zoo_classifications[
+                    self.processed_zoo_classifications["user_name"].isin(users_list)
+                ].copy()
+            else:
+                logging.warning(
+                    "Processing the classifications of all users as no user was selected."
+                )
+                classifications_filtered = self.processed_zoo_classifications
+
         self.aggregated_zoo_classifications = zoo_utils.aggregate_classifications(
             self.project,
-            self.processed_zoo_classifications,
+            classifications_filtered,
             workflow_checks["Subject type: #0"],
             agg_params,
         )

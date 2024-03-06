@@ -427,6 +427,75 @@ def request_latest_zoo_info():
     return latest_info
 
 
+def choose_aggregation_users(info_dict: dict):
+    """
+    > This function shows a widget for selecting the users to keep the annotations from. The options include:
+    - Keep the annotations made by all users. This is the default option.
+    - Select specific users to keep their annotations and discard the rest.
+
+    :param info_dict: a dictionary with the citizen scientits classifications
+    """
+
+    def get_users_list(info_dict: dict, option: str):
+        if "specific" in option:
+            users = select_users(info_dict)
+            return users
+        else:
+            clear_output()
+            return []
+
+    users = interactive(
+        get_users_list,
+        info_dict=widgets.fixed(info_dict),
+        option=widgets.RadioButtons(
+            options=[
+                "Keep annotations of all users",
+                "Select specific users",
+            ],
+            layout={"width": "max-content"},
+            default="Keep annotations of all users",
+            description="Which annotations would you like to keep?",
+            disabled=False,
+            style={"description_width": "initial"},
+        ),
+    )
+    display(users)
+    return users
+
+
+def select_users(info_dict: dict):
+    """
+    Returns a widget showing all the citizen scientits that made classifications in the project,
+    sorted in descending order according to the number of classifications they have made.
+    This facilitates the selection of top contributors to keep their annotations and discard the rest.
+
+    :param info_dict: a dictionary with the citizen scientits classifications
+    """
+
+    users = info_dict["user_name"]
+    unique_counts = users.value_counts().sort_values(ascending=False)
+    unique_counts = unique_counts.index.to_list()
+
+    w = widgets.SelectMultiple(
+        options=unique_counts,
+        description="Select users:",
+        ensure_option=False,
+        disabled=False,
+        layout=widgets.Layout(width="50%"),
+        rows=len(unique_counts),
+        style={"description_width": "initial"},
+    )
+
+    description_widget = HTML(
+        "<p>The users are sorted in descending order based on the number of annotations they have done.</p>"
+    )
+
+    # Display both widgets in a VBox
+    display(w)
+    display(description_widget)
+    return w
+
+
 def choose_agg_parameters(subject_type: str = "clip"):
     """
     > This function creates a set of sliders that allow you to set the parameters for the aggregation
