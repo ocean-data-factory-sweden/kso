@@ -300,7 +300,11 @@ def choose_footage(
         select_movie_widg = select_movie(df)
 
         def update_movie(change):
-            selected_movies = [change["new"]]
+            
+            if test:
+                selected_movies = [change["new"]]
+            else:
+                selected_movies = change["new"]
 
             # Get the df and paths of the selected movies
             (
