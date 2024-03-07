@@ -232,7 +232,6 @@ def select_movie(available_movies_df: pd.DataFrame):
         options=available_movies_tuple,
         description="Select movie(s):",
         ensure_option=False,
-        value=(),
         disabled=False,
         layout=widgets.Layout(width="50%"),
         style={"description_width": "initial"},
