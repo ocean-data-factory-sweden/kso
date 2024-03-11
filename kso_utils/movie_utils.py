@@ -802,7 +802,13 @@ def check_movies_meta(
             )
 
             # Save the updated df locally
-            df.to_csv(csv_paths["local_movies_csv"], index=False)
+            if Path(csv_paths["local_movies_csv"]).is_writable():
+                df.to_csv(csv_paths["local_movies_csv"], index=False)
+            else:
+                logging.info(
+                    "Unable to update local movies.csv file automatically, please do this manually with the given output."
+                )
+                return df
             logging.info(
                 f"The local movies.csv file {csv_paths['local_movies_csv']} has been updated"
             )
