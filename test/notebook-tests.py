@@ -139,7 +139,7 @@ def test_t4(zoo_user, zoo_pass):
     # Process zoo classifications
     pp.process_zoo_classifications(test=True)
     # Aggregate classifications
-    pp.aggregate_zoo_classifications(test=True, agg_params=[0.1, 1])
+    pp.aggregate_zoo_classifications(test=True, users=[], agg_params=[0.1, 1])
     # Fetch relevant frame subjects in dataframe (by default all species for testing)
     pp.extract_zoo_frames(test=True)
     # Review the size of the clips
@@ -327,7 +327,7 @@ def test_t8(zoo_user, zoo_pass):
 
     agg_params = kso_widgets.choose_agg_parameters(workflow_checks["Subject type: #0"])
 
-    pp.aggregate_zoo_classifications(agg_params, test=True)
+    pp.aggregate_zoo_classifications(agg_params=agg_params, users=[], test=True)
 
     # Check that aggregation was successful
     assert len(pp.aggregated_zoo_classifications) == 3
