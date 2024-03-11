@@ -377,7 +377,7 @@ class ProjectProcessor:
                 "Please run 'get_movie_info' before 'choose_footage' to set 'available_movies_df'."
             )
 
-        movie_utils.check_movies_meta(
+        df = movie_utils.check_movies_meta(
             project=self.project,
             csv_paths=self.csv_paths,
             db_connection=self.db_connection,
@@ -387,6 +387,8 @@ class ProjectProcessor:
             review_method=review_method,
             gpu_available=gpu_available,
         )
+        if df is not None:
+            self.temp_local_movies = df
 
     def concatenate_local_movies(self):
         movie_utils.concatenate_local_movies(self.csv_paths)
