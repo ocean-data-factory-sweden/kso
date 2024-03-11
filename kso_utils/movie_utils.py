@@ -1,4 +1,5 @@
 # base imports
+import os
 import sys
 import cv2
 import logging
@@ -802,7 +803,7 @@ def check_movies_meta(
             )
 
             # Save the updated df locally
-            if Path(csv_paths["local_movies_csv"]).is_writable():
+            if os.access(csv_paths["local_movies_csv"], os.W_OK):
                 df.to_csv(csv_paths["local_movies_csv"], index=False)
             else:
                 logging.info(
