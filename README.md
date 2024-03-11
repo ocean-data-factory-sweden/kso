@@ -106,8 +106,12 @@ pip install -r requirements.txt -r gpu_requirements_user.txt
 ```
 
 ## Cloudina 
-**Before running the tutorials in Cloudina, users should have SNIC credentials**
-Instructions will come...
+Cloudina is a hosted version of KSO (powered by JupyterHub) on NAISS Science Cloud. It allows users to scale and automate larger workflows using a powerful processing backend. This is currently an invitation-only service. In order to gain access to the platform, please contact jurie.germishuys[at]combine.se.
+
+The current portals are accessible as:
+1. Console (object storage) - [storage][cdn_bucket]
+2. Album (JupyterHub) - [notebooks][cdn_album]
+3. Vendor (MLFlow) - [mlflow][cdn_vendor]
 
 
 ## Starting a new project
@@ -202,3 +206,6 @@ pip install python-magic-bin
 [screenshot_loading]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/screenshot_loading.png?raw=true
 [cuda_requirements]: https://github.com/ocean-data-factory-sweden/kso/blob/dev/assets/cuda_gpu_example_requirements.png?raw=true
 [screenshot_started]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/screenshot_started.png?raw=true
+[cdn_bucket]: https://console.cloudina.org/
+[cdn_album]: https://album.cloudina.org/
+[cdn_vendor]: https://vendor.cloudina.org/
