@@ -1410,16 +1410,6 @@ def extract_clips(
                     output_options["c:v"] = "h264_nvenc"
                     logging.info("Compressing using h264_nvenc")
 
-                else:
-                    # Add standard pix_format and preset values
-                    output_options.update(
-                        {
-                            "movflags": "+faststart",
-                            "preset": "veryfast",
-                            "pix_fmt": "yuv420p",
-                        }
-                    )
-
     input_options["ss"] = upl_second_i
     input_options["t"] = clip_length
 
