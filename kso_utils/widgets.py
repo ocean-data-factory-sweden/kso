@@ -300,7 +300,6 @@ def choose_footage(
         select_movie_widg = select_movie(df)
 
         def update_movie(change):
-
             if test:
                 selected_movies = [change["new"]]
             else:
@@ -1322,13 +1321,13 @@ def select_modification():
 
     frame_modifications = {
         "Zoo_low_compression": {
-            "crf": "25",
+            "b:v": "10M",
         },
         "Zoo_medium_compression": {
-            "crf": "27",
+            "b:v": "5M",
         },
         "Zoo_high_compression": {
-            "crf": "30",
+            "b:v": "3M",
         },
         "Blur_sensitive_info": {
             "filter": '.drawbox(0, 0, "iw", "ih*(15/100)", color="black",thickness="fill").drawbox(0, "ih*(95/100)","iw", "ih*(15/100)", color="black", thickness="fill")',

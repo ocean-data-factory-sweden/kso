@@ -1391,7 +1391,7 @@ def extract_clips(
         output_options["an"] = None
 
     # Access modifications from clip_modification_widget
-    if modification_details.checks:
+    if modification_details:
         # Set up modification
         for (
             modif_number,
@@ -1399,29 +1399,18 @@ def extract_clips(
         ) in modification_details.checks.items():
             if "filter" in modification_details_dict:
                 output_options["vf"] = modification_details_dict["filter"]
-            elif "crf" in modification_details_dict:
-                crf = modification_details_dict["crf"]
+            elif "b:v" in modification_details_dict:              
+                # Specify the select size (MB) of the clip
+                output_options["b:v"] = modification_details_dict["b:v"]
+                
                 # add the cuda-compatible vcodec
                 if gpu_available:
+                    # Remove the copy format argument
                     del output_options["c"]
-                    if int(crf) < 27:
-                        # small compression
-                        output_options["c:v"] = "h264_nvenc"
-                        output_options["b:v"] = "10M"
-                        logging.info("Compressing using h264_nvenc 10M")
-                    elif int(crf) == 27:
-                        # medium compression
-                        output_options["c:v"] = "h264_nvenc"
-                        output_options["b:v"] = "5M"
-                        logging.info("Compressing using h264_nvenc 5M")
-                    elif int(crf) > 27:
-                        # high compression
-                        output_options["c:v"] = "h264_nvenc"
-                        output_options["b:v"] = "3M"
-                        logging.info("Compressing using h264_nvenc 3M")
+                    output_options["c:v"] = "h264_nvenc"
+                    logging.info("Compressing using h264_nvenc")
 
                 else:
-                    output_options["crf"] = crf
                     # Add standard pix_format and preset values
                     output_options.update(
                         {
@@ -1572,21 +1561,10 @@ def create_clips(
     # Recursively add permissions to folders created
     [os.chmod(root, 0o777) for root, dirs, files in os.walk(clips_folder)]
 
-    logging.info("Extracting clips")
+    # Add information on the modification of the clips
+    clips_start_df["clip_modification_details"] = str(modification_details)
 
-    # Read each movie and extract the clips
-    for index, row in tqdm(clips_start_df.iterrows(), total=clips_start_df.shape[0]):
-        # Extract the videos and store them in the folder
-        extract_clips(
-            movie_path=movies_paths,
-            clip_length=clip_length,
-            upl_second_i=row["upl_seconds"],
-            output_clip_path=row["clip_path"],
-            modification_details=modification_details,
-            gpu_available=gpu_available,
-        )
-
-    if modification_details.children[0].value > 0 and is_example:
+    if is_example and modification_details.children[0].value > 0:
         # Set the filename of the original clips to be compared against the modified
         clips_start_df["clip_example_original_filename"] = clips_start_df.apply(
             lambda row: f"{selected_movies}_clip_example_original_{row['upl_seconds']}_{clip_length}.mp4",
@@ -1603,22 +1581,29 @@ def create_clips(
         for index, row in tqdm(
             clips_start_df.iterrows(), total=clips_start_df.shape[0]
         ):
-            # Set modification details to 0 to extract clips that are copies of the original movie
-            modification_details.bool_widget_holder.children = ()
-
             # Extract the videos and store them in the folder
             extract_clips(
                 movie_path=movies_paths,
                 clip_length=clip_length,
                 upl_second_i=row["upl_seconds"],
                 output_clip_path=row["clip_example_original_path"],
-                modification_details=modification_details,
+                modification_details={},
                 gpu_available=gpu_available,
             )
-    # Add information on the modification of the clips
-    clips_start_df["clip_modification_details"] = str(modification_details)
+        logging.info("Original clips extracted")
 
-    logging.info("All the clips were extracted successfully")
+    logging.info("Extracting clips")
+    # Read each movie and extract the clips from the original videos
+    for index, row in tqdm(clips_start_df.iterrows(), total=clips_start_df.shape[0]):
+        extract_clips(
+            movie_path=movies_paths,
+            clip_length=clip_length,
+            upl_second_i=row["upl_seconds"],
+            output_clip_path=row["clip_path"],
+            modification_details=modification_details,
+            gpu_available=gpu_available,
+        )
+    logging.info("Clips successfully extracted")
 
     return clips_start_df
 
@@ -2159,21 +2144,7 @@ def modify_frames(
                     if "filter" in transform:
                         mod_prompt = transform["filter"]
                         full_prompt += mod_prompt
-                # Setup output prompt
-                crf_value = [
-                    transform["crf"] if "crf" in transform else None
-                    for transform in modification_details.values()
-                ]
-                crf_value = [i for i in crf_value if i is not None]
-
-                if len(crf_value) > 0:
-                    # Note: now using q option as crf not supported by ffmpeg build
-                    crf_prompt = str(max([int(i) for i in crf_value]))
-                    full_prompt += (
-                        f".output('{row['modif_frame_path']}', q={crf_prompt})"
-                    )
-                else:
-                    full_prompt += f".output('{row['modif_frame_path']}', q=20)"
+                        
                 # Run the modification
                 try:
                     logging.info(full_prompt)
