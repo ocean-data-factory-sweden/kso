@@ -555,7 +555,10 @@ class ProjectProcessor:
             generate_export=generate_export,
         )
 
-    def check_movies_uploaded_zoo(self, test: bool = False,):
+    def check_movies_uploaded_zoo(
+        self,
+        test: bool = False,
+    ):
         """
         This function checks if a movie has been uploaded to Zooniverse
 

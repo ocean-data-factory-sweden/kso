@@ -106,4 +106,5 @@ def test_select_clip_length():
 
 def test_select_modification():
     widget = kso_widgets.select_modification()
-    assert widget.value["crf"] == "25"
+    assert widget.value["b:v"] == "5M"
+
