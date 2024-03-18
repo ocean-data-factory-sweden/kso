@@ -113,7 +113,7 @@ def movies_in_movie_folder(project: Project, db_connection, server_connection: d
         # Read the movie files from the movie_path folder
         local_files = list(Path(project.movie_folder).rglob("*"))
         available_movies_list = [
-            str(f.name)
+            str(f.name).replace(f.suffix, ".mp4")
             for f in local_files
             if f.suffix.endswith(get_movie_extensions())
         ]
