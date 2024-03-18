@@ -265,7 +265,6 @@ def choose_footage_source():
 
     # Display the radio buttons
     display(source_widget)
-
     return source_widget
 
 
@@ -294,7 +293,6 @@ def choose_footage(
     if footage_source == "Existing Footage":
         # Initiate and display the movie_widget output
         movie_output = widgets.Output()
-        display(movie_output)
 
         # Display the available movies
         select_movie_widg = select_movie(df)
