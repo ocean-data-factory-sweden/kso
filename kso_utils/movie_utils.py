@@ -113,7 +113,9 @@ def movies_in_movie_folder(project: Project, db_connection, server_connection: d
         # Read the movie files from the movie_path folder
         local_files = list(Path(project.movie_folder).rglob("*"))
         available_movies_list = [
-            str(f) for f in local_files if f.suffix.endswith(get_movie_extensions())
+            str(f.name)
+            for f in local_files
+            if f.suffix.endswith(get_movie_extensions())
         ]
 
         # Save the list of movies as a pd df
