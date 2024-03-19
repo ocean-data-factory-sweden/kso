@@ -2060,8 +2060,14 @@ class MLProjectProcessor(ProjectProcessor):
                 self.registry,
                 self.run,
             )
+            import shutil
+
+            shutil.make_archive("labels.zip", "zip", Path(eval_dir, "labels"))
             self.modules["yolo_utils"].add_data(
-                Path(eval_dir, "labels"), "detection_output", self.registry, self.run
+                Path(eval_dir, "labels.zip"),
+                "detection_output",
+                self.registry,
+                self.run,
             )
         elif self.registry == "mlflow":
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
@@ -2077,8 +2083,11 @@ class MLProjectProcessor(ProjectProcessor):
                 registry=self.registry,
                 run=self.run,
             )
+            import shutil
+
+            shutil.make_archive("labels.zip", "zip", Path(eval_dir, "labels"))
             self.modules["yolo_utils"].add_data(
-                path=Path(eval_dir, "labels"),
+                path=Path(eval_dir, "labels.zip"),
                 name="detection_output",
                 registry=self.registry,
                 run=self.run,
@@ -2088,8 +2097,11 @@ class MLProjectProcessor(ProjectProcessor):
         self.modules["yolo_utils"].set_config(
             conf=conf_thres, model_name=model, evaluation_directory=eval_dir
         )
+        import shutil
+
+        shutil.make_archive("labels.zip", "zip", Path(eval_dir, "labels"))
         self.modules["yolo_utils"].add_data(
-            path=Path(eval_dir, "labels"),
+            path=Path(eval_dir, "labels.zip"),
             name="detection_output",
             registry=self.registry,
             run=self.run,
