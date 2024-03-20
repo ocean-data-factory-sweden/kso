@@ -2161,7 +2161,7 @@ def plot_processed_detections(
 
     # Group by species and minute, calculate the count
     max_count_per_species = (
-        df.groupby(["movie_id", "commonName", interval])["max_n"].max().reset_index()
+        df.groupby(["movie_id", "class_id", interval])["max_n"].max().reset_index()
     )
 
     # Enable plotting of matplotlib
@@ -2186,11 +2186,11 @@ def plot_processed_detections(
         ]
 
         # Create a separate line plot for each species
-        species_list = movie_data["commonName"].unique()
+        species_list = movie_data["class_id"].unique()
         plt.figure(figsize=(10, 6))
 
         for species in species_list:
-            species_data = movie_data[movie_data["commonName"] == species]
+            species_data = movie_data[movie_data["class_id"] == species]
             plt.plot(
                 species_data["seconds_since_reference"],
                 species_data["max_n"],
