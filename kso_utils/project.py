@@ -2062,7 +2062,9 @@ class MLProjectProcessor(ProjectProcessor):
             )
             import shutil
 
-            shutil.make_archive("labels.zip", "zip", Path(eval_dir, "labels"))
+            shutil.make_archive(
+                Path(eval_dir, "labels.zip"), "zip", Path(eval_dir, "labels")
+            )
             self.modules["yolo_utils"].add_data(
                 Path(eval_dir, "labels.zip"),
                 "detection_output",
@@ -2085,7 +2087,9 @@ class MLProjectProcessor(ProjectProcessor):
             )
             import shutil
 
-            shutil.make_archive("labels.zip", "zip", Path(eval_dir, "labels"))
+            shutil.make_archive(
+                Path(eval_dir, "labels.zip"), "zip", Path(eval_dir, "labels")
+            )
             self.modules["yolo_utils"].add_data(
                 path=Path(eval_dir, "labels.zip"),
                 name="detection_output",
@@ -2099,7 +2103,9 @@ class MLProjectProcessor(ProjectProcessor):
         )
         import shutil
 
-        shutil.make_archive("labels.zip", "zip", Path(eval_dir, "labels"))
+        shutil.make_archive(
+            Path(eval_dir, "labels.zip"), "zip", Path(eval_dir, "labels")
+        )
         self.modules["yolo_utils"].add_data(
             path=Path(eval_dir, "labels.zip"),
             name="detection_output",
