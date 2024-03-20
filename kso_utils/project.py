@@ -1116,18 +1116,24 @@ class ProjectProcessor:
         > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
         and saves the results in different csv files.
         """
-        return yolo_utils.process_detections(
-            project=project,
-            db_connection=db_connection,
-            csv_paths=csv_paths,
-            annotations_csv_path=annotations_csv_path,
-            model_registry=model_registry,
-            selected_movies_id=self.selected_movies_ids,
-            model=model,
-            project_name=project_name,
-            team_name=team_name,
-            source_movies=self.selected_movies_paths,
-        )
+        out_list = []
+        for movie_path in self.selected_movies_paths:
+            out_list.append(
+                yolo_utils.process_detections(
+                    project=project,
+                    db_connection=db_connection,
+                    csv_paths=csv_paths,
+                    annotations_csv_path=annotations_csv_path,
+                    model_registry=model_registry,
+                    selected_movies_id=self.selected_movies_ids,
+                    model=model,
+                    project_name=project_name,
+                    team_name=team_name,
+                    source_movies=movie_path,
+                )
+            )
+        df_concat = pd.concat(out_list, axis=1)
+        return df_concat
 
     def plot_processed_detections(self, df, thres, int_length):
         """
@@ -2103,9 +2109,7 @@ class MLProjectProcessor(ProjectProcessor):
         )
         import shutil
 
-        shutil.make_archive(
-            Path(eval_dir, "labels"), "zip", Path(eval_dir, "labels")
-        )
+        shutil.make_archive(Path(eval_dir, "labels"), "zip", Path(eval_dir, "labels"))
         self.modules["yolo_utils"].add_data(
             path=Path(eval_dir, "labels.zip"),
             name="detection_output",
