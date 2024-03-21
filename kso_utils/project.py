@@ -1973,6 +1973,7 @@ class MLProjectProcessor(ProjectProcessor):
                         save=save_output,
                         imgsz=img_size,
                         stream=True,
+                        half=True,
                     )
                     for i in results:
                         logging.debug(i.speed)
@@ -1987,6 +1988,7 @@ class MLProjectProcessor(ProjectProcessor):
                     save=save_output,
                     imgsz=img_size,
                     stream=True,
+                    half=True
                 )
                 for i in results:
                     logging.debug(i.speed)
