@@ -1097,8 +1097,12 @@ def generate_csv_report(
 
     # Filter by survey_start and survey_end if applicable
     if all(col in movie_csv_df for col in ["sampling_start", "sampling_end"]):
+
         detect_df["movie_filename"] = (
             detect_df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
+        )
+        detect_df["movie_filename"] = detect_df["movie_filename"].apply(
+            lambda x: x + ".mp4" if "mp4" not in x else x, 1
         )
         # Rename movie_filename to avoid filename confusion
         movie_csv_df.rename(
@@ -1108,10 +1112,14 @@ def generate_csv_report(
 
         # Add sampling data
         detect_df = pd.merge(detect_df, movie_csv_df, on="movie_filename")
-        detect_df = detect_df[
-            (detect_df.frame_no >= detect_df.sampling_start)
-            & (detect_df.frame_no <= detect_df.sampling_end)
-        ]
+        if (
+            detect_df.sampling_start.dtype == "float"
+            and detect_df.sampling_end.dtype == "float"
+        ):
+            detect_df = detect_df[
+                (detect_df.frame_no >= detect_df.sampling_start)
+                & (detect_df.frame_no <= detect_df.sampling_end)
+            ]
         # Keep only useful columns
         detect_df = detect_df[
             ["filename", "class_id", "frame_no", "x", "y", "w", "h", "conf"]
@@ -1125,6 +1133,7 @@ def generate_csv_report(
 
     # Export to CSV
     csv_out = Path(evaluation_path, "annotations.csv")
+    print(len(detect_df))
     detect_df.to_csv(csv_out, index=False)
 
     logging.info(f"Report created at {csv_out}")
