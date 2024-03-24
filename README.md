@@ -16,7 +16,7 @@ The Koster Seafloor Observatory is an open-source, citizen science and machine l
 [![Issues][issues-shield]][issues-url]
 [![GPL License][license-shield]][license-url]
 
-### KSO Information overview
+### KSO overview
 The KSO system has been developed to:
 * move and process underwater footage and its associated data (e.g. location, date, sampling device).
 * make this data available to citizen scientist in Zooniverse to annotate the data.
