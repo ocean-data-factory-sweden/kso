@@ -10,7 +10,7 @@ import sys
 
 if "kso_utils" not in sys.modules:
     # for when we are running it on git, the yaml file will install the docker image. then we do need to go to the correct directory
-    os.chdir("tutorials")
+    os.chdir("notebooks")
     sys.path.append("..")
     import kso_utils
 

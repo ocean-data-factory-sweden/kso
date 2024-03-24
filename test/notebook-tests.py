@@ -4,10 +4,10 @@
 This auto-test does not test if everything displays what it should display.
 It mainly tests if everything still runs without giving any errors.
 
-This collection of tests covers the following tutorial notebooks:
+This collection of tests covers the following notebook notebooks:
  - 1, 3, 4, 5, 6, 8
 
-All other tutorials are not tested automatically and care should be taken when
+All other notebooks are not tested automatically and care should be taken when
 making changes as these could break existing workflows.
 
 To run these tests manually, use pytest --disable-warnings test/notebook-tests.py
@@ -27,7 +27,7 @@ os.environ["WANDB_DATA_DIR"] = "/tmp"
 
 if "kso_utils" not in sys.modules:
     # for when we are running it on git, the yaml file will install the docker image. then we do need to go to the correct directory
-    os.chdir("tutorials")
+    os.chdir("notebooks")
     sys.path.append("..")
     import kso_utils
 
@@ -47,13 +47,13 @@ output_path = Path("../test/test_output")
 output_path.mkdir(parents=True, exist_ok=True)
 mlp.output_path = str(Path("../test/test_output").resolve())
 
-# ----------------Tutorial 1----------------------------------------------------
+# ----------------notebook 1----------------------------------------------------
 
 
 def test_t1():
     import kso_utils.widgets as kso_widgets
 
-    # Display the map Tutorial 1
+    # Display the map notebook 1
     pp.map_sites()
     # Retrieve and display movies
     pp.get_movie_info()
@@ -91,12 +91,12 @@ def test_t1():
     assert len(sites_sheet_df) == 5
 
 
-# -------------Tutorial 2-------------------------------------------------------
+# -------------notebook 2-------------------------------------------------------
 # """
-# This tutorial will be removed
+# This notebook will be removed
 # """
 
-# -------------Tutorial 3-------------------------------------------------------
+# -------------notebook 3-------------------------------------------------------
 """
 ...
 """
@@ -126,7 +126,7 @@ def test_t3(zoo_user, zoo_pass):
     assert len(pp.generated_clips) == 1
 
 
-# -------------Tutorial 4-------------------------------------------------------
+# -------------notebook 4-------------------------------------------------------
 # """
 # It will not be tested if the actually uploading to Zooniverse works,
 # since we do not want to upload things to them all the time.
@@ -165,7 +165,7 @@ def test_t4(zoo_user, zoo_pass):
     assert len(pp.modified_frames) == 9
 
 
-# #-------------Tutorial 5-------------------------------------------------------
+# #-------------notebook 5-------------------------------------------------------
 # """
 # ...
 # """
@@ -222,7 +222,7 @@ def test_t5():
     # shutil.rmtree(exp_path)
 
 
-# -------------Tutorial 6-------------------------------------------------------
+# -------------notebook 6-------------------------------------------------------
 """
 ...
 """
@@ -281,9 +281,9 @@ def test_t6():
     # shutil.rmtree(exp_path)
 
 
-# #-------------Tutorial 7-------------------------------------------------------
+# #-------------notebook 7-------------------------------------------------------
 """
-This tutorial is still in a very early stage and mostly uses widgets directly from widgets.py and
+This notebook is still in a very early stage and mostly uses widgets directly from widgets.py and
 API functionality from Zenodo. Tests should be added in future as its capabilities expand.
 """
 
@@ -292,7 +292,7 @@ def test_t7():
     pass
 
 
-# -------------Tutorial 8-------------------------------------------------------
+# -------------notebook 8-------------------------------------------------------
 """
 ...
 """
