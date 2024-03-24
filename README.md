@@ -16,23 +16,19 @@ The Koster Seafloor Observatory is an open-source, citizen science and machine l
 [![Issues][issues-shield]][issues-url]
 [![GPL License][license-shield]][license-url]
 
-### KSO Information architecture
-The system processes underwater footage and its associated metadata into biologically meaningful information. The format of the underwater media is standardised (typically .mp4 or .jpg) and the associated metadata should be captured in three csv files (“movies”, “sites” and “species”) following  the [Darwin Core standards (DwC)](https://dwc.tdwg.org/simple/). 
-![koster_info_diag][high-level-overview2]
-
-## Repository Overview
-This repository contains scripts and resources for:
+### KSO Information overview
+The KSO system has been developed to:
 * move and process underwater footage and its associated data (e.g. location, date, sampling device).
 * make this data available to citizen scientist in Zooniverse to annotate the data.
 * train and evaluate machine learning models (customise [Yolov5][YoloV5] or [Yolov8][YoloV8] models).
+  
+![koster_info_diag][high-level-overview]
 
-![high-level][high-level-overview]
+The system is built around a series of easy-to-use [Jupyter Notebooks][Jupyter_site]. Each notebook allows users to perform a specific task of the system (e.g. upload footage to the citizen science platform or analyse the classified data).
 
-The system is built around a series of easy-to-use [Jupyter Notebook][Jupyter_site] tutorials. Each tutorial allows users to perform a specific task of the system (e.g. upload footage to the citizen science platform or analyse the classified data).
+Users can run these notebooks via Google Colab (by clicking on the Colab links in the table below), locally or on a High-Performance Computer environment.
 
-Users can run these tutorials via Google Colab (by clicking on the Colab links in the table below), locally or on a High-Performance Computer environment.
-
-### Tutorials
+### Notebooks
 | Name                                              | Description                                                                                 | Try it!  | 
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------|
 | 1. Check footage and metadata                     | Check format and contents of footage and sites, media and species csv files                 | [![Open In Colab][colablogo]][colab_tut_1] [![binder][binderlogo]][binder_tut] | 
@@ -46,7 +42,7 @@ Users can run these tutorials via Google Colab (by clicking on the Colab links i
 | 9. Run ML models on footage                      | Automatically classify new footage                                                          | [![Open In Colab][colablogo]][colab_tut_9] [![binder][binderlogo]][binder_tut] |
 
   
-\* Project-specific tutorial
+\* Project-specific notebook
 
 ## Local Installation
 
@@ -106,7 +102,7 @@ pip install -r requirements.txt -r gpu_requirements_user.txt
 ```
 
 ## Cloudina 
-Cloudina is a hosted version of KSO (powered by JupyterHub) on NAISS Science Cloud. It allows users to scale and automate larger workflows using a powerful processing backend. This is currently an invitation-only service. In order to gain access to the platform, please contact jurie.germishuys[at]combine.se.
+Cloudina is a hosted version of KSO (powered by JupyterHub) on NAISS Science Cloud. It allows users to scale and automate larger workflows using a powerful processing backend. This is currently an invitation-only service. To access the platform, please contact jurie.germishuys[at]combine.se.
 
 The current portals are accessible as:
 1. Console (object storage) - [storage][cdn_bucket]
@@ -115,10 +111,11 @@ The current portals are accessible as:
 
 
 ## Starting a new project
-If you will work on a new project you will need to:
+To start a new project you will need to:
 1. Create initial information for the database: Input the information about the underwater footage files, sites and species of interest. You can use a [template of the csv files](https://drive.google.com/file/d/1PZGRoSY_UpyLfMhRphMUMwDXw4yx1_Fn/view?usp=sharing) and move the directory to the "db_starter" folder.
-2. Link your footage to the database: You will need files of underwater footage to run this system. You can [download some samples](https://drive.google.com/drive/folders/1t2ce8euh3SEU2I8uhiZN1Tu-76ZDqB6w?usp=sharing) and move them to `db_starter`. You can also store your own files and specify their directory in the tutorials.
+2. Link your footage to the database: You will need files of underwater footage to run this system. You can [download some samples](https://drive.google.com/drive/folders/1t2ce8euh3SEU2I8uhiZN1Tu-76ZDqB6w?usp=sharing) and move them to `db_starter`. You can also store your own files and specify their directory in the notebooks.
 
+Please remember the format of the underwater media is standardised (typically .mp4 or .jpg) and the associated metadata captured in three CSV files (“movies”, “sites” and “species”) should follow the [Darwin Core standards (DwC)](https://dwc.tdwg.org/simple/). 
 
 ## Developer instructions
 If you would like to expand and improve the KSO capabilities, please follow the instructions above to set the project up on your local computer.
@@ -157,7 +154,7 @@ If you use this code or its models in your research, please cite:
 Anton V, Germishuys J, Bergström P, Lindegarth M, Obst M (2021) An open-source, citizen science and machine learning approach to analyse subsea movies. Biodiversity Data Journal 9: e60548. https://doi.org/10.3897/BDJ.9.e60548
 
 ## Collaborations/Questions
-You can find out more about the project at https://www.zooniverse.org/projects/victorav/the-koster-seafloor-observatory.
+You can find out more about the project at https://subsim.wnmedia.se.
 
 We are always excited to collaborate and help other marine scientists. Please feel free to contact us (matthias.obst(at)marine.gu.se) with your questions.
 
@@ -181,23 +178,22 @@ pip install python-magic-bin
 [issues-url]: https://github.com/ocean-data-factory-sweden/kso/issues
 [license-shield]: https://img.shields.io/github/license/ocean-data-factory-sweden/kso.svg?style=for-the-badge
 [license-url]: https://github.com/ocean-data-factory-sweden/kso/blob/main/LICENSE.txt
-[high-level-overview2]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/high-level-overview-2.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
 [high-level-overview]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/high-level-overview.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
 [Data_management_module]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/Koster_data_management_module.png?raw=true
 [object_detection_module]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/Koster_object_detection_module.png?raw=true
 [Jupyter_site]: https://jupyter.org/
 [colablogo]: https://colab.research.google.com/assets/colab-badge.svg
 [binderlogo]: https://mybinder.org/badge_logo.svg
-[colab_tut_1]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/01_Check_and_update_csv_files.ipynb
+[colab_tut_1]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/01_Check_and_update_csv_files.ipynb
 [binder_tut]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/main
-[colab_tut_2]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/02_Upload_new_footage.ipynb
-[colab_tut_3]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/03_Upload_clips_to_Zooniverse.ipynb
-[colab_tut_4]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/04_Upload_frames_to_Zooniverse.ipynb
-[colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/05_Train_ML_models.ipynb
-[colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/06_Evaluate_ML_Models.ipynb
-[colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/07_Transfer_ML_Models.ipynb
-[colab_tut_8]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/08_Analyse_Aggregate_Zooniverse_Annotations.ipynb
-[colab_tut_9]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/tutorials/09_Run_ML_Models_on_footage.ipynb
+[colab_tut_2]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/02_Upload_new_footage.ipynb
+[colab_tut_3]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/03_Upload_clips_to_Zooniverse.ipynb
+[colab_tut_4]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/04_Upload_frames_to_Zooniverse.ipynb
+[colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/05_Train_ML_models.ipynb
+[colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/06_Evaluate_ML_Models.ipynb
+[colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/07_Transfer_ML_Models.ipynb
+[colab_tut_8]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/08_Analyse_Aggregate_Zooniverse_Annotations.ipynb
+[colab_tut_9]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/09_Run_ML_Models_on_footage.ipynb
 [Microsoft_C++]: https://visualstudio.microsoft.com/visual-cpp-build-tools/
 [pytorch]: https://pytorch.org/
 [YoloV5]: https://github.com/ultralytics/yolov5
