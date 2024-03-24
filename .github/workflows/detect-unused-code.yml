@@ -20,6 +20,6 @@ jobs:
           python -m pip install jupytext vulture
       - name: Find unused code with Vulture
         run: |
-          jupytext --to script tutorials/*
+          jupytext --to script notebooks/*
           vulture .
 
