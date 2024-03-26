@@ -1399,10 +1399,10 @@ def extract_clips(
         ) in modification_details.checks.items():
             if "filter" in modification_details_dict:
                 output_options["vf"] = modification_details_dict["filter"]
-            elif "b:v" in modification_details_dict:              
+            elif "b:v" in modification_details_dict:
                 # Specify the select size (MB) of the clip
                 output_options["b:v"] = modification_details_dict["b:v"]
-                
+
                 # add the cuda-compatible vcodec
                 if gpu_available:
                     # Remove the copy format argument
@@ -2134,7 +2134,7 @@ def modify_frames(
                     if "filter" in transform:
                         mod_prompt = transform["filter"]
                         full_prompt += mod_prompt
-                        
+
                 # Run the modification
                 try:
                     logging.info(full_prompt)

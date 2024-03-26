@@ -1097,7 +1097,6 @@ def generate_csv_report(
 
     # Filter by survey_start and survey_end if applicable
     if all(col in movie_csv_df for col in ["sampling_start", "sampling_end"]):
-
         detect_df["movie_filename"] = (
             detect_df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
         )
