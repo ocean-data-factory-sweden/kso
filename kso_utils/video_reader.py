@@ -172,9 +172,9 @@ class VideoReader:
         self._fps = float(self.container.streams.video[0].guessed_rate)
 
         self._n_frames = self.container.streams.video[0].frames
-        self._cached_last_frame: Optional[
-            VideoFrameInfo
-        ] = None  # Helps fix weird bug... see notes below
+        self._cached_last_frame: Optional[VideoFrameInfo] = (
+            None  # Helps fix weird bug... see notes below
+        )
         self._max_size_xy = max_size_xy
         self._use_cache = use_cache
         self._iterator = self._iter_frame_data()
