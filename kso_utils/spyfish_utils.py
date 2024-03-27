@@ -1,10 +1,10 @@
 # base imports
-import os
 import sqlite3
 import logging
 import pandas as pd
-import numpy as np
+from pathlib import Path
 
+from kso_utils.server_utils import get_matching_s3_keys, download_object_from_s3
 
 # Logging
 logging.basicConfig()
@@ -55,82 +55,79 @@ def process_spyfish_subjects(
     db_connection: sqlite3.Connection,
 ):
     """
-    It takes a dataframe of subjects and a path to the database, and returns a dataframe of subjects
-    with the following columns:
+    It processes a dataframe of subjects, matching species names to IDs and retrieving movie IDs.
 
-    - filename, clip_start_time,clip_end_time,frame_number,subject_type,ScientificName,frame_exp_sp_id,movie_id
-
-    The function does this by:
-
-    - Merging "#Subject_type" and "Subject_type" columns to "subject_type"
-    - Renaming columns to match the db format
-    - Calculating the clip_end_time
-    - Matching 'ScientificName' to species id and save as column "frame_exp_sp_id"
-    - Matching site code to name from movies sql and get movie_id to save it as "movie_id"
-
-    :param project: the project object
-    :param server_connection: A dictionary with the client and sftp_client
-    :param subjects: the dataframe of subjects to be processed
+    :param project: Project object
+    :param server_connection: Dictionary with client and sftp_client
+    :param subjects: DataFrame of subjects to be processed
     :param db_connection: SQL connection object
-    :return: A dataframe with the columns:
-        - filename, clip_start_time,clip_end_time,frame_number,subject_type,ScientificName,frame_exp_sp_id,movie_id
+    :return: Processed DataFrame with columns: filename, clip_start_time, clip_end_time, frame_number,
+             subject_type, ScientificName, frame_exp_sp_id, movie_id
     """
-    # Fix weird bug where Subject_type and subject_type are used for some clips
-    if "subject_type" in subjects.columns and "Subject_type" in subjects.columns:
-        subjects["subject_type"] = subjects["subject_type"].fillna(
-            subjects["Subject_type"]
-        )
-        subjects = subjects.drop(columns=["Subject_type"])
 
-    # Fix weird bug where #Subject_type and subject_type are used for some clips
-    if "subject_type" in subjects.columns and "#Subject_type" in subjects.columns:
-        subjects["subject_type"] = subjects["subject_type"].fillna(
-            subjects["#Subject_type"]
-        )
-        subjects = subjects.drop(columns=["#Subject_type"])
+    # Merge columns and drop redundant ones
+    if "Subject_type" in subjects.columns:
+        if "subject_type" not in subjects.columns:
+            subjects.rename(columns={"Subject_type": "subject_type"}, inplace=True)
 
-    # Rename common non-standard column names
-    rename_cols = {
+        else:
+            subjects["subject_type"] = subjects["subject_type"].fillna(
+                subjects["Subject_type"]
+            )
+            subjects = subjects.drop(columns=["Subject_type"])
+
+    # Fix weird bug where Subject_type is used instead of subject_type for the column name for some clips
+    if "#Subject_type" in subjects.columns and "subject_type" in subjects.columns:
+        subjects["subject_type"] = subjects[["subject_type", "#Subject_type"]].apply(
+            lambda x: x[1] if isinstance(x[1], str) else x[0], 1
+        )
+        subjects.drop(columns=["#Subject_type"], inplace=True)
+
+    # Rename non-standard column names
+    column_rename_map = {
         "#VideoFilename": "filename",
-        "#Subject_type": "subject_type",
-        "Subject_type": "subject_type",
+        #         "#Subject_type": "subject_type",
     }
+    subjects.rename(columns=column_rename_map, inplace=True)
 
-    if "movie_id" in subjects.columns:
-        # Drop movie_id because it's not a reliable way to trace back movies,
-        # we will use VideoFilename/filename instead
-        subjects = subjects.drop(columns="movie_id")
+    # Remove unreliable movie_id column
+    subjects = subjects.drop(columns="movie_id", errors="ignore")
 
-    # Rename columns to match the db format
-    subjects = subjects.rename(columns=rename_cols)
+    # Fetch CSV files from S3
+    csv_files = get_matching_s3_keys(
+        client=server_connection["client"],
+        bucket=project.bucket,
+        suffix="csv",
+    )
 
-    ##### Match site code to name from movies sql and get movie_id to save it as "movie_id"
-    # Manually update the name of the original movies that have
-    # been renamed after the clips were uploaded
-    # Download the filename lookup csv file
-    server_csv = project.key + "/update_of_movie_filenames_24_02_2023.csv"
-    local_i_csv = "update_of_movie_filenames_24_02_2023.csv"
+    # Target filename
+    lookup_filename = "update_of_movie_filenames"
 
-    if not os.path.exists(local_i_csv):
-        from kso_utils.server_utils import download_object_from_s3
+    # Filter matching files
+    matching_files = [file for file in csv_files if lookup_filename in file]
 
+    if len(matching_files) > 1:
+        logging.info(f"Multiple matching files found: {matching_files}")
+    elif matching_files:
+        file_to_download = matching_files[0]
+        local_path = Path(project.csv_folder, Path(file_to_download).name)
         download_object_from_s3(
             client=server_connection["client"],
             bucket=project.bucket,
-            key=server_csv,
-            filename=local_i_csv,
+            key=file_to_download,
+            filename=str(local_path),
         )
+    else:
+        logging.info(f"No matching file found with name: {lookup_filename}")
 
-    # Store the values to be replace 1first as df and then in a dictionary
-    renames_df = pd.read_csv(local_i_csv)
+    # Replace old filenames with updated ones
+    renames_df = pd.read_csv(local_path)
     filenames_dict = dict(zip(renames_df["OLD"], renames_df["NEW"]))
-
-    # Replace the old filenames
     subjects["filename"] = (
         subjects["filename"].map(filenames_dict).fillna(subjects["filename"])
     )
 
-    # Fix issue with some filenames missing the .mp4
+    # Ensure filenames have '.mp4' extension
     subjects["filename"] = subjects["filename"].apply(
         lambda x: x + ".mp4" if not x.endswith(".mp4") else x
     )

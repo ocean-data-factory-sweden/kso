@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
 """
 
-Single-widget test suite. 
+Single-widget test suite.
 
 """
-## Import Python packages
+# Import Python packages
 import os
 import sys
 
 if "kso_utils" not in sys.modules:
     # for when we are running it on git, the yaml file will install the docker image. then we do need to go to the correct directory
-    os.chdir("tutorials")
+    os.chdir("notebooks")
     sys.path.append("..")
     import kso_utils
 
 import kso_utils.widgets as kso_widgets
-import pytest
 import pandas as pd
 import kso_utils.project_utils as p_utils
 from kso_utils.project import ProjectProcessor, MLProjectProcessor
@@ -43,7 +42,7 @@ def test_select_movie():
     widget = kso_widgets.select_movie(
         available_movies_df=pd.DataFrame(columns=["filename"])
     )
-    assert widget.value is None
+    assert widget.value == ()
 
 
 def test_choose_species():
@@ -56,15 +55,9 @@ def test_choose_folder():
     assert widget.title == "Choose location of test_title"
 
 
-def test_choose_footage():
-    widget = kso_widgets.choose_footage(
-        start_path="../test/test_output",
-        project=project,
-        server_connection=pp.server_connection,
-        db_connection=pp.db_connection,
-        folder_type="test_title",
-    )
-    assert widget.default_path == "../test/test_output"
+def test_choose_footage_source():
+    widget = kso_widgets.choose_footage_source()
+    assert widget.value == "Existing Footage"
 
 
 def test_choose_agg_parameters():
@@ -113,7 +106,4 @@ def test_select_clip_length():
 
 def test_select_modification():
     widget = kso_widgets.select_modification()
-    assert (
-        str(widget.value["filter"]).replace(" ", "")
-        == ".filter('curves','0/00.396/0.671/1','0/00.525/0.4511/1','0/00.459/0.5171/1')"
-    )
+    assert widget.value["b:v"] == "10M"

@@ -1,5 +1,4 @@
 # base imports
-import os
 import logging
 import pims
 import cv2
@@ -9,7 +8,7 @@ import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
-
+from PIL import Image as PILImage, ImageDraw
 
 # Logging
 logging.basicConfig()
@@ -49,11 +48,12 @@ def drawBoxes(df: pd.DataFrame, movie_dir: str, out_path: str):
             end_box = tuple([int(box[0] + box[2]), int(box[1] + box[3])])
             # changed color and width to make it visible
             cv2.rectangle(frame, (int(box[0]), int(box[1])), end_box, (255, 0, 0), 1)
-        if not os.path.exists(out_path):
-            Path(out_path).mkdir(parents=True, exist_ok=True)
-            # Recursively add permissions to folders created
-            [os.chmod(root, 0o777) for root, dirs, files in os.walk(out_path)]
-        cv2.imwrite(Path(out_path, Path(name[3]).name), frame)
+        out_dir = Path(out_path)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        # Recursively add permissions to folders created
+        for root, dirs, files in out_dir.iterdir():
+            Path(root).chmod(0o777)
+        cv2.imwrite(out_dir / Path(name[3]).name, frame)
 
 
 def bb_iou(boxA, boxB):
@@ -140,3 +140,41 @@ def filter_bboxes(
 
     else:
         return [], bboxes
+
+
+def draw_annotations_in_frame(im: PILImage.Image, class_df_subject: pd.DataFrame):
+    """
+    > The function takes an image and a dataframe of annotations and returns the image with the
+    annotations drawn on it
+
+    :param im: the image object of type PILImage
+    :param class_df_subject: a dataframe containing the annotations for a single subject
+    :return: The image with the annotations
+    """
+    # Calculate image size
+    dw, dh = im._size
+
+    # Draw rectangles of each annotation
+    img1 = ImageDraw.Draw(im)
+
+    # Merge annotation info into a tuple
+    class_df_subject["vals"] = class_df_subject[["x", "y", "w", "h"]].values.tolist()
+
+    for index, row in class_df_subject.iterrows():
+        # Specify the vals object
+        vals = row.vals
+
+        # Adjust annotantions to image size
+        vals_adjusted = tuple(
+            [
+                int(vals[0]),
+                int(vals[1]),
+                int((vals[0] + vals[2])),
+                int((vals[1] + vals[3])),
+            ]
+        )
+
+        # Draw annotation
+        img1.rectangle(vals_adjusted, width=2)
+
+    return im

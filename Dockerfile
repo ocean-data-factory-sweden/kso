@@ -84,29 +84,24 @@ RUN apt-get update && \
         git \
         vim && \
     apt-get clean && \
-    # Copy over custom scripts to submodules
-    cp \
-        /usr/src/app/kso/src/multi_tracker_zoo.py \
-        /usr/src/app/kso/yolov5_tracker/trackers/multi_tracker_zoo.py && \
-    cp \
-        /usr/src/app/kso/src/detect.py \
-        /usr/src/app/kso/yolov5/detect.py && \
-    cp \
-        /usr/src/app/kso/src/track.py \
-        /usr/src/app/kso/yolov5_tracker/track.py && \
     # Install all python packages, numpy needs to be installed
     # first to avoid the lap build error
     python3 -m pip --no-cache-dir install --upgrade pip && \
     python3 -m pip --no-cache-dir install numpy && \
     python3 -m pip --no-cache-dir install \
-        -r /usr/src/app/kso/yolov5_tracker/requirements.txt \
-        -r /usr/src/app/kso/yolov5_tracker/yolov5/requirements.txt \
         -r /usr/src/app/kso/requirements.txt && \
+    # Copy over custom autobackend file to enable use of older YOLO models
+    cp \
+        /usr/src/app/kso/src/autobackend.py \
+        /usr/local/lib/python3.8/dist-packages/ultralytics/nn/autobackend.py && \
     apt-get remove --autoremove -y python3-dev build-essential
 
 # Set environment variables
 ENV WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
     WANDB_CACHE_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
+    WANDB_DATA_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
+    DATA_DIR=/tmp \
+    ARTIFACT_DIR=/tmp \
     PYTHONPATH=$PYTHONPATH:/usr/src/app/kso
 
 # Set everything up to work with the jupyter notebooks
@@ -118,10 +113,9 @@ ENV USER=${NB_USER} \
 RUN adduser --disabled-password \
     --gecos "Default user" \
     --uid ${NB_UID} \
-    ${NB_USER} && \
+    ${NB_USER}
     # Ensure widget extensions are activated
-    jupyter contrib nbextension install --user && \
-    jupyter nbextension enable --user --py widgetsnbextension && \
-    jupyter nbextension enable --user --py jupyter_bbox_widget
-
+    # jupyter contrib nbextension install --user && \
+    # jupyter nbextension enable --user --py widgetsnbextension && \
+    # jupyter nbextension enable --user --py jupyter_bbox_widget
 USER ${NB_USER}

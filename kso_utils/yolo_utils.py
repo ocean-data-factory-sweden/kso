@@ -1,6 +1,4 @@
 # base imports
-import glob
-import os
 import argparse
 import time
 import cv2 as cv2
@@ -19,6 +17,7 @@ import wandb
 import imagesize
 import base64
 import ffmpeg
+import mlflow
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 from jupyter_bbox_widget import BBoxWidget
@@ -30,17 +29,10 @@ from tqdm import tqdm
 from pathlib import Path
 from collections.abc import Callable
 from natsort import index_natsorted
+from IPython import get_ipython
 
 # util imports
 from kso_utils.project_utils import Project
-
-try:
-    from yolov5.utils import torch_utils
-    import yolov5.detect as detect
-except ModuleNotFoundError:
-    logging.error(
-        "Modules yolov5 and yolov5_tracker are required for ML functionality."
-    )
 
 # Logging
 logging.basicConfig()
@@ -133,17 +125,17 @@ def ProcFrames(proc_frame_func: Callable, frames_path: str):
     :return: The time it took to process all the frames in the folder, and the number of frames processed.
     """
     start = time.time()
-    files = os.listdir(frames_path)
+    files = Path(frames_path).iterdir()
     for f in files:
-        if f.endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
-            if os.path.exists(str(Path(frames_path, f))):
+        if str(f).endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
+            if Path(frames_path, f).exists():
                 new_frame = proc_frame_func(cv2.imread(str(Path(frames_path, f))))
                 cv2.imwrite(str(Path(frames_path, f)), new_frame)
             else:
-                from kso_utils.movie_utils import unswedify
+                from kso_utils.koster_utils import fix_text_encoding
 
                 new_frame = proc_frame_func(
-                    cv2.imread(unswedify(str(Path(frames_path, f))))
+                    cv2.imread(fix_text_encoding(str(Path(frames_path, f))))
                 )
                 cv2.imwrite(str(Path(frames_path, f)), new_frame)
     end = time.time()
@@ -219,21 +211,22 @@ def prepare(data_path, percentage_test, out_path):
 
     # Populate train.txt and test.txt
     counter = 1
-    index_test = int((1 - percentage_test) / 100 * len(os.listdir(dataset_path)))
+    index_test = int((1 - percentage_test) / 100 * len(Path(dataset_path).iterdir()))
     latest_movie = ""
-    for pathAndFilename in glob.iglob(os.path.join(dataset_path, "*.jpg")):
-        title, ext = os.path.splitext(os.path.basename(pathAndFilename))
+    for pathAndFilename in Path(dataset_path).rglob("*.jpg"):
+        file_path = Path(pathAndFilename)
+        title, _ = file_path.name, file_path.suffix
         movie_name = title.replace("_frame_*", "", regex=True)
 
         if counter == index_test + 1:
             if movie_name != latest_movie:
-                file_test.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+                file_test.write(out_path + Path(title).name + ".jpg" + "\n")
             else:
-                file_train.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+                file_train.write(out_path + Path(title).name + ".jpg" + "\n")
             counter += 1
         else:
             latest_movie = movie_name
-            file_train.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+            file_train.write(out_path + Path(title).name + ".jpg" + "\n")
             counter += 1
 
 
@@ -256,7 +249,7 @@ def process_path(path: str):
     """
     Process a single path
     """
-    return os.path.basename(re.split("_[0-9]+", path)[0]).replace("_frame", "")
+    return Path(re.split("_[0-9]+", path)[0]).name.replace("_frame", "")
 
 
 def clean_species_name(species_name: str):
@@ -280,28 +273,26 @@ def split_frames(data_path: str, perc_test: float):
 
     # Populate train.txt and test.txt
     counter = 1
-    index_test = int(
-        (1 - perc_test)
-        * len([s for s in os.listdir(images_path) if s.endswith(".jpg")])
-    )
+    index_test = int((1 - perc_test) * len(list(images_path.glob("*.jpg"))))
     latest_movie = ""
-    for pathAndFilename in sorted(glob.iglob(os.path.join(images_path, "*.jpg"))):
-        title, ext = os.path.splitext(os.path.basename(pathAndFilename))
+    for pathAndFilename in list(images_path.rglob("*.jpg")):
+        file_path = Path(pathAndFilename)
+        title, _ = file_path.name, file_path.suffix
         movie_name = title.replace("_frame_*", "")
 
         if counter >= index_test + 1:
             # Avoid leaking frames into test set
             if movie_name != latest_movie or movie_name == title:
-                file_valid.write(pathAndFilename + "\n")
+                file_valid.write(str(pathAndFilename) + "\n")
             else:
-                file_train.write(pathAndFilename + "\n")
+                file_train.write(str(pathAndFilename) + "\n")
             counter += 1
         else:
             latest_movie = movie_name
             # if random.uniform(0, 1) <= 0.5:
             #    file_train.write(pathAndFilename + "\n")
             # else:
-            file_train.write(pathAndFilename + "\n")
+            file_train.write(str(pathAndFilename) + "\n")
             counter += 1
 
 
@@ -388,17 +379,18 @@ def frame_aggregation(
         return
 
     # Create output folder
-    if os.path.isdir(out_path):
+
+    if Path(out_path).is_dir():
         shutil.rmtree(out_path)
-    os.mkdir(out_path)
+    Path(out_path).mkdir()
 
     # Set up directory structure
     img_dir = Path(out_path, "images")
     label_dir = Path(out_path, "labels")
 
     # Create image and label directories
-    os.mkdir(img_dir)
-    os.mkdir(label_dir)
+    Path(img_dir).mkdir()
+    Path(label_dir).mkdir()
 
     # Create timestamped koster yaml file with model configuration
     species_list = [clean_species_name(sp) for sp in class_list]
@@ -415,7 +407,7 @@ def frame_aggregation(
     with open(
         Path(
             out_path,
-            f"{project.Project_name+'_'+datetime.datetime.now().strftime('%H:%M:%S')}.yaml",
+            f"{project.Project_name+'_'+datetime.datetime.now().strftime('%H_%M_%S')}.yaml",
         ),
         "w",
     ) as outfile:
@@ -464,43 +456,74 @@ def frame_aggregation(
 
     # Add species_id to train_rows
     if "species_id" not in train_rows.columns:
-        # Allow for both cases where commonName or scientificName was used for annotation
-        try:
-            train_rows["species_id"] = train_rows["label"].apply(
-                lambda x: species_df[species_df.commonName == x].id.values[0]
-                if x != "empty"
-                else "empty",
-                1,
-            )
-            species_df["clean_label"] = species_df.commonName.apply(clean_species_name)
-            species_df["zoo_label"] = species_df.commonName.apply(clean_label)
-        except IndexError:
-            train_rows["species_id"] = train_rows["label"].apply(
-                lambda x: species_df[species_df.scientificName == x].id.values[0]
-                if x != "empty"
-                else "empty",
-                1,
-            )
-            species_df["clean_label"] = species_df.scientificName.apply(
-                clean_species_name
-            )
-            species_df["zoo_label"] = species_df.scientificName.apply(clean_label)
+        if "ZooClassification" in train_rows.columns:
+            train_rows["species_id"] = train_rows.ZooClassification
+            # species_df["clean_label"] = species_df.ZooClassification.apply(clean_species_name)
+            # species_df["zoo_label"] = species_df.ZooClassification.apply(clean_label)
+            sp_id2mod_id = {}
+            m_id = 0
+            for ix, item in enumerate(species_list):
+                # match = species_df[species_df.clean_label == species_list[ix]].id.values
+                # if len(match) == 1:
+                sp_id2mod_id[item.capitalize().replace("_", " ")] = m_id
+                m_id += 1
 
-        train_rows.drop(columns=["label"], axis=1, inplace=True)
+        else:
+            # Allow for both cases where commonName or scientificName was used for annotation
+            try:
+                train_rows["species_id"] = train_rows["label"].apply(
+                    lambda x: (
+                        species_df[species_df.commonName == x].id.values[0]
+                        if x != "empty"
+                        else "empty"
+                    ),
+                    1,
+                )
+                species_df["clean_label"] = species_df.commonName.apply(
+                    clean_species_name
+                )
+                species_df["zoo_label"] = species_df.commonName.apply(clean_label)
+            except IndexError:
 
-    sp_id2mod_id = {
-        species_df[species_df.clean_label == species_list[i]].id.values[0]: i
-        for i in range(len(species_list))
-    }
+                def get_species_id(row):
+                    if row == "empty":
+                        return "empty"
+                    else:
+                        out = species_df[species_df.scientificName == row].id.values
+                        if len(out) == 1:
+                            return out[0]
+                        else:
+                            return None
+
+                train_rows["species_id"] = train_rows["label"].apply(
+                    lambda x: get_species_id(x), 1
+                )
+                species_df["clean_label"] = species_df.scientificName.apply(
+                    clean_species_name
+                )
+                species_df["zoo_label"] = species_df.scientificName.apply(clean_label)
+
+                train_rows.drop(columns=["label"], axis=1, inplace=True)
+
+                # Keep only species that can be matched to species_list
+                species_df = species_df[species_df.clean_label.isin(species_list)]
+
+            sp_id2mod_id = {}
+            m_id = 0
+            for ix, item in enumerate(species_list):
+                match = species_df[species_df.clean_label == species_list[ix]].id.values
+                if len(match) == 1:
+                    sp_id2mod_id[match[0]] = m_id
+                    m_id += 1
 
     # Get movie info from server
     from kso_utils.movie_utils import retrieve_movie_info_from_server
 
-    movie_df, _, _ = retrieve_movie_info_from_server(
+    movie_df = retrieve_movie_info_from_server(
         project=project,
         server_connection=server_connection,
         db_connection=db_connection,
-    )
+    )[0]
 
     # If at least one movie is linked to the project
     logging.info(f"There are {len(movie_df)} movies")
@@ -530,8 +553,18 @@ def frame_aggregation(
         )
         return None
 
+    if link_bool and movie_bool:
+        # If both movies and subject urls exist, use movie urls since Zooniverse is rate
+        # limited
+        movie_bool = False
+
     if movie_bool:
         # Get movie path on the server
+        movie_df.rename(columns={"movie_id": "id"}, inplace=True)
+        # TODO: Remove weird workaround for datatype conversions (should not be done manually here)
+        movie_df["id"] = movie_df["id"].astype(float).astype(int)
+        train_rows["movie_id"] = train_rows["movie_id"].astype(float).astype(int)
+        train_rows = train_rows.reset_index(drop=True)
 
         train_rows["movie_path"] = train_rows.merge(
             movie_df, on="movie_id", how="left"
@@ -540,7 +573,9 @@ def frame_aggregation(
         from kso_utils.movie_utils import get_movie_path
 
         train_rows["movie_path"] = train_rows["movie_path"].apply(
-            lambda x: get_movie_path(x, project, server_connection)
+            lambda x: get_movie_path(
+                f_path=x, project=project, server_connection=server_connection
+            )
         )
 
         # Read each movie for efficient frame access
@@ -548,11 +583,16 @@ def frame_aggregation(
         for i in tqdm(train_rows["movie_path"].unique()):
             try:
                 video_dict[i] = pims.MoviePyReader(i)
-            except FileNotFoundError:
+            except Exception as e:
                 try:
-                    from kso_utils.movie_utils import unswedify
+                    logging.info(
+                        f"Could not use moviepy, switching to regular pims... {e}"
+                    )
+                    from kso_utils.koster_utils import fix_text_encoding
 
-                    video_dict[unswedify(str(i))] = pims.Video(unswedify(str(i)))
+                    video_dict[fix_text_encoding(str(i))] = pims.Video(
+                        fix_text_encoding(str(i))
+                    )
                 except KeyError:
                     logging.warning("Missing file" + f"{i}")
 
@@ -563,6 +603,7 @@ def frame_aggregation(
 
         # Ensure key fields wrt movies are available
         key_fields = [
+            "subject_ids",
             "species_id",
             "frame_number",
             "movie_path",
@@ -607,6 +648,8 @@ def frame_aggregation(
         )
     )
 
+    print(group_fields)
+
     new_rows = []
     bboxes = {}
     tboxes = {}
@@ -629,9 +672,11 @@ def frame_aggregation(
             named_tuple = tuple([rev_fields])
 
         if movie_bool:
-            from kso_utils.movie_utils import unswedify
+            from kso_utils.koster_utils import fix_text_encoding
 
-            final_name = name[2] if name[2] in video_dict else unswedify(name[2])
+            final_name = (
+                name[2] if name[2] in video_dict else fix_text_encoding(name[2])
+            )
 
             if grouped_fields[1] > len(video_dict[final_name]):
                 logging.warning(
@@ -687,22 +732,35 @@ def frame_aggregation(
                 tuple(i[len(grouped_fields) :]) for i in group.values
             )
 
+            if link_bool:
+                try:
+                    # Attempt to open the image and get its size
+                    response = requests.get(filename, stream=True)
+                    if response.status_code == 200:
+                        image = PIL.Image.open(response.raw)
+                        s1, s2 = image.size
+                    else:
+                        # If the request was unsuccessful, use the fallback size
+                        s1, s2 = img_size
+                except (IOError, PIL.UnidentifiedImageError) as e:
+                    # Handle specific exceptions for image loading failures
+                    logging.error(f"Failed to load image: {e}")
+                    s1, s2 = img_size
+            else:
+                s1, s2 = PIL.Image.open(filename).size
+
             for box in bboxes[named_tuple]:
                 new_rows.append(
                     (
                         grouped_fields[-1],  # species_id
                         filename,
-                        PIL.Image.open(requests.get(filename, stream=True).raw).size[0]
-                        if link_bool
-                        else PIL.Image.open(filename).size[0],
-                        PIL.Image.open(requests.get(filename, stream=True).raw).size[1]
-                        if link_bool
-                        else PIL.Image.open(filename).size[1],
+                        s1,
+                        s2,
                     )
                     + box
                 )
 
-    ### Final export step
+    # Final export step
     if movie_bool:
         # Export full rows
         full_rows = pd.DataFrame(
@@ -754,15 +812,15 @@ def frame_aggregation(
         colour="green",
     ):
         if movie_bool:
-            file, ext = os.path.splitext(name[1])
-            file_base = os.path.basename(file)
-            file_out = f"{out_path}/labels/{file_base}_frame_{name[0]}.txt"
-            img_out = f"{out_path}/images/{file_base}_frame_{name[0]}.jpg"
+            file_path = Path(name[1])
+            file, _ = file_path.stem, file_path.suffix
+            file_out = Path(out_path, "labels", f"{file}_frame_{name[0]}.txt")
+            img_out = Path(out_path, "images", f"{file}_frame_{name[0]}.jpg")
         else:
-            file, ext = os.path.splitext(name)
-            file_base = os.path.basename(file)
-            file_out = f"{out_path}/labels/{file_base}.txt"
-            img_out = f"{out_path}/images/{file_base}.jpg"
+            file_path = Path(name)
+            file, _ = file_path.stem, file_path.suffix
+            file_out = Path(out_path, "labels", f"{file}.txt")
+            img_out = Path(out_path, "images", f"{file}.jpg")
 
         # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
         if out_format == "yolo":
@@ -775,11 +833,11 @@ def frame_aggregation(
                     "\n".join(
                         [
                             "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
-                                0
-                                if len(class_list) == 1
-                                else sp_id2mod_id[
-                                    i[speciesid_pos]
-                                ],  # single class vs multiple classes
+                                (
+                                    0
+                                    if len(class_list) == 1
+                                    else sp_id2mod_id[i[speciesid_pos]]
+                                ),  # single class vs multiple classes
                                 min((i[x_pos] + i[w_pos] / 2) / i[fw_pos], 1.0),
                                 min((i[y_pos] + i[h_pos] / 2) / i[fh_pos], 1.0),
                                 min(i[w_pos] / i[fw_pos], 1.0),
@@ -792,9 +850,9 @@ def frame_aggregation(
 
         # Save frames to image files
         if movie_bool:
-            from kso_utils.movie_utils import unswedify
+            from kso_utils.koster_utils import fix_text_encoding
 
-            save_name = name[1] if name[1] in video_dict else unswedify(name[1])
+            save_name = name[1] if name[1] in video_dict else fix_text_encoding(name[1])
             if save_name in video_dict:
                 img_array = video_dict[save_name][name[0]][:, :, [2, 1, 0]]
                 img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
@@ -805,7 +863,6 @@ def frame_aggregation(
             else:
                 image_output = np.asarray(PIL.Image.open(name))
             img_array = np.asarray(image_output)
-            img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
             PIL.Image.fromarray(img_array).save(img_out)
 
     logging.info("Frames extracted successfully")
@@ -907,65 +964,6 @@ def tracking_frames(
     return t_bbox
 
 
-def choose_baseline_model(download_path: str, test: bool = False):
-    """
-    It downloads the latest version of the baseline model from WANDB
-    :return: The path to the baseline model.
-    """
-    api = wandb.Api()
-    # weird error fix (initialize api another time)
-    api.runs(path="koster/model-registry")
-    api = wandb.Api()
-    collections = [
-        coll
-        for coll in api.artifact_type(
-            type_name="model", project="koster/model-registry"
-        ).collections()
-    ]
-
-    model_dict = {}
-    for artifact in collections:
-        model_dict[artifact.name] = artifact
-
-    model_widget = widgets.Dropdown(
-        options=[(name, model) for name, model in model_dict.items()],
-        value=None,
-        description="Select model:",
-        ensure_option=False,
-        disabled=False,
-        layout=widgets.Layout(width="50%"),
-        style={"description_width": "initial"},
-    )
-
-    main_out = widgets.Output()
-    display(model_widget, main_out)
-
-    def on_change(change):
-        with main_out:
-            clear_output()
-            try:
-                for af in model_dict[change["new"].name].versions():
-                    artifact_dir = af.download(download_path)
-                    artifact_file = [
-                        str(Path(artifact_dir, i))
-                        for i in os.listdir(artifact_dir)
-                        if i.endswith(".pt")
-                    ][-1]
-                    logging.info(
-                        f"Baseline {af.name} successfully downloaded from WANDB"
-                    )
-                    model_widget.artifact_path = artifact_file
-            except Exception as e:
-                logging.error(
-                    f"Failed to download the baseline model. Please ensure you are logged in to WANDB. {e}"
-                )
-
-    model_widget.observe(on_change, names="value")
-    if test:
-        model_widget.value = model_dict["baseline-yolov5"]
-    return model_widget
-
-
 def setup_paths(output_folder: str, model_type: str):
     """
     It takes the output folder and returns the path to the data file and the path to the hyperparameters
@@ -978,9 +976,9 @@ def setup_paths(output_folder: str, model_type: str):
     if model_type == 1:
         try:
             data_path = [
-                str(Path(output_folder, _))
-                for _ in os.listdir(output_folder)
-                if _.endswith(".yaml") and "hyp" not in _
+                str(f)
+                for f in Path(output_folder).iterdir()
+                if str(f).endswith(".yaml") and "hyp" not in str(f)
             ][-1]
             hyps_path = str(Path(output_folder, "hyp.yaml"))
 
@@ -1010,7 +1008,7 @@ def setup_paths(output_folder: str, model_type: str):
         return None, None
 
 
-def set_config(conf_thres: float, model: str, eval_dir: str):
+def set_config(**kwargs):
     """
     `set_config` takes in a confidence threshold, model name, and evaluation directory and returns a
     configuration object.
@@ -1024,15 +1022,17 @@ def set_config(conf_thres: float, model: str, eval_dir: str):
     :return: The config object is being returned.
     """
     config = wandb.config
-    config.confidence_threshold = conf_thres
-    config.model_name = model
-    config.evaluation_directory = eval_dir
+    for key, value in kwargs.items():
+        if key == "model_name" and "model_name" in config:
+            pass
+        else:
+            setattr(config, key, value)
     return config
 
 
-def add_data_wandb(path: str, name: str, run):
+def add_data(path: str, name: str, registry: str, run):
     """
-    > The function `add_data_wandb` takes a path to a directory, a name for the directory, and a run
+    > The function `add_data` takes a path to a directory, a name for the directory, and a run
     object, and adds the directory to the run as an artifact
 
     :param path: the path to the directory you want to upload
@@ -1041,46 +1041,105 @@ def add_data_wandb(path: str, name: str, run):
     :type name: str
     :param run: The run object that you get from calling wandb.init()
     """
-    my_data = wandb.Artifact(name, type="raw_data")
-    my_data.add_dir(path)
-    run.log_artifact(my_data)
+    if registry == "wandb":
+        my_data = wandb.Artifact(name, type="raw_data")
+        if Path(path).is_dir():
+            my_data.add_dir(path)
+            run.log_artifact(my_data)
+        else:
+            my_data.add_file(path)
+            run.log_artifact(my_data)
+    elif registry == "mlflow":
+        mlflow.log_artifact(path, artifact_path=name)
 
 
 def generate_csv_report(
-    entity: str, project: str, evaluation_path: str, run, wandb_log: bool = False
+    evaluation_path: str,
+    movie_csv_df: pd.DataFrame,
+    run,
+    log: bool = False,
+    registry: str = "wandb",
 ):
     """
-    > We read the labels from the `labels` folder, and create a dictionary with the filename as the key,
-    and the list of labels as the value. We then convert this dictionary to a dataframe, and write it to
-    a csv file
+    Generate a CSV report from labels in the evaluation folder.
 
     :param evaluation_path: The path to the evaluation folder
     :type evaluation_path: str
-    :return: A dataframe with the following columns:
-        filename, class_id, frame_no, x, y, w, h, conf
+    :return: A dataframe with columns: filename, class_id, frame_no, x, y, w, h, conf
     """
-    labels = os.listdir(Path(evaluation_path, "labels"))
+    labels_path = Path(evaluation_path, "labels")
     data_dict = {}
-    for f in labels:
-        frame_no = int(float(f.split("_")[-1].replace(".txt", "")))
-        data_dict[f] = []
-        with open(Path(evaluation_path, "labels", f), "r") as infile:
+
+    for label_file in labels_path.glob("*.txt"):
+        try:
+            frame_no = int(label_file.stem.split("_")[-1])
+        except ValueError:
+            logging.error(
+                "Custom frames not linked to uploaded movies, no frame numbers available"
+            )
+            frame_no = None
+
+        with open(label_file, "r") as infile:
             lines = infile.readlines()
             for line in lines:
-                class_id, x, y, w, h, conf = line.split(" ")
-                data_dict[f].append([class_id, frame_no, x, y, w, h, float(conf)])
-    dlist = [[key, *i] for key, value in data_dict.items() for i in value]
-    detect_df = pd.DataFrame.from_records(
+                parts = line.split()
+                class_id, x, y, w, h, conf = parts[:6]
+                data_dict.setdefault(str(label_file), []).append(
+                    [class_id, frame_no, x, y, w, h, float(conf)]
+                )
+
+    dlist = [[key, *i] for key, values in data_dict.items() for i in values]
+
+    # Convert list of lists to output dataframe
+    detect_df = pd.DataFrame(
         dlist, columns=["filename", "class_id", "frame_no", "x", "y", "w", "h", "conf"]
     )
+
+    # Filter by survey_start and survey_end if applicable
+    if all(col in movie_csv_df for col in ["sampling_start", "sampling_end"]):
+        detect_df["movie_filename"] = (
+            detect_df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
+        )
+        detect_df["movie_filename"] = detect_df["movie_filename"].apply(
+            lambda x: x + ".mp4" if "mp4" not in x else x, 1
+        )
+        # Rename movie_filename to avoid filename confusion
+        movie_csv_df.rename(
+            columns={"filename": "movie_filename"},
+            inplace=True,
+        )
+
+        # Add sampling data
+        detect_df = pd.merge(detect_df, movie_csv_df, on="movie_filename")
+        if (
+            detect_df.sampling_start.dtype == "float"
+            and detect_df.sampling_end.dtype == "float"
+        ):
+            detect_df = detect_df[
+                (detect_df.frame_no >= detect_df.sampling_start)
+                & (detect_df.frame_no <= detect_df.sampling_end)
+            ]
+        # Keep only useful columns
+        detect_df = detect_df[
+            ["filename", "class_id", "frame_no", "x", "y", "w", "h", "conf"]
+        ]
+
+    # Sort dataframe by frame_no and filename
+    detect_df = detect_df.sort_values(
+        by=["frame_no", "filename"],
+        key=lambda x: np.argsort(index_natsorted(detect_df["filename"])),
+    )
+
+    # Export to CSV
     csv_out = Path(evaluation_path, "annotations.csv")
-    detect_df.sort_values(
-        by="frame_no", key=lambda x: np.argsort(index_natsorted(detect_df["filename"]))
-    ).to_csv(csv_out, index=False)
-    logging.info("Report created at {}".format(csv_out))
-    if wandb_log:
-        # wandb.init(resume="must", entity=entity, project="model-evaluations", id=run.id)
+    print(len(detect_df))
+    detect_df.to_csv(csv_out, index=False)
+
+    logging.info(f"Report created at {csv_out}")
+
+    if log and registry == "wandb":
         wandb.log({"predictions": wandb.Table(dataframe=detect_df)})
+
     return detect_df
 
 
@@ -1096,31 +1155,36 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
     :return: A dataframe with the following columns: filename, class_id, frame_no, tracker_id
     """
     data_dict = {}
-    if os.path.exists(tracker_dir):
-        track_files = os.listdir(tracker_dir)
+    if Path(tracker_dir).exists():
+        track_files = [str(f.name) for f in Path(tracker_dir).iterdir()]
     else:
         track_files = []
     if len(track_files) == 0:
         logging.error("No tracks found.")
     else:
         for track_file in track_files:
-            if track_file.endswith(".txt"):
+            if str(track_file).endswith(".txt"):
                 data_dict[track_file] = []
                 with open(Path(tracker_dir, track_file), "r") as infile:
                     lines = infile.readlines()
                     for line in lines:
                         vals = line.split(" ")
-                        class_id, frame_no, tracker_id = vals[0], vals[1], vals[2]
+                        print(vals)
+                        class_id, frame_no, tracker_id = (
+                            vals[-3],
+                            vals[0],
+                            vals[1],
+                        )  # vals[-2], vals[0], vals[1] (track_yolo)
                         data_dict[track_file].append([class_id, frame_no, tracker_id])
         dlist = [
-            [os.path.splitext(key)[0] + f"_{i[1]}.txt", i[0], i[1], i[2]]
+            [str(Path(key).parent / Path(key).stem) + f"_{i[1]}.txt", i[0], i[1], i[2]]
             for key, value in data_dict.items()
             for i in value
         ]
         detect_df = pd.DataFrame.from_records(
             dlist, columns=["filename", "class_id", "frame_no", "tracker_id"]
         )
-        csv_out = Path(eval_dir, "tracking.csv")
+        csv_out = Path(tracker_dir, "tracking.csv")
         detect_df.sort_values(
             by="frame_no",
             key=lambda x: np.argsort(index_natsorted(detect_df["filename"])),
@@ -1130,20 +1194,19 @@ def generate_tracking_report(tracker_dir: str, eval_dir: str):
 
 
 def generate_counts(
-    entity: str,
-    project: str,
     eval_dir: str,
     tracker_dir: str,
     artifact_dir: str,
     run,
-    wandb_log: bool = False,
+    log: bool = False,
+    registry: str = "wandb",
 ):
     import torch
 
     model = torch.load(
         Path(
             [
-                f
+                str(f)
                 for f in Path(artifact_dir).iterdir()
                 if f.is_file() and "best.pt" in str(f)
             ][-1]
@@ -1167,11 +1230,12 @@ def generate_counts(
             .to_frame()
             .reset_index()
         )
-        if wandb_log:
-            # wandb.init(
-            #    resume="must", entity=entity, project="model-evaluations", id=run.id
-            # )
-            wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
+        if log:
+            if registry == "wandb":
+                # wandb.init(resume="must", id=run.id)
+                wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
+            elif registry == "mlflow":
+                pass
         return final_df
 
 
@@ -1183,6 +1247,7 @@ def track_objects(
     conf_thres: float = 0.5,
     img_size: tuple = (720, 540),
     gpu: bool = False,
+    test: bool = False,
 ):
     """
     This function takes in the source directory of the video, the artifact directory, the tracker
@@ -1198,18 +1263,16 @@ def track_objects(
     :return: The latest tracker folder
     """
     import torch
-    import yolov5_tracker.track as track
-    from yolov5.utils import torch_utils
-
-    os.chdir("../yolov5_tracker/")
+    import src.track_yolo as track
+    from types import SimpleNamespace
 
     # Check that tracker folder specified exists
-    if not os.path.exists(tracker_folder):
+    if not Path(tracker_folder).exists():
         logging.error("The tracker folder does not exist. Please try again")
         return None
 
-    model_path = [
-        f
+    models = [
+        str(f)
         for f in Path(artifact_dir).iterdir()
         if f.is_file()
         and ".pt" in str(f)
@@ -1217,41 +1280,44 @@ def track_objects(
         and "best" in str(f)
     ]
 
-    best_model = Path(model_path[0])
-
-    if not gpu:
-        track.run(
-            name=name,
-            source=source_dir,
-            conf_thres=conf_thres,
-            yolo_weights=best_model,
-            reid_weights=Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
-            imgsz=img_size,
-            project=Path(f"{tracker_folder}/runs/track/"),
-            save_vid=True,
-            save_conf=True,
-            save_txt=True,
-        )
+    if len(models) > 0 and not test:
+        best_model = models[0]
     else:
-        track.run(
-            name=name,
-            source=source_dir,
-            conf_thres=conf_thres,
-            yolo_weights=best_model,
-            reid_weights=Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
-            imgsz=img_size,
-            project=Path(f"{tracker_folder}/runs/track/"),
-            device=torch_utils.select_device(""),
-            save_vid=True,
-            save_conf=True,
-            save_txt=True,
-            half=True,
-        )
+        logging.info("No trained model found, using yolov8 base model...")
+        best_model = "yolov8s.pt"
 
-    tracker_root = os.path.join(tracker_folder, "runs", "track")
-    latest_tracker = os.path.join(
-        tracker_root, sorted(os.listdir(tracker_root))[-1], "tracks"
-    )
+    best_model = Path(best_model)
+
+    track_dict = {
+        "name": name,
+        "source": source_dir,
+        "conf": conf_thres,
+        "yolo_model": best_model,
+        "reid_model": Path(tracker_folder, "osnet_x0_25_msmt17.pt"),
+        "imgsz": img_size,
+        "project": Path(f"{tracker_folder}/runs/track/"),
+        "device": "0" if torch.cuda.is_available() else "cpu",
+        "save": True,
+        "save_mot": True,
+        "save_txt": True,
+        "half": True,
+        "iou": 0.7,
+        "show": False,
+        "show_conf": True,
+        "show_labels": True,
+        "verbose": True,
+        "exist_ok": True,
+        "classes": None,
+        "vid_stride": 1,
+        "line_width": None,
+        "tracking_method": "deepocsort",
+        "save_id_crops": False,
+    }
+
+    args = SimpleNamespace(**track_dict)
+    track.run(args)
+    tracker_root = Path(tracker_folder, "runs", "track")
+    latest_tracker = Path(sorted(Path(tracker_root).iterdir())[-1], "mot")
     logging.info(f"Tracking saved succesfully to {latest_tracker}")
     return latest_tracker
 
@@ -1270,188 +1336,188 @@ def encode_image(filepath):
     return "data:image/jpg;base64," + encoded
 
 
-def get_annotator(image_path: str, species_list: list, autolabel_model: str = None):
-    """
-    It takes a path to a folder containing images and annotations, and a list of species names, and
-    returns a widget that allows you to view the images and their annotations, and to edit the
-    annotations
+# def get_annotator(image_path: str, species_list: list, autolabel_model: str = None):
+#     """
+#     It takes a path to a folder containing images and annotations, and a list of species names, and
+#     returns a widget that allows you to view the images and their annotations, and to edit the
+#     annotations
 
-    :param data_path: the path to the image folder
-    :type data_path: str
-    :param species_list: a list of species names
-    :type species_list: list
-    :return: A VBox widget containing a progress bar and a BBoxWidget.
-    """
-    images = sorted(
-        [
-            f
-            for f in os.listdir(image_path)
-            if os.path.isfile(os.path.join(image_path, f)) and f.endswith(".jpg")
-        ]
-    )
+#     :param data_path: the path to the image folder
+#     :type data_path: str
+#     :param species_list: a list of species names
+#     :type species_list: list
+#     :return: A VBox widget containing a progress bar and a BBoxWidget.
+#     """
+#     images = sorted(
+#         [
+#             f
+#             for f in Path(image_path).iterdir()
+#             if Path(image_path, f).is_file() and f.suffix == ".jpg"
+#         ]
+#     )
 
-    annot_path = os.path.join(Path(image_path).parent, "labels")
+#     annot_path = Path(Path(image_path).parent, "labels")
 
-    # a progress bar to show how far we got
-    w_progress = widgets.IntProgress(value=0, max=len(images), description="Progress")
-    w_status = widgets.Label(value="")
+#     # a progress bar to show how far we got
+#     w_progress = widgets.IntProgress(value=0, max=len(images), description="Progress")
+#     w_status = widgets.Label(value="")
 
-    def get_bboxes(image, bboxes, labels, predict: bool = False):
-        logging.getLogger("yolov5").setLevel(logging.WARNING)
-        if predict:
-            detect.run(
-                weights=autolabel_model,
-                source=image,
-                conf_thres=0.5,
-                nosave=True,
-                name="labels",
-            )
-        label_file = [
-            f
-            for f in os.listdir(annot_path)
-            if os.path.isfile(os.path.join(annot_path, f))
-            and f.endswith(".txt")
-            and Path(f).stem == Path(image).stem
-        ]
-        if len(label_file) == 1:
-            label_file = label_file[0]
-            with open(os.path.join(annot_path, label_file), "r") as f:
-                for line in f:
-                    s = line.split(" ")
-                    labels.append(s[0])
+#     def get_bboxes(image, bboxes, labels, predict: bool = False):
+#         logging.getLogger("yolov5").setLevel(logging.WARNING)
+#         if predict:
+#             detect.run(
+#                 weights=autolabel_model,
+#                 source=image,
+#                 conf_thres=0.5,
+#                 nosave=True,
+#                 name="labels",
+#             )
+#         label_file = [
+#             f
+#             for f in Path(annot_path).iterdir()
+#             if Path(annot_path, f).is_file()
+#             and f.suffix == ".txt"
+#             and Path(f).stem == Path(image).stem
+#         ]
+#         if len(label_file) == 1:
+#             label_file = label_file[0]
+#             with open(Path(annot_path, label_file), "r") as f:
+#                 for line in f:
+#                     s = line.split(" ")
+#                     labels.append(s[0])
 
-                    left = (float(s[1]) - (float(s[3]) / 2)) * width
-                    top = (float(s[2]) - (float(s[4]) / 2)) * height
+#                     left = (float(s[1]) - (float(s[3]) / 2)) * width
+#                     top = (float(s[2]) - (float(s[4]) / 2)) * height
 
-                    bboxes.append(
-                        {
-                            "x": left,
-                            "y": top,
-                            "width": float(s[3]) * width,
-                            "height": float(s[4]) * height,
-                            "label": species_list[int(s[0])],
-                        }
-                    )
-            w_status.value = "Annotations loaded"
-        else:
-            w_status.value = "No annotations found"
-        return bboxes, labels
+#                     bboxes.append(
+#                         {
+#                             "x": left,
+#                             "y": top,
+#                             "width": float(s[3]) * width,
+#                             "height": float(s[4]) * height,
+#                             "label": species_list[int(s[0])],
+#                         }
+#                     )
+#             w_status.value = "Annotations loaded"
+#         else:
+#             w_status.value = "No annotations found"
+#         return bboxes, labels
 
-    # the bbox widget
-    image = os.path.join(image_path, images[0])
-    width, height = imagesize.get(image)
-    bboxes, labels = [], []
-    if autolabel_model is not None:
-        w_status.value = "Loading annotations..."
-        bboxes, labels = get_bboxes(image, bboxes, labels, predict=True)
-    else:
-        w_status.value = "No predictions, using existing labels if available"
-        bboxes, labels = get_bboxes(image, bboxes, labels)
-    w_bbox = BBoxWidget(image=encode_image(image), classes=species_list)
+#     # the bbox widget
+#     image = Path(image_path, images[0])
+#     width, height = imagesize.get(image)
+#     bboxes, labels = [], []
+#     if autolabel_model is not None:
+#         w_status.value = "Loading annotations..."
+#         bboxes, labels = get_bboxes(image, bboxes, labels, predict=True)
+#     else:
+#         w_status.value = "No predictions, using existing labels if available"
+#         bboxes, labels = get_bboxes(image, bboxes, labels)
+#     w_bbox = BBoxWidget(image=encode_image(image), classes=species_list)
 
-    # here we assign an empty list to bboxes but
-    # we could also run a detection model on the file
-    # and use its output for creating initial bboxes
-    w_bbox.bboxes = bboxes
+#     # here we assign an empty list to bboxes but
+#     # we could also run a detection model on the file
+#     # and use its output for creating initial bboxes
+#     w_bbox.bboxes = bboxes
 
-    # combine widgets into a container
-    w_container = widgets.VBox(
-        [
-            w_status,
-            w_progress,
-            w_bbox,
-        ]
-    )
+#     # combine widgets into a container
+#     w_container = widgets.VBox(
+#         [
+#             w_status,
+#             w_progress,
+#             w_bbox,
+#         ]
+#     )
 
-    def on_button_clicked(b):
-        w_progress.value = 0
-        image = os.path.join(image_path, images[0])
-        width, height = imagesize.get(image)
-        bboxes, labels = [], []
-        if autolabel_model is not None:
-            w_status.value = "Loading annotations..."
-            bboxes, labels = get_bboxes(image, bboxes, labels, predict=True)
-        else:
-            w_status.value = "No annotations found"
-            bboxes, labels = get_bboxes(image, bboxes, labels)
-        w_bbox.image = encode_image(image)
+#     def on_button_clicked(b):
+#         w_progress.value = 0
+#         image = Path(image_path, images[0])
+#         width, height = imagesize.get(image)
+#         bboxes, labels = [], []
+#         if autolabel_model is not None:
+#             w_status.value = "Loading annotations..."
+#             bboxes, labels = get_bboxes(image, bboxes, labels, predict=True)
+#         else:
+#             w_status.value = "No annotations found"
+#             bboxes, labels = get_bboxes(image, bboxes, labels)
+#         w_bbox.image = encode_image(image)
 
-        # here we assign an empty list to bboxes but
-        # we could also run a detection model on the file
-        # and use its output for creating inital bboxes
-        w_bbox.bboxes = bboxes
-        w_container.children = tuple(list(w_container.children[1:]))
-        b.close()
+#         # here we assign an empty list to bboxes but
+#         # we could also run a detection model on the file
+#         # and use its output for creating inital bboxes
+#         w_bbox.bboxes = bboxes
+#         w_container.children = tuple(list(w_container.children[1:]))
+#         b.close()
 
-    # when Skip button is pressed we move on to the next file
-    def on_skip():
-        w_progress.value += 1
-        if w_progress.value == len(images):
-            button = widgets.Button(
-                description="Click to restart.",
-                disabled=False,
-                display="flex",
-                flex_flow="column",
-                align_items="stretch",
-            )
-            if isinstance(w_container.children[0], widgets.Button):
-                w_container.children = tuple(list(w_container.children[1:]))
-            w_container.children = tuple([button] + list(w_container.children))
-            button.on_click(on_button_clicked)
+#     # when Skip button is pressed we move on to the next file
+#     def on_skip():
+#         w_progress.value += 1
+#         if w_progress.value == len(images):
+#             button = widgets.Button(
+#                 description="Click to restart.",
+#                 disabled=False,
+#                 display="flex",
+#                 flex_flow="column",
+#                 align_items="stretch",
+#             )
+#             if isinstance(w_container.children[0], widgets.Button):
+#                 w_container.children = tuple(list(w_container.children[1:]))
+#             w_container.children = tuple([button] + list(w_container.children))
+#             button.on_click(on_button_clicked)
 
-        # open new image in the widget
-        else:
-            image_file = images[w_progress.value]
-            image_p = os.path.join(image_path, image_file)
-            width, height = imagesize.get(image_p)
-            w_bbox.image = encode_image(image_p)
-            bboxes, labels = [], []
-            if autolabel_model is not None:
-                w_status.value = "Loading annotations..."
-                bboxes, labels = get_bboxes(image_p, bboxes, labels, predict=True)
-            else:
-                w_status.value = "No annotations found"
-                bboxes, labels = get_bboxes(image_p, bboxes, labels)
+#         # open new image in the widget
+#         else:
+#             image_file = images[w_progress.value]
+#             image_p = Path(image_path, image_file)
+#             width, height = imagesize.get(image_p)
+#             w_bbox.image = encode_image(image_p)
+#             bboxes, labels = [], []
+#             if autolabel_model is not None:
+#                 w_status.value = "Loading annotations..."
+#                 bboxes, labels = get_bboxes(image_p, bboxes, labels, predict=True)
+#             else:
+#                 w_status.value = "No annotations found"
+#                 bboxes, labels = get_bboxes(image_p, bboxes, labels)
 
-            # here we assign an empty list to bboxes but
-            # we could also run a detection model on the file
-            # and use its output for creating initial bboxes
-            w_bbox.bboxes = bboxes
+#             # here we assign an empty list to bboxes but
+#             # we could also run a detection model on the file
+#             # and use its output for creating initial bboxes
+#             w_bbox.bboxes = bboxes
 
-    w_bbox.on_skip(on_skip)
+#     w_bbox.on_skip(on_skip)
 
-    # when Submit button is pressed we save current annotations
-    # and then move on to the next file
-    def on_submit():
-        image_file = images[w_progress.value]
-        width, height = imagesize.get(os.path.join(image_path, image_file))
-        # save annotations for current image
-        label_file = Path(image_file).name.replace(".jpg", ".txt")
-        # if the label_file needs to be created
-        if not os.path.exists(annot_path):
-            Path(annot_path).mkdir(parents=True, exist_ok=True)
-        open(os.path.join(annot_path, label_file), "w").write(
-            "\n".join(
-                [
-                    "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
-                        species_list.index(
-                            i["label"]
-                        ),  # single class vs multiple classes
-                        min((i["x"] + i["width"] / 2) / width, 1.0),
-                        min((i["y"] + i["height"] / 2) / height, 1.0),
-                        min(i["width"] / width, 1.0),
-                        min(i["height"] / height, 1.0),
-                    )
-                    for i in w_bbox.bboxes
-                ]
-            )
-        )
-        # move on to the next file
-        on_skip()
+#     # when Submit button is pressed we save current annotations
+#     # and then move on to the next file
+#     def on_submit():
+#         image_file = images[w_progress.value]
+#         width, height = imagesize.get(Path(image_path, image_file))
+#         # save annotations for current image
+#         label_file = Path(image_file).name.replace(".jpg", ".txt")
+#         # if the label_file needs to be created
+#         if not Path(annot_path).exists():
+#             Path(annot_path).mkdir(parents=True, exist_ok=True)
+#         open(Path(annot_path, label_file), "w").write(
+#             "\n".join(
+#                 [
+#                     "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
+#                         species_list.index(
+#                             i["label"]
+#                         ),  # single class vs multiple classes
+#                         min((i["x"] + i["width"] / 2) / width, 1.0),
+#                         min((i["y"] + i["height"] / 2) / height, 1.0),
+#                         min(i["width"] / width, 1.0),
+#                         min(i["height"] / height, 1.0),
+#                     )
+#                     for i in w_bbox.bboxes
+#                 ]
+#             )
+#         )
+#         # move on to the next file
+#         on_skip()
 
-    w_bbox.on_submit(on_submit)
+#     w_bbox.on_submit(on_submit)
 
-    return w_container
+#     return w_container
 
 
 def get_annotations_viewer(data_path: str, species_list: list):
@@ -1466,33 +1532,25 @@ def get_annotations_viewer(data_path: str, species_list: list):
     :type species_list: list
     :return: A VBox widget containing a progress bar and a BBoxWidget.
     """
-    image_path = os.path.join(data_path, "images")
-    annot_path = os.path.join(data_path, "labels")
+    image_path = Path(data_path, "images")
+    annot_path = Path(data_path, "labels")
 
     images = sorted(
-        [
-            f
-            for f in os.listdir(image_path)
-            if os.path.isfile(os.path.join(image_path, f))
-        ]
+        [f for f in Path(image_path).iterdir() if Path(image_path, f).is_file()]
     )
     annotations = sorted(
-        [
-            f
-            for f in os.listdir(annot_path)
-            if os.path.isfile(os.path.join(annot_path, f))
-        ]
+        [f for f in Path(annot_path).iterdir() if Path(annot_path, f).is_file()]
     )
 
     # a progress bar to show how far we got
     w_progress = widgets.IntProgress(value=0, max=len(images), description="Progress")
     # the bbox widget
-    image = os.path.join(image_path, images[0])
+    image = Path(image_path, images[0])
     width, height = imagesize.get(image)
     label_file = annotations[w_progress.value]
     bboxes = []
     labels = []
-    with open(os.path.join(annot_path, label_file), "r") as f:
+    with open(Path(annot_path, label_file), "r") as f:
         for line in f:
             s = line.split(" ")
             labels.append(s[0])
@@ -1526,12 +1584,12 @@ def get_annotations_viewer(data_path: str, species_list: list):
 
     def on_button_clicked(b):
         w_progress.value = 0
-        image = os.path.join(image_path, images[0])
+        image = Path(image_path, images[0])
         width, height = imagesize.get(image)
         label_file = annotations[w_progress.value]
         bboxes = []
         labels = []
-        with open(os.path.join(annot_path, label_file), "r") as f:
+        with open(Path(annot_path, label_file), "r") as f:
             for line in f:
                 s = line.split(" ")
                 labels.append(s[0])
@@ -1576,12 +1634,12 @@ def get_annotations_viewer(data_path: str, species_list: list):
         # open new image in the widget
         else:
             image_file = images[w_progress.value]
-            image_p = os.path.join(image_path, image_file)
+            image_p = Path(image_path, image_file)
             width, height = imagesize.get(image_p)
             w_bbox.image = encode_image(image_p)
             label_file = annotations[w_progress.value]
             bboxes = []
-            with open(os.path.join(annot_path, label_file), "r") as f:
+            with open(Path(annot_path, label_file), "r") as f:
                 for line in f:
                     s = line.split(" ")
                     left = (float(s[1]) - (float(s[3]) / 2)) * width
@@ -1607,9 +1665,9 @@ def get_annotations_viewer(data_path: str, species_list: list):
     # and then move on to the next file
     def on_submit():
         image_file = images[w_progress.value]
-        width, height = imagesize.get(os.path.join(image_path, image_file))
+        width, height = imagesize.get(Path(image_path, image_file))
         # save annotations for current image
-        open(os.path.join(annot_path, label_file), "w").write(
+        open(Path(annot_path, label_file), "w").write(
             "\n".join(
                 [
                     "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
@@ -1645,10 +1703,14 @@ def get_data_viewer(data_path: str):
     if "empty_string" in data_path:
         logging.info("No files.")
         return None
-    imgs = list(filter(lambda fn: fn.lower().endswith(".jpg"), os.listdir(data_path)))
+    imgs = [
+        file
+        for file in Path(data_path).iterdir()
+        if file.is_file() and file.name.lower().endswith(".jpg")
+    ]
 
     def loadimg(k, scale=0.4):
-        display(draw_box(os.path.join(data_path, imgs[k]), scale))
+        display(draw_box(Path(data_path, imgs[k]), scale))
 
     return widgets.interact(loadimg, k=(0, len(imgs) - 1), scale=(0.1, 1.0))
 
@@ -1702,7 +1764,7 @@ def choose_files(path: str):
     if path is None:
         logging.error("No path selected.")
         return
-    files = np.append([path + i for i in os.listdir(path)], "No file")
+    files = np.append([str(i) for i in Path(path).iterdir()], "No file")
 
     clip_path_widget = widgets.Dropdown(
         options=tuple(np.sort(files)),
@@ -1739,23 +1801,23 @@ def view_file(path: str):
     :return: A widget that displays the image or video.
     """
     # Get path of the modified clip selected
-    extension = os.path.splitext(path)[1]
+    extension = Path(path).suffix
     file = open(path, "rb").read()
     if extension.lower() in [".jpeg", ".png", ".jpg"]:
         widget = widgets.Image(value=file, format=extension)
     elif extension.lower() in [".mp4", ".mov", ".avi"]:
-        if os.path.exists("linked_content"):
+        if Path("linked_content").exists():
             shutil.rmtree("linked_content")
         try:
-            os.mkdir("linked_content")
+            Path("linked_content").mkdir()
             logging.info("Opening viewer...")
             stream = ffmpeg.input(path)
-            stream = ffmpeg.output(stream, f"linked_content/{os.path.basename(path)}")
+            stream = ffmpeg.output(stream, f"linked_content/{Path(path).name}")
             ffmpeg.run(stream)
             widget = HTML(
                 f"""
                         <video width=800 height=400 alt="test" controls>
-                            <source src="linked_content/{os.path.basename(path)}" type="video/{extension.lower().replace(".", "")}">
+                            <source src="linked_content/{Path(path).name}" type="video/{extension.lower().replace(".", "")}">
                         </video>
                     """
             )
@@ -1786,19 +1848,25 @@ def adjust_tracking(
     import torch
 
     try:
-        model = torch.load(
-            Path(
-                [
-                    f
-                    for f in Path(tracking_folder).parent.iterdir()
-                    if f.is_file() and "best.pt" in str(f)
-                ][-1]
-            )
-        )
-        names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
+        # Find the latest model file named "best.pt" in the directory
+        model_files = [
+            f
+            for f in Path(tracking_folder).parent.iterdir()
+            if f.is_file() and "best.pt" in str(f)
+        ]
+        if model_files:
+            latest_model_file = sorted(model_files)[-1]
+            model = torch.load(latest_model_file)
+            names = {
+                i: model["model"].names[i] for i in range(len(model["model"].names))
+            }
+        else:
+            raise FileNotFoundError("No model file found")
 
-    except:
-        logging.error("Model not found, using class_id.")
+    except (FileNotFoundError, IndexError) as e:
+        # Handle specific exceptions for file not found or index errors
+        logging.error(f"Error loading model: {e}")
+        logging.error("Using class_id.")
         names = {}
 
     if plot_result:
@@ -1867,6 +1935,281 @@ def adjust_tracking(
     else:
         logging.info(filtered_df["class_id"].value_counts())
     return filtered_df.to_csv(str(Path(tracking_folder, "tracking_clean.csv")))
+
+
+# Auxiliary function to obtain a dictionary with the mapping between the class ids used by the detection model and the species names
+def get_species_mapping(model, project_name, team_name="koster"):
+    import wandb
+
+    api = wandb.Api()
+
+    full_path = f"{team_name}/{project_name}"
+    runs = api.runs(full_path)  # Get all runs in the project
+    for r in runs:
+        # Choose the run corresponding to the model given as parameter
+        if r.id == model.split("_")[1]:
+            run = api.run(project_name + "/" + r.id)
+
+    import yaml
+
+    def read_yaml_file(file_path):
+        with open(file_path, "r") as file:
+            yaml_data = yaml.safe_load(file)
+        return yaml_data
+
+    # Read species mapping into data dictionary
+    try:
+        # Attempt to directly read species mapping from the configuration
+        data_dict = run.rawconfig["data_dict"]
+        species_mapping = data_dict["names"]
+    except KeyError:
+        try:
+            # Attempt to read species mapping from a YAML file specified in the configuration
+            data_dict = read_yaml_file(run.rawconfig["data"])
+            species_mapping = data_dict["names"]
+            species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
+        except (FileNotFoundError, KeyError):
+            # Handle the case where species mapping cannot be found in either location
+            logging.error("Error reading species mapping from config or file.")
+            species_mapping = {}
+
+    return species_mapping
+
+
+def process_detections(
+    project: Project,
+    db_connection,
+    csv_paths: dict,
+    annotations_csv_path: str,
+    model_registry: str,
+    selected_movies_id: dict = None,
+    model: str = None,
+    project_name: str = None,
+    team_name: str = None,
+    source_movies: str = None,
+):
+    """
+    > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+    and saves the results in different csv files.
+
+    :param project: the project object
+    :param db_connection: SQL connection object
+    :param csv_paths: a dictionary with the paths of the csvs used to initiate the db
+    :param annotations_csv_path: the path to the folder containing the annotations.csv file or the annotations.csv
+    :param selected_movies_id: the ids of the movies selected in earlier steps (note if the selection changes b, mlflow)
+    :param model_registry: the name of the model register (e.g wandb, mlflow)
+    :param model: the name of the model in wandb used to obtain the detections
+    :param project_name: name of the project in wandb
+    :param team_name: name of the team in wandb.
+    :param source_movies: A string with the path to the movies where the model ran inferences from
+    """
+
+    # Read the annotations.csv file
+    df = pd.read_csv(Path(annotations_csv_path, "annotations.csv"))
+
+    # Check if the DataFrame is not empty
+    if df.empty:
+        raise ValueError(
+            "There are no labels to aggregate, run the model again with a lower threshold or try a different model."
+        )
+
+    # Extract the actual filenames using pathlib
+    df["filename"] = df["filename"].apply(lambda path: Path(path).name)
+
+    # Remove frame number and txt extension from filename to represent individual movies
+    if project_name == "template_project":
+        # Extract unique movie names using regular expression
+        df["movie_filename"] = df["filename"].str.rsplit("_", n=1).str[0]
+    else:
+        df["movie_filename"] = (
+            df["filename"].str.split("/").str[-1].str.rsplit(pat="_", n=1).str[0]
+        )
+
+    # Drop the filename column to avoid confusion
+    df = df.drop("filename", axis=1)
+
+    # Add movie ids info from the movies selected in choose_footage
+    if selected_movies_id:
+        # Create a new column with the mapped values
+        df["movie_id"] = df["movie_filename"].apply(
+            lambda x: dict(selected_movies_id).get(x, None)
+        )
+
+        # Define the movie col of interest
+        movie_group_col = "movie_id"
+
+    else:
+        # Define the movie col of interest
+        movie_group_col = "movie_filename"
+
+    # Map the class id to species labels
+    if model_registry == "wandb":
+        # Set the name of the template project
+        if project_name == "template_project":
+            project_name = "spyfish_aotearoa"
+
+        # Obtain a dictionary with the mapping between the class ids and the species names
+        species_mapping = get_species_mapping(model, project_name, team_name)
+
+        # Add a column with the species name corresponding to each class id
+        df["commonName"] = df["class_id"].astype(str).map(species_mapping)
+
+        # Define the movie col of interest
+        sp_group_col = "commonName"
+
+    else:
+        # Define the movie col of interest
+        sp_group_col = "class_id"
+
+    # Get max_n per class detected in each movie per frame
+    df["max_n"] = df.groupby([movie_group_col, "frame_no"])[sp_group_col].transform(
+        "count"
+    )
+
+    # Specify the columns for which we want unique confidence values
+    columns_conf = [movie_group_col, "frame_no", sp_group_col]
+
+    # Get the confidence range of each detection per frame and add three columns
+    df["min_conf"] = df.groupby(columns_conf)["conf"].transform("min")
+    df["mean_conf"] = df.groupby(columns_conf)["conf"].transform("mean")
+    df["max_conf"] = df.groupby(columns_conf)["conf"].transform("max")
+
+    # Create a boolean mask for duplicated rows based on the specified columns
+    mask_duplicates = df.duplicated(subset=columns_conf, keep=False)
+
+    # Keep only unique rows based on grouped columns
+    df = df[~mask_duplicates]
+
+    # Retrieve the max counts and conf.levels of uploaded footage
+    if all(column_name in df.columns for column_name in ["movie_id", "commonName"]):
+        from kso_utils.db_utils import add_db_info_to_df
+
+        # Combine the movie info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="movies",
+        )
+
+        # Combine the site info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="sites",
+        )
+
+        # Combine the species info with the labels
+        df = add_db_info_to_df(
+            project=project,
+            conn=db_connection,
+            csv_paths=csv_paths,
+            df=df,
+            table_name="species",
+        )
+
+    # Set the fps information for movies without info in the sql db
+    if "fps" not in df.columns:
+        from kso_utils.movie_utils import get_fps_duration
+
+        # Get the fps of the movie
+        df["fps"], _ = get_fps_duration(movie_path=source_movies)
+
+        # Set the movie id to 0
+        df["movie_id"] = 0
+
+    # Calculate the corresponding second of the frame in the movie
+    df["second_in_movie"] = (df["frame_no"] / df["fps"]).astype(int)
+
+    # Report the function ran without issues.
+    logging.info(
+        f"Detections processed. The dataframe has a total of {df.shape[0]} rows and {df.shape[1]} columns",
+    )
+
+    return df
+
+
+def plot_processed_detections(
+    df,
+    thres: int = 5,  # number of seconds for thresholding in interval
+    int_length: int = 10,
+):
+    """
+    > This function computes the given statistics over the detections obtained by a model on different footages for the species of interest,
+    and saves the results in different csv files.
+    :param df: df of the aggregated detections
+    :param thres: The `thres` parameter is used to filter out columns in the `result_df`
+    DataFrame where the corresponding `frame_count` column has a value less than `thres`. This
+    means that only columns with a minimum number of frames per interval greater than or equal to
+    `thres, defaults to 5
+    :param int_length: An integer value specifying the length in seconds of interval for filtering
+
+    """
+
+    if "second_in_movie" not in df.columns:
+        logging.error("Aggregation plot not currently supported on this film.")
+
+    # Convert 'second_in_movie' to seconds since 0 (e.g. the start of the movie)
+    reference_time = pd.to_datetime("1970-01-01 00:00:00", format="%Y-%m-%d %H:%M:%S")
+
+    df["seconds_since_reference"] = (
+        pd.to_datetime(df["second_in_movie"], unit="s") - reference_time
+    ).dt.total_seconds()
+
+    # Ensure 'seconds_since_reference' is in datetime format
+    df["seconds_since_reference"] = pd.to_datetime(
+        df["seconds_since_reference"], unit="s"
+    )
+
+    # Group by n-second intervals
+    interval = pd.Grouper(key="seconds_since_reference", freq=str(int_length) + "S")
+
+    # Group by species and minute, calculate the count
+    max_count_per_species = (
+        df.groupby(["movie_id", "class_id", interval])["max_n"].max().reset_index()
+    )
+
+    # Enable plotting of matplotlib
+    try:
+        # Enable inline plotting for Matplotlib
+        get_ipython().magic("matplotlib inline")
+    except ImportError:
+        # Handle the case where IPython is not available
+        pass
+    except Exception as e:
+        # Handle other specific exceptions that may occur
+        print(f"Error occurred while enabling inline plotting: {e}")
+
+    import matplotlib.pyplot as plt
+
+    # Plot each movie separately
+    movies = max_count_per_species["movie_id"].unique()
+
+    for movie_id in movies:
+        movie_data = max_count_per_species[
+            max_count_per_species["movie_id"] == movie_id
+        ]
+
+        # Create a separate line plot for each species
+        species_list = movie_data["class_id"].unique()
+        plt.figure(figsize=(10, 6))
+
+        for species in species_list:
+            species_data = movie_data[movie_data["class_id"] == species]
+            plt.plot(
+                species_data["seconds_since_reference"],
+                species_data["max_n"],
+                label=species,
+            )
+
+            plt.xlabel("Timestamp (seconds)")
+        plt.ylabel("Max Individuals Recorded in a Minute")
+        plt.title(f"Max Individuals Recorded Every Minute for Movie {movie_id}")
+        plt.legend()
+        plt.show()
 
 
 def main():

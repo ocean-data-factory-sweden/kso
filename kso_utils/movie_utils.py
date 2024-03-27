@@ -1,8 +1,9 @@
 # base imports
-import sys
 import os
+import sys
 import cv2
 import logging
+import ffmpeg
 import subprocess
 import urllib
 import unicodedata
@@ -10,41 +11,31 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
-from urllib.request import pathname2url
-from IPython.display import HTML
+from ultralytics.utils.downloads import is_url
+from IPython.display import display
+import ipywidgets as widgets
 
 # util imports
 from kso_utils.project_utils import Project
 
 # server imports
-from kso_utils.server_utils import ServerType, get_matching_s3_keys
+from kso_utils.server_utils import ServerType, get_matching_s3_keys, upload_file_server
+
 
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 
-# Function to prevent issues with Swedish characters
-# Converting the Swedish characters ä and ö to utf-8.
-def unswedify(string: str):
-    """Convert ä and ö to utf-8"""
-    return (
-        string.encode("utf-8")
-        .replace(b"\xc3\xa4", b"a\xcc\x88")
-        .replace(b"\xc3\xb6", b"o\xcc\x88")
-        .decode("utf-8")
-    )
+# Function to check if ffmpeg is available in the system's PATH.
+def check_ffmpeg_availability():
+    try:
+        # Try to import the ffmpeg module from ffmpeg-python
+        import ffmpeg
 
-
-# Function to prevent issues with Swedish characters
-def reswedify(string: str):
-    """Convert ä and ö to utf-8"""
-    return (
-        string.encode("utf-8")
-        .replace(b"a\xcc\x88", b"\xc3\xa4")
-        .replace(b"o\xcc\x88", b"\xc3\xb6")
-        .decode("utf-8")
-    )
+        return True
+    except ImportError:
+        return False
 
 
 def get_fps_duration(movie_path: str):
@@ -120,12 +111,9 @@ def movies_in_movie_folder(project: Project, db_connection, server_connection: d
     elif project.server in [ServerType.LOCAL, ServerType.SNIC]:
         logging.info("Retrieving movies that are available locally")
         # Read the movie files from the movie_path folder
-        local_files = os.listdir(project.movie_folder)
+        local_files = list(Path(project.movie_folder).rglob("*"))
         available_movies_list = [
-            os.path.join(dp, f)
-            for dp, dn, filenames in os.walk(project.movie_folder)
-            for f in filenames
-            if os.path.splitext(f)[1].endswith(get_movie_extensions())
+            str(f) for f in local_files if f.suffix.endswith(get_movie_extensions())
         ]
 
         # Save the list of movies as a pd df
@@ -176,8 +164,6 @@ def retrieve_movie_info_from_server(
     movies_df = movies_df.rename(columns={"id": "movie_id"})
 
     if project.server == ServerType.SNIC:
-        # Find closest matching filename (may differ due to Swedish character encoding)
-        parsed_url = urllib.parse.urlparse(movies_df["fpath"].iloc[0])
 
         def get_match(string, string_options):
             normalized_string = unicodedata.normalize("NFC", string)
@@ -239,103 +225,98 @@ def retrieve_movie_info_from_server(
     return available_movies_df, no_available_movies_df, no_info_movies_df
 
 
-# Function to preview underwater movies
 def preview_movie(
+    movie_path: str,
+    movie_metadata: pd.DataFrame,
+):
+    """
+    It takes a movie filename and its associated metadata and returns a widget object that can be displayed in the notebook
+
+    :param movie_path: the filename of the movie you want to preview
+    :param movie_metadata: the metadata of the movie you want to preview
+    :return: Widget object
+    """
+
+    # Adjust the width of the video and metadata sections based on your preference
+    video_width = "60%"  # Adjust as needed
+    metadata_width = "40%"  # Adjust as needed
+
+    if "http" in movie_path:
+        video_widget = widgets.Video.from_url(movie_path, width=video_width)
+    else:
+        video_widget = widgets.Video.from_file(movie_path, width=video_width)
+
+    metadata_html = movie_metadata.T.to_html()
+
+    metadata_widget = widgets.HTML(
+        value=metadata_html,
+        layout=widgets.Layout(width=metadata_width, overflow="auto"),
+    )
+
+    # Create a horizontal box layout to display video and metadata side by side
+    display_widget = widgets.HBox([video_widget, metadata_widget])
+
+    display(display_widget)
+
+    return display_widget
+
+
+def get_info_selected_movies(
+    selected_movies: list,
+    footage_source: str,
+    df: pd.DataFrame,
     project: Project,
-    available_movies_df: pd.DataFrame,
-    movie_i: str,
     server_connection: dict,
 ):
     """
-    It takes a movie filename and returns a HTML object that can be displayed in the notebook
-
+    > This function takes the selected movies and source of the footage (already in the system or new) and return the df, paths and ids of the movies selected.
+    :param selected_movies: TBC
+    :param footage_source: a string specifying whether the footage is already in the system or is new
     :param project: the project object
-    :param available_movies_df: a dataframe with all the movies in the database
-    :param movie_i: the filename of the movie you want to preview
     :param server_connection: a dictionary with the connection to the server
-    :return: A tuple of two elements:
-        1. HTML object
-        2. Movie path
+    :param df: the dataframe of available movies
     """
 
-    # Select the movie of interest
-    movie_selected = available_movies_df[
-        available_movies_df["filename"] == movie_i
-    ].reset_index(drop=True)
-    movie_selected_view = movie_selected.T
-    movie_selected_view.columns = ["Movie summary"]
-
-    # Make sure only one movie is selected
-    if len(movie_selected.index) > 1:
-        logging.info(
-            "There are several movies with the same filename. This should be fixed!"
-        )
-        return None
-
-    else:
-        # Generate temporary path to the selected movie
-        movie_path = get_movie_path(
-            project=project,
-            f_path=movie_selected["fpath"].values[0],
-            server_connection=server_connection,
+    if footage_source == "Existing Footage":
+        # Create a df with the selected movies
+        selected_movies_df = df[df["filename"].isin(selected_movies)].reset_index(
+            drop=True
         )
 
-        html_code = f"""<html>
-                <div style="display: flex; justify-content: space-around; align-items: center">
-                <div>
-                  <video width=500 controls>
-                  <source src={movie_path}>
-                  </video>
-                </div>
-                <div>{movie_selected_view.to_html()}</div>
-                </div>
-                </html>"""
-
-        return HTML(html_code), movie_path
-
-
-def check_movie_uploaded(project: Project, db_connection, movie_i: str):
-    """
-    This function takes in a movie name and a dictionary containing the path to the database and returns
-    a boolean value indicating whether the movie has already been uploaded to Zooniverse
-
-    :param project: the project object
-    :param movie_i: the name of the movie you want to check
-    :type movie_i: str
-    :param db_connection: SQL connection object
-    """
-    from kso_utils.db_utils import get_df_from_db_table
-
-    # Query info about the clip subjects uploaded to Zooniverse from the db
-    subjects_df = get_df_from_db_table(conn=db_connection, table_name="subjects")
-
-    # Select only columns of interest
-    subjects_df = subjects_df[
-        [
-            "id",
-            "subject_type",
-            "filename",
-            "clip_start_time",
-            "clip_end_time",
-            "movie_id",
+        # Retrieve the paths of the movies selected
+        selected_movies_paths = [
+            get_movie_path(
+                project=project,
+                f_path=f_path,
+                server_connection=server_connection,
+            )
+            for f_path in selected_movies_df["fpath"]
         ]
-    ]
 
-    # Select only clip subjects
-    subjects_df = subjects_df[subjects_df["subject_type"] == "clip"]
+        # Remove movie extension to match yolo_format labels
+        selected_movies_no_ext = tuple(
+            filename.rsplit(".", 1)[0] for filename in selected_movies
+        )
 
-    # Save the video filenames of the clips uploaded to Zooniverse
-    videos_uploaded = subjects_df.filename.dropna().unique()
+        selected_movies_ids = {
+            key: value
+            for key, value in zip(
+                selected_movies_no_ext,
+                selected_movies_df["movie_id"].to_list(),
+            )
+        }
 
-    # Check if selected movie has already been uploaded
-    already_uploaded = any(mv in movie_i for mv in videos_uploaded)
+    elif footage_source == "New Footage":
+        selected_movies_paths = selected_movies
+        selected_movies_ids = {}
+        selected_movies_df = pd.DataFrame()
 
-    if already_uploaded:
-        clips_uploaded = subjects_df[subjects_df["filename"].str.contains(movie_i)]
-        logging.info(f"{movie_i} has clips already uploaded.")
-        logging.info(clips_uploaded.head())
-    else:
-        logging.info(f"{movie_i} has not been uploaded to Zooniverse yet")
+    return (
+        selected_movies_paths,
+        selected_movies,
+        selected_movies_df,
+        selected_movies_ids,
+    )
 
 
 # Function to extract selected frames from videos
@@ -356,17 +337,20 @@ def extract_frames(
 
     # Set the filename of the frames
     df["frame_path"] = df.apply(
-        lambda row: os.path.join(
-            frames_folder, f"{row['filename']}_{row['frame_number']}_{row['label']}.jpg"
+        lambda row: str(
+            Path(frames_folder)
+            / f"{row['filename']}_{row['frame_number']}_{row['label']}.jpg"
         ),
         axis=1,
     )
 
     # Create the folder to store the frames if not exist
-    if not os.path.exists(frames_folder):
-        Path(frames_folder).mkdir(parents=True, exist_ok=True)
+    frames_folder_path = Path(frames_folder)
+    if not frames_folder_path.exists():
+        frames_folder_path.mkdir(parents=True, exist_ok=True)
         # Recursively add permissions to folders created
-        [os.chmod(root, 0o777) for root, dirs, files in os.walk(frames_folder)]
+        for root, dirs, files in frames_folder_path.iterdir():
+            Path(root).chmod(0o777)
 
     for movie in df["fpath"].unique():
         url = get_movie_path(
@@ -401,15 +385,16 @@ def write_movie_frames(key_movie_df: pd.DataFrame, url: str):
         # Get the frame numbers for each movie the fps and duration
         for index, row in tqdm(key_movie_df.iterrows(), total=key_movie_df.shape[0]):
             # Create the folder to store the frames if not exist
-            if not os.path.exists(row["frame_path"]):
+            frame_path = Path(row["frame_path"])
+            if not frame_path.exists():
                 cap.set(1, row["frame_number"])
                 ret, frame = cap.read()
                 if frame is not None:
-                    cv2.imwrite(row["frame_path"], frame)
-                    os.chmod(row["frame_path"], 0o777)
+                    cv2.imwrite(str(frame_path), frame)
+                    frame_path.chmod(0o777)
                 else:
-                    cv2.imwrite(row["frame_path"], np.zeros((100, 100, 3), np.uint8))
-                    os.chmod(row["frame_path"], 0o777)
+                    cv2.imwrite(str(frame_path), np.zeros((100, 100, 3), np.uint8))
+                    frame_path.chmod(0o777)
                     logging.info(
                         f"No frame was extracted for {url} at frame {row['frame_number']}"
                     )
@@ -436,7 +421,7 @@ def convert_video(
     :param movie_path: The local path- or url to the movie file you want to convert
     :type movie_path: str
     :param movie_filename: The filename of the movie file you want to convert
-    :type movie_path: str
+    :type movie_filename: str
     :param gpu_available: Boolean, whether or not a GPU is available
     :type gpu_available: bool
     :param compression: Boolean, whether or not movie compression is required
@@ -445,99 +430,66 @@ def convert_video(
     :type fps_output: str
     :return: The path to the converted video file.
     """
-    from kso_utils.tutorials_utils import is_url
 
     # Set the name of the converted movie
     conv_filename = "conv_" + movie_filename
 
     # Check the movie is accessible locally
-    if os.path.exists(movie_path):
+    if Path(movie_path).exists():
         # Store the directory and filename of the movie
-        movie_fpath = os.path.dirname(movie_path)
-        conv_fpath = os.path.join(movie_fpath, conv_filename)
+        movie_fpath = Path(movie_path).parent
+        conv_fpath = movie_fpath / conv_filename
 
     # Check if the path to the movie is a url
     elif is_url(movie_path):
         # Specify the directory to store the converted movie
-        conv_fpath = os.path.join(conv_filename)
+        conv_fpath = Path(conv_filename)
 
     else:
-        logging.error(f"The path to {movie_path} is invalid")
+        logging.error(f"The path to {conv_fpath} is invalid")
 
-    if gpu_available and compression:
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-hwaccel",
-                "cuda",
-                "-hwaccel_output_format",
-                "cuda",
-                "-i",
-                str(movie_path),
-                "-filter:v",
-                fps_output,
-                "-c:v",
-                "h264_nvenc",  # ensures correct codec
-                "-crf",
-                "22",  # compresses the video
-                str(conv_fpath),
-            ]
-        )
+    # Set up input and output default prompts
+    input_path = movie_path
+    output_path = str(conv_fpath)
 
-    elif gpu_available and not compression:
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-hwaccel",
-                "cuda",
-                "-hwaccel_output_format",
-                "cuda",
-                "-i",
-                str(movie_path),
-                "-filter:v",
-                fps_output,
-                "-c:v",
-                "h264_nvenc",  # ensures correct codec
-                str(conv_fpath),
-            ]
-        )
+    input_options = {}
+    output_options = {}
 
-    elif not gpu_available and compression:
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-i",
-                str(movie_path),
-                "-filter:v",
-                fps_output,
-                "-c:v",
-                "h264",  # ensures correct codec
-                "-crf",
-                "22",  # compresses the video
-                str(conv_fpath),
-            ]
-        )
+    # Add GPU-related options if available
+    if gpu_available:
+        input_options["hwaccel"] = "cuda"
 
-    elif not gpu_available and not compression:
-        subprocess.call(
-            [
-                "ffmpeg",
-                "-i",
-                str(movie_path),
-                "-filter:v",
-                fps_output,
-                "-c:v",
-                "h264",  # ensures correct codec
-                str(conv_fpath),
-            ]
-        )
+    output_options["filter:v"] = fps_output
+    output_options["pix_fmt"] = "yuv420p"
+
+    if compression:
+        output_options["crf"] = "22"
+
+    # Run the ffmpeg movie convertion code
+    try:
+        ffmpeg.input(input_path, **input_options).output(
+            output_path, **output_options
+        ).run(overwrite_output=True)
+
+    except ffmpeg.Error as e:
+        logging.error("ffmpeg error occurred.")
+        logging.error(f"stderr: {e}")
+        if e.stdout is not None:
+            logging.error(f"stdout: {e.stdout.decode('utf8')}")
+        if e.stderr is not None:
+            logging.error(f"stderr: {e.stderr.decode('utf8')}")
+        raise e
+
+    # Ensure the movie was extracted
+    if not conv_fpath.exists():
+        raise FileNotFoundError(f"{conv_fpath} was not converted and stored locally.")
+
     else:
-        raise ValueError(f"{movie_path} not modified")
+        # Ensure open permissions on file
+        conv_fpath.chmod(0o777)
+        logging.info(f"{conv_fpath} successfully converted and stored locally.")
 
-    # Ensure open permissions on file (for now)
-    os.chmod(conv_fpath, 0o777)
-    logging.info("Movie file successfully converted and stored locally.")
-    return conv_fpath
+    return str(conv_fpath)
 
 
 def standarise_movie_format(
@@ -563,13 +515,10 @@ def standarise_movie_format(
     :type gpu_available: bool
     """
 
-    from kso_utils.tutorials_utils import is_url
-    from kso_utils.server_utils import upload_file_server
-
-    ##### Check movie format ######
+    # Check movie format ######
     ext = Path(movie_filename).suffix
 
-    # Set video convertion to false as default
+    # Set video conversion to false as default
     convert_video_T_F = False
 
     if not ext.lower() == ".mp4":
@@ -577,7 +526,7 @@ def standarise_movie_format(
         # Set conversion to True
         convert_video_T_F = True
 
-    ##### Check frame rate #######
+    # Check frame rate #######
     cap = cv2.VideoCapture(movie_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
 
@@ -588,7 +537,7 @@ def standarise_movie_format(
         # Set conversion to True
         convert_video_T_F = True
 
-    ##### Check codec info ########
+    # Check codec info ########
     def get_fourcc(cap: cv2.VideoCapture) -> str:
         """Return the 4-letter string of the codec of a video."""
         return (
@@ -599,15 +548,14 @@ def standarise_movie_format(
 
     codec = get_fourcc(cap)
 
-    if not codec in ["h264", "avc1"]:
+    if codec not in ["h264", "avc1"]:
         logging.info(
             f"The codecs of {movie_filename} are not supported (only h264 is supported)."
         )
         # Set conversion to True
         convert_video_T_F = True
 
-    ##### Check movie file #######
-    ##### (not needed in Spyfish) #####
+    #  Check movie file #######
     # Create a list of the project where movie compression is not needed
     project_no_compress = ["Spyfish_Aotearoa"]
 
@@ -622,9 +570,9 @@ def standarise_movie_format(
         duration_mins = duration / 60
 
         # Check if the movie is accessible locally
-        if os.path.exists(movie_path):
+        if Path(movie_path).exists():
             # Store the size of the movie
-            size = os.path.getsize(movie_path)
+            size = Path(movie_path).stat().st_size
 
         # Check if the path to the movie is a url
         elif is_url(movie_path):
@@ -855,8 +803,16 @@ def check_movies_meta(
             )
 
             # Save the updated df locally
-            df.to_csv(csv_paths["local_movies_csv"], index=False)
-            logging.info(f"The local movies.csv file has been updated")
+            if os.access(csv_paths["local_movies_csv"], os.W_OK):
+                df.to_csv(csv_paths["local_movies_csv"], index=False)
+            else:
+                logging.info(
+                    "Unable to update local movies.csv file automatically, please do this manually with the given output."
+                )
+                return df
+            logging.info(
+                f"The local movies.csv file {csv_paths['local_movies_csv']} has been updated"
+            )
 
             from kso_utils.server_utils import update_csv_server
 
@@ -871,45 +827,36 @@ def check_movies_meta(
 
 
 def concatenate_local_movies(csv_paths):
-    # concatenates the movies specified in the "go_pro_files" column
-    # and saves them to fpath
-
     # Load the csv with movies information
     df = pd.read_csv(csv_paths["local_movies_csv"])
 
     # Select only the path of the folder
-    df["Path"] = df["fpath"].str.rsplit("\\", n=1).str[0]
+    df["Path"] = df["fpath"].apply(lambda x: Path(x).parent)
 
     # Function to merge directory path and multiple filenames into a list
     def merge_paths(row):
         directory_path = row["Path"]
         filenames = row["go_pro_files"].split("; ")
-        merged_paths = [
-            os.path.join(directory_path, filename.strip()) for filename in filenames
-        ]
+        merged_paths = [directory_path / filename.strip() for filename in filenames]
         return merged_paths
 
     # Combine the path of the folder with the go_profiles inside the folder
     df["path_go_pros"] = df.apply(merge_paths, axis=1)
 
-    # Create an empty list to store the annotations
-    rows_list = []
-
     # Loop through each classification submitted by the users
     for index, row in tqdm(df.iterrows(), total=df.shape[0]):
         # Start text file and list to keep track of the videos to concatenate
         textfile_name = "a_file.txt"
-        textfile = open(textfile_name, "w")
-        video_list = []
+        with open(textfile_name, "w") as textfile:
+            video_list = []
 
-        for movie_i in sorted(row["path_go_pros"]):
-            # Keep track of the videos to concatenate
-            textfile.write("file '" + movie_i + "'" + "\n")
-            video_list.append(movie_i)
-        textfile.close()
+            for movie_i in sorted(row["path_go_pros"]):
+                # Keep track of the videos to concatenate
+                textfile.write("file '" + str(movie_i) + "'" + "\n")
+                video_list.append(movie_i)
 
         # Concatenate the files
-        if os.path.exists(row["fpath"]):
+        if Path(row["fpath"]).exists():
             logging.info(f"{row['fpath']} not concatenated because it already exists")
         else:
             logging.info(f"Concatenating {row['fpath']}")
@@ -926,19 +873,14 @@ def concatenate_local_movies(csv_paths):
                     "a_file.txt",
                     "-c",
                     "copy",
-                    row["fpath"],
+                    str(row["fpath"]),
                 ]
             )
 
         logging.info(f"{row['fpath']} concatenated successfully")
 
         # Delete the text file
-        os.remove(textfile_name)
-
-
-#         # Delete the go_pro_videos
-#         for f in video_list:
-#             os.remove(f)
+        Path(textfile_name).unlink()
 
 
 def select_project_movies(
@@ -951,8 +893,16 @@ def select_project_movies(
     :param project: the project object
     :param movies_df: a df with the information about the filepaths and "existance" of the movies
     """
+
     # Select only movies that are a good deployment
-    if project.Project_name in ["Spyfish_Aotearoa", "Spyfish_BOPRC"]:
-        movies_df = movies_df.loc[~movies_df.IsBadDeployment]
+    if project.Project_name in ["Spyfish_Aotearoa"]:
+        # Check for missing values in IsBadDeployment column
+        if movies_df["IsBadDeployment"].isnull().any():
+            raise ValueError(
+                "The 'IsBadDeployment' column contains missing values. Please handle missing values before proceeding."
+            )
+
+        else:
+            movies_df = movies_df.loc[~movies_df.IsBadDeployment]
 
     return movies_df

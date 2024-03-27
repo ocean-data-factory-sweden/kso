@@ -4,7 +4,7 @@ from collections.abc import Callable
 import cv2 as cv
 import numpy as np
 from pathlib import Path
-from kso_utils.koster_utils import unswedify
+from kso_utils.koster_utils import fix_text_encoding
 
 # globals
 frame_device = cv.cuda_GpuMat()
@@ -77,7 +77,7 @@ def ProcFrames(proc_frame_func: Callable, frames_path: str):
                 cv.imwrite(str(Path(frames_path, f)), new_frame)
             else:
                 new_frame = proc_frame_func(
-                    cv.imread(unswedify(str(Path(frames_path, f))))
+                    cv.imread(fix_text_encoding(str(Path(frames_path, f))))
                 )
                 cv.imwrite(str(Path(frames_path, f)), new_frame)
     end = time.time()

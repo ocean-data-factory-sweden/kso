@@ -1,5 +1,3 @@
-import glob
-import os
 import argparse
 from pathlib import Path
 
@@ -23,21 +21,23 @@ def prepare(data_path, percentage_test, out_path):
 
     # Populate train.txt and test.txt
     counter = 1
-    index_test = int((1 - percentage_test) / 100 * len(os.listdir(dataset_path)))
+    index_test = int(
+        (1 - percentage_test) / 100 * len(list(dataset_path.glob("*.jpg")))
+    )
     latest_movie = ""
-    for pathAndFilename in glob.iglob(os.path.join(dataset_path, "*.jpg")):
-        title, ext = os.path.splitext(os.path.basename(pathAndFilename))
-        movie_name = title.replace("_frame_*", "", regex=True)
+    for pathAndFilename in dataset_path.glob("*.jpg"):
+        title = pathAndFilename.stem
+        movie_name = title.split("_frame_")[0]
 
         if counter == index_test + 1:
             if movie_name != latest_movie:
-                file_test.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+                file_test.write(str(Path(out_path, f"{title}.jpg")) + "\n")
             else:
-                file_train.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+                file_train.write(str(Path(out_path, f"{title}.jpg")) + "\n")
             counter += 1
         else:
             latest_movie = movie_name
-            file_train.write(out_path + os.path.basename(title) + ".jpg" + "\n")
+            file_train.write(str(Path(out_path, f"{title}.jpg")) + "\n")
             counter += 1
 
 

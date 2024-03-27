@@ -183,7 +183,6 @@ def run(
 
         # NMS
         with dt[2]:
-
             from torchvision.ops import box_iou, batched_nms
             from collections import Counter
             import numpy as np

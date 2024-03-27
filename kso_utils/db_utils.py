@@ -1,7 +1,7 @@
 # base imports
-import os
 import sqlite3
 import logging
+from pathlib import Path
 import pandas as pd
 
 # util imports
@@ -23,14 +23,15 @@ def create_connection(db_file: str):
     :return: Connection object or None
     """
     conn = None
+    db_path = Path(db_file)
     try:
-        if not os.path.exists(os.path.dirname(db_file)):
-            if not os.path.dirname(db_file) == "":
-                os.mkdir(os.path.dirname(db_file))
-                os.chmod(os.path.dirname(db_file), 0o777)
+        if not db_path.parent.exists():
+            if not db_path.parent == Path(""):
+                db_path.parent.mkdir(parents=True)
+                db_path.parent.chmod(0o777)
         conn = sqlite3.connect(db_file)
         conn.execute("PRAGMA foreign_keys = 1")
-        os.chmod(db_file, 0o777)
+        db_path.chmod(0o777)
         return conn
     except sqlite3.Error as e:
         logging.error(e)
@@ -282,16 +283,17 @@ def create_db(db_path: str):
     :param db_path: path of the database file
     :return:
     """
+    db_file = Path(db_path)
 
     # Delete previous database versions if exists
-    if os.path.exists(db_path):
-        os.remove(db_path)
+    if db_file.exists():
+        db_file.unlink()
 
     # Get sql command for db setup
     sql_setup = schema.sql
 
     # create a database connection
-    conn = create_connection(r"{:s}".format(db_path))
+    conn = create_connection(str(db_file))
 
     # create tables
     if conn is not None:
@@ -392,8 +394,7 @@ def process_test_csv(
     # Rename id columns using the dictionary
     local_df = local_df.rename(columns=id_lookup)
 
-    ##################
-    ##Roadblock to ensure cols match schema
+    # Roadblock to ensure cols match schema
     ##################
     # Get the "standard" schema column names of the table of interest
     col_names_dic = get_column_names_db(conn, init_key)
@@ -493,17 +494,18 @@ def add_db_info_to_df(
 
     # Set species table
     elif table_name == "species":
+        # Save the name of the columns to merge dfs on
+        left_on_col = "commonName"
+        right_on_col = "commonName"
+
         if "label" in df.columns:
-            df["commonName"] = df["label"]
+            df[right_on_col] = df["label"]
 
         from kso_utils.zooniverse_utils import clean_label
 
         # Match format of species name to Zooniverse labels
-        sql_df["commonName"] = sql_df["commonName"].apply(clean_label)
-
-        # Save the name of the columns to merge dfs on
-        left_on_col = "commonName"
-        right_on_col = "commonName"
+        sql_df[right_on_col] = sql_df[right_on_col].apply(clean_label)
+        df[left_on_col] = df[left_on_col].apply(clean_label)
 
     else:
         logging.error(
@@ -512,12 +514,30 @@ def add_db_info_to_df(
 
     # Ensure id columns that are going to be used to merge are int
     if "id" in left_on_col:
-        df[left_on_col] = df[left_on_col].astype(float).astype(int)
+        # Ensure there are no NaN values found in the column id column
+        if df[left_on_col].isna().any() or (df[left_on_col] == "None").any():
+            logging.error(
+                f"Error: NaN values found in the {left_on_col} column of {table_name}."
+            )
+
+        else:
+            df[left_on_col] = df[left_on_col].astype(float).astype(int)
 
     # Combine the original and sqldf dfs
     comb_df = pd.merge(
         df, sql_df, how="left", left_on=left_on_col, right_on=right_on_col
     )
+
+    # Check for rows with NaN values in the merged DataFrame
+    missing_values = comb_df[right_on_col].isnull()
+
+    # If there are missing values, raise an issue
+    if missing_values.any():
+        # Log a warning or raise an exception with relevant information
+        logging.error(
+            f"Some rows in df do not have corresponding values in sql_df. Rows with missing values are: {comb_df[missing_values]}"
+        )
+
     # Drop the id column to prevent duplicated column issues
     comb_df = comb_df.drop(columns=["id"], errors="ignore")
 

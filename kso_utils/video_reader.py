@@ -172,9 +172,9 @@ class VideoReader:
         self._fps = float(self.container.streams.video[0].guessed_rate)
 
         self._n_frames = self.container.streams.video[0].frames
-        self._cached_last_frame: Optional[
-            VideoFrameInfo
-        ] = None  # Helps fix weird bug... see notes below
+        self._cached_last_frame: Optional[VideoFrameInfo] = (
+            None  # Helps fix weird bug... see notes below
+        )
         self._max_size_xy = max_size_xy
         self._use_cache = use_cache
         self._iterator = self._iter_frame_data()
@@ -201,17 +201,21 @@ class VideoReader:
             tstart, tstop = time_interval
             return range(
                 self.time_to_nearest_frame(tstart) if tstart is not None else 0,
-                self.time_to_nearest_frame(tstop) + 1
-                if tstop is not None
-                else self.get_n_frames(),
+                (
+                    self.time_to_nearest_frame(tstop) + 1
+                    if tstop is not None
+                    else self.get_n_frames()
+                ),
             )
         elif frame_interval != (None, None):
             istart, istop = frame_interval
             return range(
                 self.frame_index_to_nearest_frame(istart) if istart is not None else 0,
-                self.frame_index_to_nearest_frame(istop)
-                if istop is not None
-                else self.get_n_frames(),
+                (
+                    self.frame_index_to_nearest_frame(istop)
+                    if istop is not None
+                    else self.get_n_frames()
+                ),
             )
         else:
             return range(0, self.get_n_frames())
