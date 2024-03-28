@@ -334,7 +334,11 @@ class ProjectProcessor:
                 self.selected_movies_df,
                 self.selected_movies_ids,
             ) = movie_utils.get_info_selected_movies(
-                selected_movies=self.footage_selected_widget.selected,
+                selected_movies=(
+                    self.footage_selected_widget.selected
+                    if self.footage_selected_widget.value is None
+                    else self.footage_selected_widget.value
+                ),
                 footage_source=self.source_footage,
                 df=self.available_movies_df,
                 project=self.project,
