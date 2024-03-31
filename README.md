@@ -19,7 +19,7 @@ The Koster Seafloor Observatory is an open-source, citizen science and machine l
 ### KSO overview
 The KSO system has been developed to:
 * move and process underwater footage and its associated data (e.g. location, date, sampling device).
-* make this data available to citizen scientist in Zooniverse to annotate the data.
+* make this data available to citizen scientists in Zooniverse to annotate the data.
 * train and evaluate machine learning models (customise [Yolov5][YoloV5] or [Yolov8][YoloV8] models).
   
 ![koster_info_diag][high-level-overview]
@@ -92,7 +92,9 @@ conda activate <name env>
 5. Specify your GPU details.
 
   5a. Find out the [pytorch][pytorch] installation you need. Navigate to the system options (example below) and select your device/platform details.
-  ![cuda_requirements][cuda_requirements]
+  <div style="text-align: center;">
+    <img src="https://github.com/ocean-data-factory-sweden/kso/blob/dev/assets/cuda_gpu_example_requirements.png?raw=true" alt="CUDA Requirements" width="450" height="150">
+  </div>
   
   5b. Add the recommended command to the KSO's gpu_requirements_user.txt file.
 
@@ -178,9 +180,7 @@ pip install python-magic-bin
 [issues-url]: https://github.com/ocean-data-factory-sweden/kso/issues
 [license-shield]: https://img.shields.io/github/license/ocean-data-factory-sweden/kso.svg?style=for-the-badge
 [license-url]: https://github.com/ocean-data-factory-sweden/kso/blob/main/LICENSE.txt
-[high-level-overview]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/high-level-overview.png?raw=true "Overview of the three main modules and the components of the Koster Seafloor Observatory"
-[Data_management_module]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/Koster_data_management_module.png?raw=true
-[object_detection_module]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/Koster_object_detection_module.png?raw=true
+[high-level-overview]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/high-level-overview.png?raw=true
 [Jupyter_site]: https://jupyter.org/
 [colablogo]: https://colab.research.google.com/assets/colab-badge.svg
 [binderlogo]: https://mybinder.org/badge_logo.svg
@@ -198,10 +198,6 @@ pip install python-magic-bin
 [pytorch]: https://pytorch.org/
 [YoloV5]: https://github.com/ultralytics/yolov5
 [YoloV8]: https://github.com/ultralytics/ultralytics
-[Koster_info_diagram]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/Koster_information_flow.png?raw=true "Information architecture of the Koster Seafloor Observatory"
-[screenshot_loading]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/screenshot_loading.png?raw=true
-[cuda_requirements]: https://github.com/ocean-data-factory-sweden/kso/blob/dev/assets/cuda_gpu_example_requirements.png?raw=true
-[screenshot_started]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/screenshot_started.png?raw=true
 [cdn_bucket]: https://console.cloudina.org/
 [cdn_album]: https://album.cloudina.org/
 [cdn_vendor]: https://vendor.cloudina.org/
