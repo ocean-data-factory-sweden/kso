@@ -1046,11 +1046,11 @@ class ProjectProcessor:
 
         # Download the processed classifications as a csv file
         csv_filename = (
-            self.project.csv_folder
-            + self.project.Project_name
+            self.project.Project_name
             + str(datetime.date.today())
             + "classifications.csv"
         )
+
         class_df.to_csv(csv_filename, index=False)
 
         logging.info(f"The classications have been downloaded to {csv_filename}")
@@ -1074,7 +1074,7 @@ class ProjectProcessor:
             folder_path, species_list=annotation_classes
         )
 
-    def download_gbif_occurrences(self, classified_by, df):
+    def download_gbif_occurrences(self, classified_by, df, max_count=True):
         if classified_by == "citizen_scientists":
             # Add the site and movie information to the classifications based on the subject information
             df = zoo_utils.add_subject_site_movie_info_to_class(
@@ -1094,13 +1094,17 @@ class ProjectProcessor:
             self.zoo_info,
         )
 
+        if max_count:
+            # Group by species/date/location and get the maximum 'individualCount'
+            occurrence_df = occurrence_df.groupby(
+                "scientificName", "eventDate", "decimalLatitude", "decimalLongitude"
+            )["individualCount"].transform("max")
+
         # Download the processed classifications as a csv file
         csv_filename = (
-            self.project.csv_folder
-            + self.project.Project_name
-            + str(datetime.date.today())
-            + "occurrence.csv"
+            self.project.Project_name + str(datetime.date.today()) + "occurrence.csv"
         )
+
         occurrence_df.to_csv(csv_filename, index=False)
 
         logging.info(f"The occurences have been downloaded to {csv_filename}")
@@ -1156,10 +1160,7 @@ class ProjectProcessor:
     def download_detections_csv(self, df):
         # Download the processed detections as a csv file
         csv_filename = (
-            self.project.csv_folder
-            + self.project.Project_name
-            + str(datetime.date.today())
-            + "detections.csv"
+            self.project.Project_name + str(datetime.date.today()) + "detections.csv"
         )
 
         df.to_csv(csv_filename, index=False)
@@ -1240,10 +1241,7 @@ class ProjectProcessor:
 
         # Download the processed detections as a csv file
         csv_filename = (
-            self.project.csv_folder
-            + self.project.Project_name
-            + str(datetime.date.today())
-            + "detections.csv"
+            self.project.Project_name + str(datetime.date.today()) + "detections.csv"
         )
 
         merged_df.to_csv(csv_filename, index=False)

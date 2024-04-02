@@ -1938,18 +1938,7 @@ def adjust_tracking(
 
 
 # Auxiliary function to obtain a dictionary with the mapping between the class ids used by the detection model and the species names
-def get_species_mapping(model, project_name, team_name="koster"):
-    import wandb
-
-    api = wandb.Api()
-
-    full_path = f"{team_name}/{project_name}"
-    runs = api.runs(full_path)  # Get all runs in the project
-    for r in runs:
-        # Choose the run corresponding to the model given as parameter
-        if r.id == model.split("_")[1]:
-            run = api.run(project_name + "/" + r.id)
-
+def get_species_mapping(model, project_name, team_name="koster", registry="wandb"):
     import yaml
 
     def read_yaml_file(file_path):
@@ -1957,21 +1946,64 @@ def get_species_mapping(model, project_name, team_name="koster"):
             yaml_data = yaml.safe_load(file)
         return yaml_data
 
-    # Read species mapping into data dictionary
-    try:
-        # Attempt to directly read species mapping from the configuration
-        data_dict = run.rawconfig["data_dict"]
-        species_mapping = data_dict["names"]
-    except KeyError:
+    if registry == "wandb":
+        import wandb
+
+        api = wandb.Api()
+
+        full_path = f"{team_name}/{project_name}"
+        runs = api.runs(full_path)  # Get all runs in the project
+        for r in runs:
+            # Choose the run corresponding to the model given as parameter
+            if r.id == model.split("_")[1]:
+                run = api.run(project_name + "/" + r.id)
+
+        # Read species mapping into data dictionary
         try:
+            # Attempt to directly read species mapping from the configuration
+            data_dict = run.rawconfig["data_dict"]
+            species_mapping = data_dict["names"]
+        except KeyError:
+            try:
+                # Attempt to read species mapping from a YAML file specified in the configuration
+                data_dict = read_yaml_file(run.rawconfig["data"])
+                species_mapping = data_dict["names"]
+                species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
+            except (FileNotFoundError, KeyError):
+                # Handle the case where species mapping cannot be found in either location
+                logging.error("Error reading species mapping from config or file.")
+                species_mapping = {}
+    elif registry == "mlflow":
+        from mlflow import MlflowClient
+
+        experiment = mlflow.get_experiment_by_name(project_name)
+        client = MlflowClient()
+        pattern = r"runs:/([^/]+)/weights/best\.pt"
+        # Use re.search() to find the match
+        try:
+            run_id = re.search(pattern, model).group(1)
+        except:
+            logging.error("No valid run found.")
+        if experiment is not None:
+            # Get the path of the artifact with the labels and class_id
+            artifacts = client.list_artifacts(run_id, path="input_datasets")
+            run = mlflow.get_run(run_id)
+            artifact_uri = run.info.artifact_uri
+            yaml_fpath = [
+                Path(artifact_uri, af.path)
+                for af in artifacts
+                if ".yaml" in af.path and "hyp.yaml" not in af.path
+            ][0]
+
+            # Temporarily download the artifact with mapping labels
+            local_artifact = mlflow.artifacts.download_artifacts(str(yaml_fpath))
+
             # Attempt to read species mapping from a YAML file specified in the configuration
-            data_dict = read_yaml_file(run.rawconfig["data"])
+            data_dict = read_yaml_file(local_artifact)
             species_mapping = data_dict["names"]
             species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
-        except (FileNotFoundError, KeyError):
-            # Handle the case where species mapping cannot be found in either location
-            logging.error("Error reading species mapping from config or file.")
-            species_mapping = {}
+    else:
+        logging.error("Registry invalid.")
 
     return species_mapping
 
@@ -2048,26 +2080,21 @@ def process_detections(
         if project_name == "template_project":
             project_name = "spyfish_aotearoa"
 
-        # Obtain a dictionary with the mapping between the class ids and the species names
-        species_mapping = get_species_mapping(model, project_name, team_name)
+    # Obtain a dictionary with the mapping between the class ids and the species names
+    species_mapping = get_species_mapping(
+        model, project_name, team_name, model_registry
+    )
 
-        # Add a column with the species name corresponding to each class id
-        df["commonName"] = df["class_id"].astype(str).map(species_mapping)
-
-        # Define the movie col of interest
-        sp_group_col = "commonName"
-
-    else:
-        # Define the movie col of interest
-        sp_group_col = "class_id"
+    # Add a column with the species name corresponding to each class id
+    df["commonName"] = df["class_id"].astype(str).map(species_mapping)
 
     # Get max_n per class detected in each movie per frame
-    df["max_n"] = df.groupby([movie_group_col, "frame_no"])[sp_group_col].transform(
+    df["max_n"] = df.groupby([movie_group_col, "frame_no"])["commonName"].transform(
         "count"
     )
 
     # Specify the columns for which we want unique confidence values
-    columns_conf = [movie_group_col, "frame_no", sp_group_col]
+    columns_conf = [movie_group_col, "frame_no", "commonName"]
 
     # Get the confidence range of each detection per frame and add three columns
     df["min_conf"] = df.groupby(columns_conf)["conf"].transform("min")
@@ -2169,7 +2196,7 @@ def plot_processed_detections(
 
     # Group by species and minute, calculate the count
     max_count_per_species = (
-        df.groupby(["movie_id", "class_id", interval])["max_n"].max().reset_index()
+        df.groupby(["movie_id", "commonName", interval])["max_n"].max().reset_index()
     )
 
     # Enable plotting of matplotlib
@@ -2194,11 +2221,11 @@ def plot_processed_detections(
         ]
 
         # Create a separate line plot for each species
-        species_list = movie_data["class_id"].unique()
+        species_list = movie_data["commonName"].unique()
         plt.figure(figsize=(10, 6))
 
         for species in species_list:
-            species_data = movie_data[movie_data["class_id"] == species]
+            species_data = movie_data[movie_data["commonName"] == species]
             plt.plot(
                 species_data["seconds_since_reference"],
                 species_data["max_n"],
