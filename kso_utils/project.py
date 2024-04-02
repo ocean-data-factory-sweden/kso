@@ -1096,9 +1096,19 @@ class ProjectProcessor:
 
         if max_count:
             # Group by species/date/location and get the maximum 'individualCount'
-            occurrence_df = occurrence_df.groupby(
-                "scientificName", "eventDate", "decimalLatitude", "decimalLongitude"
-            )["individualCount"].transform("max")
+            occurrence_df = (
+                occurrence_df.sort_values("individualCount", ascending=False)
+                .groupby(
+                    [
+                        "scientificName",
+                        "eventDate",
+                        "decimalLatitude",
+                        "decimalLongitude",
+                    ],
+                    as_index=False,
+                )
+                .first()
+            )
 
         # Download the processed classifications as a csv file
         csv_filename = (
