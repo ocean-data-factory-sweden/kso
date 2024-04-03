@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kso_utils"
-version = "0.1.0"
+version = "0.2.2"
 description = "A package containing utility scripts for use with KSO analysis notebooks."
 authors = ["Jurie Germishuys <jurie.germishuys@combine.se>"]
 license = "MIT"
@@ -25,7 +25,7 @@ ipython = "8.11.0"
 ipywidgets = "7.7.2"
 jupyter-bbox-widget = "0.5.0"
 natsort = "8.1.0"
-opencv-python = "4.5.4.60"
+opencv-python = "4.6.0.66"
 panoptes-client = "1.6.0"
 pillow = "9.4.0"
 pims = "0.6.1"
@@ -33,10 +33,10 @@ pyyaml = "6.0"
 scikit-learn = "1.2.2"
 scp = "0.14.1"
 split-folders = "0.5.1"
-torch = "1.8.0"
 tqdm = "4.64.1"
 wandb = "0.13.2"
 csv-diff = "^1.1"
+ultralytics = "8.0.200"
 
 [build-system]
 requires = ["poetry-core"]
