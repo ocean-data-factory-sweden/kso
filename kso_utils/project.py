@@ -177,6 +177,11 @@ class ProjectProcessor:
     # t1
     #############
 
+    def check_basic_meta(self):
+        return db_utils.check_basic_meta(
+            csv_paths=self.csv_paths, conn=self.db_connection
+        )
+
     def select_meta_range(self, meta_key: str):
         """
         > This function takes a meta key as input and returns a dataframe, range of rows, and range of

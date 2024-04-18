@@ -422,6 +422,33 @@ def process_test_csv(
     return local_df
 
 
+def check_basic_meta(csv_paths: dict, conn: sqlite3.Connection):
+    """
+    The function `check_basic_meta` reads CSV files, retrieves basic column names from a SQLite
+    database, selects relevant columns, and performs a data check before logging completion.
+
+    :param csv_paths: The `csv_paths` parameter is a dictionary where the keys represent meta keys and
+    the values represent file paths to CSV files containing movies information
+    :type csv_paths: dict
+    :param conn: sqlite3.Connection object representing a connection to a SQLite database
+    :type conn: sqlite3.Connection
+    """
+
+    for meta_key, meta_path in csv_paths.items():
+        # Remove extra information from key
+        meta_key = meta_key.split("_")[1]
+        # Load the csv with movies information
+        test_df = pd.read_csv(meta_path)
+        # Retrieve the names of the basic columns in the sql db
+        field_names = list(get_column_names_db(conn, meta_key).values())
+        # Select the basic fields for the db check
+        df_to_db = test_df[[c for c in test_df.columns if c in field_names]]
+        # Double-check to prevent missing key information
+        test_table(df_to_db, meta_key, df_to_db.columns)
+
+        logging.info(f"The {meta_key} dataframe is complete")
+
+
 def check_species_meta(csv_paths: dict, conn: sqlite3.Connection):
     """
     > The function `check_species_meta` loads the csv with species information and checks if it is empty
