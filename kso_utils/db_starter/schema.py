@@ -19,7 +19,7 @@ duration datetime NULL,
 sampling_start real NULL,
 sampling_end real NULL,
 author text NULL,
-site_id text NULL,
+siteName text NULL,
 fpath text NULL,
 UNIQUE (filename),
 FOREIGN KEY (site_id) REFERENCES sites (id)
