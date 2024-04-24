@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kso_utils"
-version = "0.2.3"
+version = "0.2.4"
 description = "A package containing utility scripts for use with KSO analysis notebooks."
 authors = ["Jurie Germishuys <jurie.germishuys@combine.se>"]
 license = "MIT"

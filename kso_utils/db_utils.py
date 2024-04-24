@@ -422,7 +422,7 @@ def process_test_csv(
     return local_df
 
 
-def check_basic_meta(csv_paths: dict, conn: sqlite3.Connection):
+def check_basic_meta(csv_paths: dict, conn: sqlite3.Connection, keys: list = []):
     """
     The function `check_basic_meta` reads CSV files, retrieves basic column names from a SQLite
     database, selects relevant columns, and performs a data check before logging completion.
@@ -444,7 +444,10 @@ def check_basic_meta(csv_paths: dict, conn: sqlite3.Connection):
         # Select the basic fields for the db check
         df_to_db = test_df[[c for c in test_df.columns if c in field_names]]
         # Double-check to prevent missing key information
-        test_table(df_to_db, meta_key, df_to_db.columns)
+        if len(keys) == 0:
+            test_table(df_to_db, meta_key, df_to_db.columns)
+        else:
+            test_table(df_to_db, meta_key, keys)
 
         logging.info(f"The {meta_key} dataframe is complete")
 
