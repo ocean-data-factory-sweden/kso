@@ -177,10 +177,38 @@ class ProjectProcessor:
     # t1
     #############
 
-    def check_basic_meta(self):
-        return db_utils.check_basic_meta(
-            csv_paths=self.csv_paths, conn=self.db_connection
-        )
+    def check_basic_meta(self, meta_keys: list = ["species", "sites", "movies"]):
+        col_reqs = {
+            "sites": [
+                "siteName",
+                "decimalLatitude",
+                "decimalLongitude",
+                "geodeticDatum",
+                "countryCode",
+            ],
+            "species": [
+                "commonName",
+                "scientificName",
+                "taxonRank",
+                "kingdom",
+            ],
+            "movies": [
+                "filename",
+                "siteName",
+                "created_on",
+                "author",
+            ],
+        }
+        for meta_key, meta_path in self.csv_paths.items():
+            # Remove extra information from key
+            meta_key = meta_key.split("_")[1]
+            if meta_key in meta_keys:
+                return db_utils.check_basic_meta(
+                    meta_key=meta_key,
+                    meta_path=meta_path,
+                    conn=self.db_connection,
+                    keys=col_reqs[meta_key],
+                )
 
     def select_meta_range(self, meta_key: str):
         """
