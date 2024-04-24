@@ -1,7 +1,7 @@
 sql = """CREATE TABLE IF NOT EXISTS sites
 (
 id integer PRIMARY KEY,
-siteName text NULL,
+siteName text NOT NULL,
 decimalLatitude varchar(255) NULL,
 decimalLongitude varchar(255) NULL,
 geodeticDatum varchar(255) NULL,
@@ -22,7 +22,7 @@ author text NULL,
 siteName text NULL,
 fpath text NULL,
 UNIQUE (filename),
-FOREIGN KEY (site_id) REFERENCES sites (id)
+FOREIGN KEY (siteName) REFERENCES sites (siteName)
 );
 
 CREATE TABLE IF NOT EXISTS photos
