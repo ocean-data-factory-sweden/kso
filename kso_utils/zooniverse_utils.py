@@ -500,8 +500,20 @@ def process_zoo_classifications(
                         for i in ann_i["value"]:
                             choice_i = {
                                 "classification_id": row["classification_id"],
-                                "x": int(i["x"]) if "x" in i else None,
-                                "y": int(i["y"]) if "y" in i else None,
+                                "x": (
+                                    int(i["x"])
+                                    if "x" in i
+                                    else (
+                                        int(i["x_center"]) if "x_center" in i else None
+                                    )
+                                ),
+                                "y": (
+                                    int(i["y"])
+                                    if "y" in i
+                                    else (
+                                        int(i["y_center"]) if "y_center" in i else None
+                                    )
+                                ),
                                 "w": int(i["width"]) if "width" in i else None,
                                 "h": int(i["height"]) if "height" in i else None,
                                 "label": (
@@ -1133,6 +1145,7 @@ def populate_subjects(
     rename_cols = {
         "subject_id": "id",
         "VideoFilename": "filename",
+        "Filename": "filename",
         "upl_seconds": "clip_start_time",
         "Subject_type": "subject_type",
     }
@@ -1140,7 +1153,7 @@ def populate_subjects(
     # Rename columns to match the db format
     subjects = subjects.rename(columns=rename_cols)
 
-    if hasattr(subjects["subject_type"], "columns"):
+    if "subject_type" in subjects.columns:
         # Avoid having two subject_type columns (one from Zoo one from the db)
         subjects["subject_type0"] = subjects["subject_type"].iloc[:, 0]
         subjects["subject_type1"] = subjects["subject_type"].iloc[:, 1]
@@ -1157,6 +1170,8 @@ def populate_subjects(
 
         # Rename the combined subject type
         subjects = subjects.rename(columns={"combined_subject_type": "subject_type"})
+    else:
+        subjects["subject_type"] = "frame"
 
     # Extract the html location of the subjects
     subjects["https_location"] = subjects["locations"].apply(
@@ -1239,9 +1254,10 @@ def populate_subjects(
         # this value is not crucial as we use the labels
         # to process the actual classifications
         # Modify the DataFrame to retain only the first value from each list
-        subjects["frame_exp_sp_id"] = subjects["frame_exp_sp_id"].apply(
-            lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x
-        )
+        if "frame_exp_sp_id" in subjects.columns:
+            subjects["frame_exp_sp_id"] = subjects["frame_exp_sp_id"].apply(
+                lambda x: x[0] if isinstance(x, list) and len(x) > 0 else x
+            )
 
     # Get the names required for the subject table
     from kso_utils.db_utils import get_column_names_db
