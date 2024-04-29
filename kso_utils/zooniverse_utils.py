@@ -516,8 +516,15 @@ def process_zoo_classifications(
                                 ),
                                 "w": int(i["width"]) if "width" in i else None,
                                 "h": int(i["height"]) if "height" in i else None,
+                                "poly_points": i["points"] if "points" in i else None,
                                 "label": (
-                                    str(i["tool_label"]) if "tool_label" in i else None
+                                    str(i["tool_label"])
+                                    if "tool_label" in i and i["tool_label"] is not None
+                                    else (
+                                        str(i["toolIndex"])
+                                        if "toolIndex" in i
+                                        else None
+                                    )
                                 ),
                             }
                             rows_list.append(choice_i)
@@ -529,7 +536,7 @@ def process_zoo_classifications(
     if subject_type == "clip":
         subject_cols = ["first_seen", "how_many"]
     else:
-        subject_cols = ["x", "y", "w", "h"]
+        subject_cols = ["x", "y", "w", "h", "poly_points"]
 
     # Combine common columns for the flattened annotations with subject type specific
     annot_cols = ["classification_id", "label"]
@@ -548,7 +555,8 @@ def process_zoo_classifications(
     )
 
     # Ensure the subject type specific columns are numeric
-    flat_annot_df[subject_cols] = flat_annot_df[subject_cols].astype("float64")
+    coord_cols = ["x", "y", "w", "h"]
+    flat_annot_df[coord_cols] = flat_annot_df[coord_cols].astype("float64")
 
     # Combine the flatten the classifications with the subject information
 
