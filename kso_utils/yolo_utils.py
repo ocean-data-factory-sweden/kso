@@ -834,9 +834,8 @@ def frame_aggregation(
                         )
                     # Pad with NaN values if necessary
                     row_data.extend([""] * ((max_num_points - len(entry[4:])) * 2))
-                    full_rows = full_rows.append(
-                        pd.Series(row_data, index=column_names), ignore_index=True
-                    )
+                    new_row_df = pd.DataFrame([row_data], index=column_names)
+                    full_rows = pd.concat([full_rows, new_row_df], ignore_index=True)
                 f_group_fields = ["filename"]
 
     if out_format in ["yolo", "yolo-seg"]:
@@ -925,6 +924,9 @@ def frame_aggregation(
                     groups = [
                         i for i in groups.values if not all(pd.isnull(i[4:]))
                     ]  # Filter out rows with all x_i values as NaN
+                    groups = [
+                        [item for item in sublist if item != ""] for sublist in groups
+                    ]
                     open(file_out, "w").write(
                         "\n".join(
                             [
@@ -937,23 +939,15 @@ def frame_aggregation(
                                     " ".join(
                                         map(
                                             lambda idx: (
-                                                str(i[x_i_pos[idx]] / i[fw_pos])
-                                                if isinstance(x_i_pos[idx], int)
-                                                and idx % 2 == 0
-                                                and isinstance(
-                                                    i[x_i_pos[idx]], (int, float)
-                                                )
+                                                str(float(i[idx + 4]) / i[fw_pos])
+                                                if (idx + 4) % 2 == 0
                                                 else (
-                                                    str(i[y_i_pos[idx]] / i[fh_pos])
-                                                    if isinstance(y_i_pos[idx], int)
-                                                    and idx % 2 != 0
-                                                    and isinstance(
-                                                        i[y_i_pos[idx]], (int, float)
-                                                    )
+                                                    str(float(i[idx + 4]) / i[fh_pos])
+                                                    if (idx + 4) % 2 != 0
                                                     else ""
                                                 )
                                             ),
-                                            range(max_points),
+                                            range(len(i) - 4),
                                         )
                                     ),
                                 )
