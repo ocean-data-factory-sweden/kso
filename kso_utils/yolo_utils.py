@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 from jupyter_bbox_widget import BBoxWidget
 from IPython.display import display, clear_output, HTML
 from PIL import Image as PILImage, ImageDraw
+from ast import literal_eval
 
 from functools import partial
 from tqdm import tqdm
@@ -357,7 +358,13 @@ def frame_aggregation(
     # Rename columns if in different format
     train_rows = (
         train_rows.rename(
-            columns={"x": "x_position", "y": "y_position", "w": "width", "h": "height"}
+            columns={
+                "x": "x_position",
+                "y": "y_position",
+                "w": "width",
+                "h": "height",
+                "poly_points": "polygons",
+            }
         )
         .copy()
         .reset_index()
@@ -365,13 +372,22 @@ def frame_aggregation(
 
     # Remove null annotations
     if remove_nulls:
-        train_rows = (
-            train_rows.dropna(
-                subset=["x_position", "y_position", "width", "height"],
+        if out_format == "yolo":
+            train_rows = (
+                train_rows.dropna(
+                    subset=["x_position", "y_position", "width", "height"],
+                )
+                .copy()
+                .reset_index()
             )
-            .copy()
-            .reset_index()
-        )
+        elif out_format == "yolo-seg":
+            train_rows = (
+                train_rows.dropna(
+                    subset=["polygons"],
+                )
+                .copy()
+                .reset_index()
+            )
 
     # Check if any frames are left after removing null values
     if len(train_rows) == 0:
@@ -493,7 +509,10 @@ def frame_aggregation(
                         if len(out) == 1:
                             return out[0]
                         else:
-                            return None
+                            logging.info(
+                                "Warning: Using raw labels without species verification"
+                            )
+                            return row
 
                 train_rows["species_id"] = train_rows["label"].apply(
                     lambda x: get_species_id(x), 1
@@ -611,6 +630,7 @@ def frame_aggregation(
             "y_position",
             "width",
             "height",
+            "polygons",
         ]
 
     else:
@@ -622,6 +642,7 @@ def frame_aggregation(
                 "y_position",
                 "width",
                 "height",
+                "polygons",
             ]
         else:
             key_fields = [
@@ -631,6 +652,7 @@ def frame_aggregation(
                 "y_position",
                 "width",
                 "height",
+                "polygons",
             ]
 
     # Get relevant fields from dataframe (before groupby)
@@ -647,8 +669,6 @@ def frame_aggregation(
             else ["filename", "species_id"]
         )
     )
-
-    print(group_fields)
 
     new_rows = []
     bboxes = {}
@@ -685,9 +705,18 @@ def frame_aggregation(
 
             if final_name in video_dict:
                 bboxes[named_tuple], tboxes[named_tuple] = [], []
-                bboxes[named_tuple].extend(
-                    tuple(i[len(grouped_fields) :]) for i in group.values
-                )
+                if out_format == "yolo":
+                    bboxes[named_tuple].extend(
+                        tuple(i[len(grouped_fields) :]) for i in group.values
+                    )
+                elif out_format == "yolo-seg":
+                    # Add polygons
+                    bboxes[named_tuple].extend(
+                        tuple(literal_eval(i[-1])) for i in group.values
+                    )
+                else:
+                    logging.error("Unsupported format")
+                    return
 
                 movie_w, movie_h = video_dict[final_name][0].shape[:2]
 
@@ -728,9 +757,18 @@ def frame_aggregation(
         else:
             # Track intermediate frames
             bboxes[named_tuple] = []
-            bboxes[named_tuple].extend(
-                tuple(i[len(grouped_fields) :]) for i in group.values
-            )
+            if out_format == "yolo":
+                bboxes[named_tuple].extend(
+                    tuple(i[len(grouped_fields) :]) for i in group.values
+                )
+            elif out_format == "yolo-seg":
+                # Add polygons
+                bboxes[named_tuple].extend(
+                    tuple(literal_eval(i[-1])) for i in group.values
+                )
+            else:
+                logging.error("Unsupported format")
+                return
 
             if link_bool:
                 try:
@@ -761,109 +799,187 @@ def frame_aggregation(
                 )
 
     # Final export step
-    if movie_bool:
-        # Export full rows
-        full_rows = pd.DataFrame(
-            new_rows,
-            columns=[
-                "species_id",
-                "frame_number",
-                "filename",
-                "f_w",
-                "f_h",
-                "x",
-                "y",
-                "w",
-                "h",
-            ],
-        )
-        f_group_fields = ["frame_number", "filename"]
-    else:
-        full_rows = pd.DataFrame(
-            new_rows,
-            columns=[
-                "species_id",
-                "filename",
-                "f_w",
-                "f_h",
-                "x",
-                "y",
-                "w",
-                "h",
-            ],
-        )
-        f_group_fields = ["filename"]
-
-    # Find indices of important fields
-    col_list = list(full_rows.columns)
-    fw_pos, fh_pos, x_pos, y_pos, w_pos, h_pos, speciesid_pos = (
-        col_list.index("f_w"),
-        col_list.index("f_h"),
-        col_list.index("x"),
-        col_list.index("y"),
-        col_list.index("w"),
-        col_list.index("h"),
-        col_list.index("species_id"),
-    )
-
-    for name, groups in tqdm(
-        full_rows.groupby(f_group_fields),
-        desc="Saving frames...",
-        colour="green",
-    ):
+    if out_format in ["yolo", "yolo-seg"]:
         if movie_bool:
-            file_path = Path(name[1])
-            file, _ = file_path.stem, file_path.suffix
-            file_out = Path(out_path, "labels", f"{file}_frame_{name[0]}.txt")
-            img_out = Path(out_path, "images", f"{file}_frame_{name[0]}.jpg")
+            column_names = ["species_id", "frame_number", "filename", "f_w", "f_h"]
+            if out_format == "yolo":
+                column_names.extend(["x", "y", "w", "h"])
+            elif out_format == "yolo-seg":
+                column_names.append("polygons")
+            full_rows = pd.DataFrame(new_rows, columns=column_names)
+            f_group_fields = (
+                ["frame_number", "filename"] if out_format == "yolo" else ["filename"]
+            )
         else:
-            file_path = Path(name)
-            file, _ = file_path.stem, file_path.suffix
-            file_out = Path(out_path, "labels", f"{file}.txt")
-            img_out = Path(out_path, "images", f"{file}.jpg")
+            column_names = ["species_id", "filename", "f_w", "f_h"]
+            if out_format == "yolo":
+                column_names.extend(["x", "y", "w", "h"])
+            elif out_format == "yolo-seg":
+                # Determine the maximum number of (x, y) pairs in new_rows
+                max_num_points = max(len(entry[4:]) for entry in new_rows)
 
-        # Added condition to avoid bounding boxes outside of maximum size of frame + added 0 class id when working with single class
-        if out_format == "yolo":
-            if len(groups.values) == 1 and str(groups.values[0][-1]) == "nan":
-                # Empty files
-                open(file_out, "w")
-            else:
-                groups = [i for i in groups.values if str(i[-1]) != "nan"]
-                open(file_out, "w").write(
-                    "\n".join(
-                        [
-                            "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
-                                (
-                                    0
-                                    if len(class_list) == 1
-                                    else sp_id2mod_id[i[speciesid_pos]]
-                                ),  # single class vs multiple classes
-                                min((i[x_pos] + i[w_pos] / 2) / i[fw_pos], 1.0),
-                                min((i[y_pos] + i[h_pos] / 2) / i[fh_pos], 1.0),
-                                min(i[w_pos] / i[fw_pos], 1.0),
-                                min(i[h_pos] / i[fh_pos], 1.0),
-                            )
-                            for i in groups
-                        ]
+                # Add columns for each (x, y) pair
+                for i in range(max_num_points):
+                    column_names.extend([f"x_{i}", f"y_{i}"])
+
+                # Create an empty DataFrame with the specified columns
+                full_rows = pd.DataFrame(columns=column_names)
+
+                # Fill the DataFrame with data from new_rows
+                for entry in new_rows:
+                    row_data = list(entry[:4])
+                    for point in entry[4:]:
+                        row_data.extend(
+                            [point.get("x", float("NaN")), point.get("y", float("NaN"))]
+                        )
+                    # Pad with NaN values if necessary
+                    row_data.extend([""] * ((max_num_points - len(entry[4:])) * 2))
+                    full_rows = full_rows.append(
+                        pd.Series(row_data, index=column_names), ignore_index=True
                     )
-                )
+                f_group_fields = ["filename"]
 
-        # Save frames to image files
-        if movie_bool:
-            from kso_utils.koster_utils import fix_text_encoding
+    if out_format in ["yolo", "yolo-seg"]:
+        col_list = list(full_rows.columns)
+        fw_pos, fh_pos, speciesid_pos = (
+            col_list.index("f_w"),
+            col_list.index("f_h"),
+            col_list.index("species_id"),
+        )
 
-            save_name = name[1] if name[1] in video_dict else fix_text_encoding(name[1])
-            if save_name in video_dict:
-                img_array = video_dict[save_name][name[0]][:, :, [2, 1, 0]]
-                img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
-                PIL.Image.fromarray(img_array).save(img_out)
-        else:
-            if link_bool:
-                image_output = PIL.Image.open(requests.get(name, stream=True).raw)
+        if out_format == "yolo":
+            x_pos, y_pos, w_pos, h_pos = (
+                col_list.index("x"),
+                col_list.index("y"),
+                col_list.index("w"),
+                col_list.index("h"),
+            )
+
+        elif out_format == "yolo-seg":
+            max_points = max(
+                max(full_rows[f"x_{i}"].count(), full_rows[f"y_{i}"].count())
+                for i in range(40)
+            )
+            x_i_pos = []
+            y_i_pos = []
+
+            for i in range(max_points):
+                try:
+                    x_i_pos.append(col_list.index(f"x_{i}"))
+                except ValueError:
+                    # Column not found, append an empty string as a placeholder
+                    x_i_pos.append("")
+
+                try:
+                    y_i_pos.append(col_list.index(f"y_{i}"))
+                except ValueError:
+                    # Column not found, append an empty string as a placeholder
+                    y_i_pos.append("")
+
+        for name, groups in tqdm(
+            full_rows.groupby(f_group_fields),
+            desc="Saving frames...",
+            colour="green",
+        ):
+            if movie_bool:
+                file_path = Path(name[1])
+                file, _ = file_path.stem, file_path.suffix
+                file_out = Path(out_path, "labels", f"{file}_frame_{name[0]}.txt")
+                img_out = Path(out_path, "images", f"{file}_frame_{name[0]}.jpg")
             else:
-                image_output = np.asarray(PIL.Image.open(name))
-            img_array = np.asarray(image_output)
-            PIL.Image.fromarray(img_array).save(img_out)
+                file_path = Path(name)
+                file, _ = file_path.stem, file_path.suffix
+                file_out = Path(out_path, "labels", f"{file}.txt")
+                img_out = Path(out_path, "images", f"{file}.jpg")
+
+            if out_format == "yolo":
+                if len(groups.values) == 0 or all(pd.isnull(groups["species_id"])):
+                    open(file_out, "w")
+                else:
+                    groups = [
+                        i for i in groups.values if not pd.isnull(i[speciesid_pos])
+                    ]
+                    open(file_out, "w").write(
+                        "\n".join(
+                            [
+                                "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
+                                    (
+                                        0
+                                        if len(class_list) == 1
+                                        else sp_id2mod_id[i[speciesid_pos]]
+                                    ),
+                                    min((i[x_pos] + i[w_pos] / 2) / i[fw_pos], 1.0),
+                                    min((i[y_pos] + i[h_pos] / 2) / i[fh_pos], 1.0),
+                                    min(i[w_pos] / i[fw_pos], 1.0),
+                                    min(i[h_pos] / i[fh_pos], 1.0),
+                                )
+                                for i in groups
+                            ]
+                        )
+                    )
+
+            elif out_format == "yolo-seg":
+                if len(groups.values) == 0:  # Check if there are no x_i values
+                    open(file_out, "w")
+                else:
+                    groups = [
+                        i for i in groups.values if not all(pd.isnull(i[4:]))
+                    ]  # Filter out rows with all x_i values as NaN
+                    open(file_out, "w").write(
+                        "\n".join(
+                            [
+                                "{} {}".format(
+                                    (
+                                        0
+                                        if len(class_list) == 1
+                                        else sp_id2mod_id[i[speciesid_pos]]
+                                    ),
+                                    " ".join(
+                                        map(
+                                            lambda idx: (
+                                                str(i[x_i_pos[idx]] / i[fw_pos])
+                                                if isinstance(x_i_pos[idx], int)
+                                                and idx % 2 == 0
+                                                and isinstance(
+                                                    i[x_i_pos[idx]], (int, float)
+                                                )
+                                                else (
+                                                    str(i[y_i_pos[idx]] / i[fh_pos])
+                                                    if isinstance(y_i_pos[idx], int)
+                                                    and idx % 2 != 0
+                                                    and isinstance(
+                                                        i[y_i_pos[idx]], (int, float)
+                                                    )
+                                                    else ""
+                                                )
+                                            ),
+                                            range(max_points),
+                                        )
+                                    ),
+                                )
+                                for i in groups
+                            ]
+                        )
+                    )
+
+            # Save frames to image files
+            if movie_bool:
+                from kso_utils.koster_utils import fix_text_encoding
+
+                save_name = (
+                    name[1] if name[1] in video_dict else fix_text_encoding(name[1])
+                )
+                if save_name in video_dict:
+                    img_array = video_dict[save_name][name[0]][:, :, [2, 1, 0]]
+                    img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+                    PIL.Image.fromarray(img_array).save(img_out)
+            else:
+                if link_bool:
+                    image_output = PIL.Image.open(requests.get(name, stream=True).raw)
+                else:
+                    image_output = np.asarray(PIL.Image.open(name))
+                img_array = np.asarray(image_output)
+                PIL.Image.fromarray(img_array).save(img_out)
 
     logging.info("Frames extracted successfully")
 

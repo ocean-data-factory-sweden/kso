@@ -826,12 +826,16 @@ class ProjectProcessor:
                 )
                 classifications_filtered = self.processed_zoo_classifications
 
-        self.aggregated_zoo_classifications = zoo_utils.aggregate_classifications(
-            self.project,
-            classifications_filtered,
-            workflow_checks["Subject type: #0"],
-            agg_params,
-        )
+        if not "poly_points" in classifications_filtered.columns:
+            self.aggregated_zoo_classifications = zoo_utils.aggregate_classifications(
+                self.project,
+                classifications_filtered,
+                workflow_checks["Subject type: #0"],
+                agg_params,
+            )
+        else:
+            # Use all polygons
+            self.aggregated_zoo_classifications = classifications_filtered
 
     def extract_zoo_frames(
         self, n_frames_subject: int = 3, subsample_up_to: int = 100, test: bool = False
@@ -1369,6 +1373,7 @@ class MLProjectProcessor(ProjectProcessor):
         track_frames: bool = False,
         n_tracked_frames: int = 0,
         test: bool = False,
+        out_format: str = "yolo",
     ):
         if test:
             self.species_of_interest = db_utils.get_df_from_db_table(
@@ -1388,6 +1393,7 @@ class MLProjectProcessor(ProjectProcessor):
                 track_frames=track_frames,
                 n_tracked_frames=n_tracked_frames,
                 agg_df=agg_df,
+                out_format=out_format,
             )
 
         else:
@@ -1419,6 +1425,7 @@ class MLProjectProcessor(ProjectProcessor):
                     track_frames=track_frames,
                     n_tracked_frames=n_tracked_frames,
                     agg_df=agg_df,
+                    out_format=out_format,
                 )
 
             button.on_click(on_button_clicked)
