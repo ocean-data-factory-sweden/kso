@@ -41,9 +41,7 @@ def upload_archive(access_key: str, artifact_dir: str):
     add_file_to_zenodo_upload(
         access_key,
         bucket_url,
-        [f for f in Path(artifact_dir).iterdir() if f.is_file() and ".pt" in str(f)][
-            -1
-        ],
+        artifact_dir,
     )
 
     return depo_id
