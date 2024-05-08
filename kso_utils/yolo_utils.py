@@ -857,7 +857,7 @@ def frame_aggregation(
         elif out_format == "yolo-seg":
             max_points = max(
                 full_rows[[f"x_{i}", f"y_{i}"]].stack().groupby(level=0).count().max()
-                for i in range(len(full_rows.columns) // 2)
+                for i in range(max_num_points)
             )
 
             # Preprocess col_list to create a dictionary of column indices
