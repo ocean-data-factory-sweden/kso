@@ -834,7 +834,7 @@ def frame_aggregation(
                         )
                     # Pad with NaN values if necessary
                     row_data.extend([""] * ((max_num_points - len(entry[4:])) * 2))
-                    new_row_df = pd.DataFrame([row_data], index=column_names)
+                    new_row_df = pd.DataFrame([row_data], columns=column_names)
                     full_rows = pd.concat([full_rows, new_row_df], ignore_index=True)
                 f_group_fields = ["filename"]
 
@@ -868,9 +868,7 @@ def frame_aggregation(
             y_i_pos = []
 
             # Iterate over the range of max_points
-            for i in tqdm(
-                range(max_points), desc="Adding segmentation points..."
-            ):
+            for i in tqdm(range(max_points), desc="Adding segmentation points..."):
                 x_i_pos.append(col_dict.get(f"x_{i}", ""))  # Look up index in col_dict
                 y_i_pos.append(col_dict.get(f"y_{i}", ""))  # Look up index in col_dict
 
