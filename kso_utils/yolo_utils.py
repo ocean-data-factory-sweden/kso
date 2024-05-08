@@ -856,7 +856,7 @@ def frame_aggregation(
 
         elif out_format == "yolo-seg":
             max_points = max(
-                full_rows[[f"x_{i}", f"y_{i}"]].stack().groupby(level=0).count().max()
+                max(full_rows[f"x_{i}"].count(), full_rows[f"y_{i}"].count())
                 for i in range(max_num_points)
             )
 
