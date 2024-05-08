@@ -1,12 +1,25 @@
 import requests
 import os
 import json
+import zipfile
 import logging
 from pathlib import Path
 
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
+
+
+def zip_folder(folder_path):
+    folder_path = Path(folder_path)
+    zip_file_name = folder_path.with_suffix(".zip")
+
+    with zipfile.ZipFile(zip_file_name, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for file_path in folder_path.glob("**/*"):
+            if file_path.is_file():
+                zipf.write(file_path, file_path.relative_to(folder_path))
+
+    return zip_file_name
 
 
 def upload_archive(access_key: str, artifact_dir: str):
