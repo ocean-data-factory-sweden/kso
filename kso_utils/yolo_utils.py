@@ -932,7 +932,7 @@ def frame_aggregation(
                                     (
                                         0
                                         if len(class_list) == 1
-                                        else sp_id2mod_id[i[speciesid_pos]]
+                                        else i[speciesid_pos]
                                     ),
                                     " ".join(
                                         map(
