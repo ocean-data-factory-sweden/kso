@@ -869,7 +869,7 @@ def frame_aggregation(
 
             # Iterate over the range of max_points
             for i in tqdm(
-                range(max_points), description="Adding segmentation points..."
+                range(max_points), desc="Adding segmentation points..."
             ):
                 x_i_pos.append(col_dict.get(f"x_{i}", ""))  # Look up index in col_dict
                 y_i_pos.append(col_dict.get(f"y_{i}", ""))  # Look up index in col_dict
