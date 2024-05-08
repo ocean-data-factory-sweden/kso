@@ -857,23 +857,22 @@ def frame_aggregation(
         elif out_format == "yolo-seg":
             max_points = max(
                 max(full_rows[f"x_{i}"].count(), full_rows[f"y_{i}"].count())
-                for i in range(40)
+                for i in range(100)
             )
+
+            # Preprocess col_list to create a dictionary of column indices
+            col_dict = {col_name: idx for idx, col_name in enumerate(col_list)}
+
+            # Initialize lists to store indices
             x_i_pos = []
             y_i_pos = []
 
-            for i in range(max_points):
-                try:
-                    x_i_pos.append(col_list.index(f"x_{i}"))
-                except ValueError:
-                    # Column not found, append an empty string as a placeholder
-                    x_i_pos.append("")
-
-                try:
-                    y_i_pos.append(col_list.index(f"y_{i}"))
-                except ValueError:
-                    # Column not found, append an empty string as a placeholder
-                    y_i_pos.append("")
+            # Iterate over the range of max_points
+            for i in tqdm(
+                range(max_points), description="Adding segmentation points..."
+            ):
+                x_i_pos.append(col_dict.get(f"x_{i}", ""))  # Look up index in col_dict
+                y_i_pos.append(col_dict.get(f"y_{i}", ""))  # Look up index in col_dict
 
         for name, groups in tqdm(
             full_rows.groupby(f_group_fields),
@@ -920,6 +919,7 @@ def frame_aggregation(
             elif out_format == "yolo-seg":
                 if len(groups.values) == 0:  # Check if there are no x_i values
                     open(file_out, "w")
+                    logging.error("No segmentation masks found.")
                 else:
                     groups = [
                         i for i in groups.values if not all(pd.isnull(i[4:]))
