@@ -555,8 +555,9 @@ def process_zoo_classifications(
     )
 
     # Ensure the subject type specific columns are numeric
-    coord_cols = ["x", "y", "w", "h"]
-    flat_annot_df[coord_cols] = flat_annot_df[coord_cols].astype("float64")
+    if subject_type == "frame":
+        coord_cols = ["x", "y", "w", "h"]
+        flat_annot_df[coord_cols] = flat_annot_df[coord_cols].astype("float64")
 
     # Combine the flatten the classifications with the subject information
 
@@ -1163,8 +1164,12 @@ def populate_subjects(
 
     if "subject_type" in subjects.columns:
         # Avoid having two subject_type columns (one from Zoo one from the db)
-        subjects["subject_type0"] = subjects["subject_type"].iloc[:, 0]
-        subjects["subject_type1"] = subjects["subject_type"].iloc[:, 1]
+        if isinstance(subjects["subject_type"], pd.DataFrame):
+            subjects["subject_type0"] = subjects["subject_type"].iloc[:, 0]
+            subjects["subject_type1"] = subjects["subject_type"].iloc[:, 1]
+        else:
+            subjects["subject_type0"] = subjects["subject_type"]
+            subjects["subject_type1"] = subjects["subject_type"]
 
         # Update with non-empty values
         subjects["combined_subject_type"] = subjects["subject_type0"].combine_first(
