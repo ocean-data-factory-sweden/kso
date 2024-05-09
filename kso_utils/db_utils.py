@@ -137,8 +137,24 @@ def add_to_table(
             table_name,
             num_fields,
         )
+
     except sqlite3.Error as e:
-        logging.error(e)
+        # Check if the error code indicates a foreign key constraint violation
+        if e.args[0].startswith("FOREIGN KEY constraint failed"):
+            # Get the table of the problematic value
+            df1 = get_df_from_db_table(conn, table_name)
+
+            # Get the last row added to the table
+            value_i = len(df1)
+
+            # Save the problematic value
+            foreign_key_value = values[value_i]
+
+            logging.error(f"Foreign Key Constraint Error (table: {table_name}):")
+            logging.error(f"Error values: {foreign_key_value}")
+            logging.error(f"Full Error: {e}")
+        else:
+            logging.error(e)  # Log the full error for other errors
 
     conn.commit()
 
