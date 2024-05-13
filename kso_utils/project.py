@@ -1791,7 +1791,7 @@ class MLProjectProcessor(ProjectProcessor):
     # t6
     #############
     # Function to choose a model to evaluate
-    def choose_model(self):
+    def choose_model(self, custom_project: str = ""):
         """
         It takes a project name that is defined in the class and returns a dropdown widget that displays the metrics of the model
         selected
@@ -1863,9 +1863,11 @@ class MLProjectProcessor(ProjectProcessor):
             api = wandb.Api()
 
             # weird error fix (initialize api another time)
-            if self.team_name == "wildlife-ai":
-                logging.info("Please note: Using models from adi-ohad-heb-uni account.")
-                full_path = "adi-ohad-heb-uni/project-wildlife-ai"
+            if len(custom_project) > 0:
+                logging.info(
+                    "Please note: Using models from custom project, please ensure that you have access."
+                )
+                full_path = custom_project
                 api.runs(path=full_path).objects
             elif self.project_name == "template_project":
                 full_path = f"{self.team_name}/spyfish_aotearoa"
