@@ -15,7 +15,7 @@ import ipysheet
 import folium
 import ipywidgets as widgets
 from ipyfilechooser import FileChooser
-from IPython.display import HTML, display, clear_output
+from IPython.display import HTML, display, clear_output, Image as IPImage
 from ipywidgets import interactive, Layout, Video
 from folium.plugins import MiniMap
 from pathlib import Path
@@ -2235,6 +2235,64 @@ def choose_eval_params():
 
     display(z1)
     return z1
+
+
+def choose_viewer(viewer):
+    if viewer == "image":
+        image_viewer()
+    elif viewer == "video":
+        movie_viewer()
+    else:
+        logging.error("Invalid option selected.")
+
+
+def select_viewer():
+    viewer_dropdown = widgets.Dropdown(
+        options=["image", "video"],
+        value="image",
+        description="Select viewer:",
+        disabled=False,
+    )
+
+    output = widgets.Output()
+
+    def on_change(change):
+        with output:
+            output.clear_output()
+            choose_viewer(change.new)
+
+    viewer_dropdown.observe(on_change, names="value")
+
+    display(viewer_dropdown)
+    display(output)
+
+
+def image_viewer():
+    def check_image(change):
+        filepath = file_chooser.selected
+        if filepath.lower().endswith((".jpg", ".jpeg")):
+            logging.info(f"Showing image: {filepath}")
+            show_image(filepath)
+        else:
+            logging.error("Please select a JPG or JPEG file.")
+
+    def show_image(image_path):
+        with image_output:
+            clear_output(wait=True)
+            img = IPImage(filename=image_path)
+            display(img)
+
+    image_output = widgets.Output()
+
+    file_chooser = FileChooser(os.getcwd())
+    file_chooser.use_dir_icons = True
+    file_chooser.filter_pattern = "*.jpg;*.jpeg"
+    file_chooser.register_callback(check_image)
+
+    file_chooser_widget = widgets.VBox(
+        [widgets.Label("Select a JPG or JPEG file:"), file_chooser, image_output]
+    )
+    display(file_chooser_widget)
 
 
 def movie_viewer():
