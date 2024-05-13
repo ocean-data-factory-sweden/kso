@@ -2286,7 +2286,7 @@ def image_viewer():
 
     file_chooser = FileChooser(os.getcwd())
     file_chooser.use_dir_icons = True
-    file_chooser.filter_pattern = "*.jpg;*.jpeg;*.JPG"
+    file_chooser.filter_pattern = "*.jpg;*.jpeg;*.JPG;*.JPEG"
     file_chooser.register_callback(check_image)
 
     file_chooser_widget = widgets.VBox(
