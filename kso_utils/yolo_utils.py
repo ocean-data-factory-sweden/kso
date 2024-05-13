@@ -929,11 +929,7 @@ def frame_aggregation(
                         "\n".join(
                             [
                                 "{} {}".format(
-                                    (
-                                        0
-                                        if len(class_list) == 1
-                                        else i[speciesid_pos]
-                                    ),
+                                    (0 if len(class_list) == 1 else i[speciesid_pos]),
                                     " ".join(
                                         map(
                                             lambda idx: (
@@ -2097,19 +2093,25 @@ def get_species_mapping(model, project_name, team_name="koster", registry="wandb
             artifacts = client.list_artifacts(run_id, path="input_datasets")
             run = mlflow.get_run(run_id)
             artifact_uri = run.info.artifact_uri
-            yaml_fpath = [
+
+            yaml_fpaths = [
                 Path(artifact_uri, af.path)
                 for af in artifacts
                 if ".yaml" in af.path and "hyp.yaml" not in af.path
-            ][0]
+            ]
+            if yaml_fpaths:
+                yaml_fpath = yaml_fpaths[0]
+                # Download the artifact using yaml_fpath
+                # Temporarily download the artifact with mapping labels
+                local_artifact = mlflow.artifacts.download_artifacts(str(yaml_fpath))
 
-            # Temporarily download the artifact with mapping labels
-            local_artifact = mlflow.artifacts.download_artifacts(str(yaml_fpath))
-
-            # Attempt to read species mapping from a YAML file specified in the configuration
-            data_dict = read_yaml_file(local_artifact)
-            species_mapping = data_dict["names"]
-            species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
+                # Attempt to read species mapping from a YAML file specified in the configuration
+                data_dict = read_yaml_file(local_artifact)
+                species_mapping = data_dict["names"]
+                species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
+            else:
+                # Handle the case where no artifacts meet the criteria
+                logging.error(f"No artifacts found in run{run.info.artifact_uri}.")
     else:
         logging.error("Registry invalid.")
 
