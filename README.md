@@ -26,23 +26,22 @@ The KSO system has been developed to:
 
 The system is built around a series of easy-to-use [Jupyter Notebooks][Jupyter_site]. Each notebook allows users to perform a specific task of the system (e.g. upload footage to the citizen science platform or analyse the classified data).
 
-Users can run these notebooks via Google Colab (by clicking on the Colab links in the table below), locally or on a High-Performance Computer environment.
+Users can run these notebooks via Google Colab (by clicking on the Colab links in the table below), locally or on a high-performance computing (HPC) environment.
 
 ### Notebooks
+
+Our notebooks are modular in nature and are grouped into task-related subgroups for simplicity. 
+
 | Name                                              | Description                                                                                 | Try it!  | 
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------|
-| 1. Check footage and metadata                     | Check format and contents of footage and sites, media and species csv files                 | [![Open In Colab][colablogo]][colab_tut_1] [![binder][binderlogo]][binder_tut] | 
-| 2. Upload new media to the system*                | Upload new underwater media to the cloud/server and update the csv files                    | WIP | 
-| 3. Upload clips to Zooniverse                     | Prepare original footage and upload short clips to Zooniverse                               | [![Open In Colab][colablogo]][colab_tut_3] [![binder][binderlogo]][binder_tut] |
-| 4. Upload frames to Zooniverse                    | Extract frames of interest from the original footage and upload them to Zooniverse              | [![Open In Colab][colablogo]][colab_tut_4] [![binder][binderlogo]][binder_tut] |
-| 5. Train ML models                                | Prepare the training and test data, set model parameters and train models                   | [![Open In Colab][colablogo]][colab_tut_5] [![binder][binderlogo]][binder_tut] | 
-| 6. Evaluate ML models                            | Use ecologically relevant metrics to test the models                                        | [![Open In Colab][colablogo]][colab_tut_6] [![binder][binderlogo]][binder_tut]   |
-| 7. Publish ML models                               | Publish the model to a public repository                                                   | [![Open In Colab][colablogo]][colab_tut_7] [![binder][binderlogo]][binder_tut]  | 
-| 8. Analyse Zooniverse classifications             | Pull and analyse up-to-date classifications from Zooniverse and export observations to GBIF             | [![Open In Colab][colablogo]][colab_tut_8] [![binder][binderlogo]][binder_tut] |
-| 9. Run ML models on footage                      | Automatically classify new footage and export observations to GBIF                                                          | [![Open In Colab][colablogo]][colab_tut_9] [![binder][binderlogo]][binder_tut] |
+| setup/Check_metadata                     | Check format and contents of footage and sites, media and species csv files                 | [![Open In Colab][colablogo]][colab_tut_1] [![binder][binderlogo]][binder_tut] | 
+| classify/Upload_subjects_to_Zooniverse                    | Prepare original footage and upload short clips to Zooniverse, extract frames of interest from the original footage and upload them to Zooniverse                               | [![Open In Colab][colablogo]][colab_tut_3] [![binder][binderlogo]][binder_tut] |
+| classify/Process_classifications             | Pull and process up-to-date classifications from Zooniverse             | [![Open In Colab][colablogo]][colab_tut_8] [![binder][binderlogo]][binder_tut] |
+| analyse/Train_models                                | Prepare the training and test data, set model parameters and train models                   | [![Open In Colab][colablogo]][colab_tut_5] [![binder][binderlogo]][binder_tut] | 
+| analyse/Evaluate_models                            | Use ecologically relevant metrics to test the models                                        | [![Open In Colab][colablogo]][colab_tut_6] [![binder][binderlogo]][binder_tut]   |
+| publish/Publish_models                             | Publish the model to a public repository                                                   | [![Open In Colab][colablogo]][colab_tut_7] [![binder][binderlogo]][binder_tut]  | 
+| publish/Publish_observations                      | Automatically classify new footage and export observations to GBIF                                                          | [![Open In Colab][colablogo]][colab_tut_9] [![binder][binderlogo]][binder_tut] |
 
-  
-\* Project-specific notebook
 
 ## Local Installation
 
@@ -156,7 +155,7 @@ If you use this code or its models in your research, please cite:
 Anton V, Germishuys J, Bergström P, Lindegarth M, Obst M (2021) An open-source, citizen science and machine learning approach to analyse subsea movies. Biodiversity Data Journal 9: e60548. https://doi.org/10.3897/BDJ.9.e60548
 
 ## Collaborations/Questions
-You can find out more about the project at https://subsim.wnmedia.se.
+You can find out more about the project at https://subsim.se.
 
 We are always excited to collaborate and help other marine scientists. Please feel free to contact us (matthias.obst(at)marine.gu.se) with your questions.
 
@@ -184,16 +183,14 @@ pip install python-magic-bin
 [Jupyter_site]: https://jupyter.org/
 [colablogo]: https://colab.research.google.com/assets/colab-badge.svg
 [binderlogo]: https://mybinder.org/badge_logo.svg
-[colab_tut_1]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/01_Check_and_update_csv_files.ipynb
+[colab_tut_1]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/setup/Check_metadata.ipynb
 [binder_tut]: https://mybinder.org/v2/gh/ocean-data-factory-sweden/kso/main
-[colab_tut_2]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/02_Upload_new_footage.ipynb
-[colab_tut_3]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/03_Upload_clips_to_Zooniverse.ipynb
-[colab_tut_4]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/04_Upload_frames_to_Zooniverse.ipynb
-[colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/05_Train_ML_models.ipynb
-[colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/06_Evaluate_ML_Models.ipynb
-[colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/07_Transfer_ML_Models.ipynb
-[colab_tut_8]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/08_Analyse_Aggregate_Zooniverse_Annotations.ipynb
-[colab_tut_9]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/09_Run_ML_Models_on_footage.ipynb
+[colab_tut_3]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/classify/Upload_subjects_to_Zooniverse.ipynb
+[colab_tut_5]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/analyse/Train_models.ipynb
+[colab_tut_6]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/analyse/Evaluate_models.ipynb
+[colab_tut_7]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/publish/Publish_models.ipynb
+[colab_tut_8]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/classify/Process_classifications.ipynb
+[colab_tut_9]: https://colab.research.google.com/github/ocean-data-factory-sweden/kso/blob/dev/notebooks/publish/Publish_observations.ipynb
 [Microsoft_C++]: https://visualstudio.microsoft.com/visual-cpp-build-tools/
 [pytorch]: https://pytorch.org/
 [YoloV5]: https://github.com/ultralytics/yolov5
