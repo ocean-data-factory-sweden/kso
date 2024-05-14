@@ -41,8 +41,7 @@ Our notebooks are modular in nature and are grouped into task-related subgroups 
 | analyse/Evaluate_models                            | Use ecologically relevant metrics to test the models                                        | [![Open In Colab][colablogo]][colab_tut_6] [![binder][binderlogo]][binder_tut]   |
 | publish/Publish_models                             | Publish the model to a public repository                                                   | [![Open In Colab][colablogo]][colab_tut_7] [![binder][binderlogo]][binder_tut]  | 
 | publish/Publish_observations                      | Automatically classify new footage and export observations to GBIF                                                          | [![Open In Colab][colablogo]][colab_tut_9] [![binder][binderlogo]][binder_tut] |
-  
-\* Project-specific notebook
+
 
 ## Local Installation
 
