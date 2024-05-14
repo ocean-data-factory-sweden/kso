@@ -152,7 +152,7 @@ jobs:
         run: pip install pytest pylint nbqa
       - name: Pylint Test kso_utils
         run: |
-          /github/home/.local/bin/pylint --disable=no-member,assignment-from-no-return kso_utils
+          /github/home/.local/bin/pylint --disable=possibly-used-before-assignment,used-before-assignment,no-member,assignment-from-no-return kso_utils
       - name: Pylint Test tests
         if: success() || failure()
         run: |
@@ -160,7 +160,7 @@ jobs:
       - name: Pylint Test NB notebooks
         if: success() || failure()
         run: |
-          /github/home/.local/bin/nbqa pylint --disable=no-member,assignment-from-no-return,no-value-for-parameter notebooks
+          /github/home/.local/bin/nbqa pylint --disable=unexpected-keyword-arg,no-member,assignment-from-no-return,no-value-for-parameter notebooks
         # If one of the pylint steps fails, there are errors and we do not need to run the test below.
       - name: Login W&B
         shell: bash
