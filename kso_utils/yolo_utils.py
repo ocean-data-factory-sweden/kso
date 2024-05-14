@@ -929,11 +929,7 @@ def frame_aggregation(
                         "\n".join(
                             [
                                 "{} {}".format(
-                                    (
-                                        0
-                                        if len(class_list) == 1
-                                        else i[speciesid_pos]
-                                    ),
+                                    (0 if len(class_list) == 1 else i[speciesid_pos]),
                                     " ".join(
                                         map(
                                             lambda idx: (
