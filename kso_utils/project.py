@@ -1,5 +1,6 @@
 # base imports
 import os
+import pims
 import sys
 import logging
 import wandb
@@ -1969,6 +1970,20 @@ class MLProjectProcessor(ProjectProcessor):
         logging.info("Run succeeded, finishing run...")
         self.modules["wandb"].finish()
 
+    def process_results(src, results):
+        fc = 0
+        vid = pims.Video(src)  # store video capture object
+        for r in results:
+            fc += 1
+            t = sum(r.speed.values()) / 1000
+            t_left = (len(vid) - fc) * t
+            statement = f"Processed frame {fc} / {len(vid)} in {t*1000} ms. Estimated remaining time: {round(t_left, 2)}s."
+            if t_left < 60:
+                logging.info(f"{statement} Almost there! ⏳")
+            else:
+                logging.info(f"{statement} Grab a ☕")
+        logging.info("Prediction completed successfully! ✅")
+
     def detect_yolo(
         self,
         project: str,
@@ -2032,9 +2047,10 @@ class MLProjectProcessor(ProjectProcessor):
                         save=save_output,
                         imgsz=img_size,
                         stream=True,
+                        verbose=False,
                     )
-                    for i in results:
-                        logging.debug(i.speed)
+                    self.process_results(src, results)
+
             else:
                 results = model.predict(
                     project=project,
@@ -2046,9 +2062,9 @@ class MLProjectProcessor(ProjectProcessor):
                     save=save_output,
                     imgsz=img_size,
                     stream=True,
+                    verbose=False,
                 )
-                for i in results:
-                    logging.debug(i.speed)
+                self.process_results(source, results)
         else:
             logging.error(
                 "We do not currently support running YoloV5 models. Please re-train models "
