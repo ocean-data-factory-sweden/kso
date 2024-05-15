@@ -1979,7 +1979,7 @@ class MLProjectProcessor(ProjectProcessor):
         for r in results:
             fc += 1
             t = sum(r.speed.values()) / 1000
-            t_left = ((len(obj) - fc) * (t+0.01) # conservative
+            t_left = (len(obj) - fc) * (t+0.01) # conservative
             statement = f"Processed item {fc} / {len(obj)} in {t*1000} ms. Estimated remaining time: {round(t_left, 2)}s."
             if t_left < 60:
                 logging.info(f"{statement} Almost there! ⏳")
