@@ -1970,7 +1970,7 @@ class MLProjectProcessor(ProjectProcessor):
         logging.info("Run succeeded, finishing run...")
         self.modules["wandb"].finish()
 
-    def process_results(src, results):
+    def process_results(self, src, results):
         fc = 0
         vid = pims.Video(src)  # store video capture object
         for r in results:
