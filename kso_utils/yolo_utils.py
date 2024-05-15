@@ -1163,6 +1163,7 @@ def generate_csv_report(
     run,
     log: bool = False,
     registry: str = "wandb",
+    out_format: str = "yolo",
 ):
     """
     Generate a CSV report from labels in the evaluation folder.
@@ -1187,17 +1188,35 @@ def generate_csv_report(
             lines = infile.readlines()
             for line in lines:
                 parts = line.split()
-                class_id, x, y, w, h, conf = parts[:6]
-                data_dict.setdefault(str(label_file), []).append(
-                    [class_id, frame_no, x, y, w, h, float(conf)]
-                )
+                if out_format == "yolo":
+                    class_id, x, y, w, h, conf = parts[:6]
+                    data_dict.setdefault(str(label_file), []).append(
+                        [class_id, frame_no, x, y, w, h, float(conf)]
+                    )
+                    out_col_list = [
+                        "filename",
+                        "class_id",
+                        "frame_no",
+                        "x",
+                        "y",
+                        "w",
+                        "h",
+                        "conf",
+                    ]
+                elif out_format == "yolo-seg":
+                    class_id, conf = parts[0], parts[-1]
+                    masks = parts[1:-1]
+                    data_dict.setdefault(str(label_file), []).append(
+                        [class_id, frame_no, masks, float(conf)]
+                    )
+                    out_col_list = ["filename", "class_id", "frame_no", "masks", "conf"]
+                else:
+                    logging.error("Model type not supported")
 
     dlist = [[key, *i] for key, values in data_dict.items() for i in values]
 
     # Convert list of lists to output dataframe
-    detect_df = pd.DataFrame(
-        dlist, columns=["filename", "class_id", "frame_no", "x", "y", "w", "h", "conf"]
-    )
+    detect_df = pd.DataFrame(dlist, columns=out_col_list)
 
     # Filter by survey_start and survey_end if applicable
     if all(col in movie_csv_df for col in ["sampling_start", "sampling_end"]):
@@ -1224,9 +1243,7 @@ def generate_csv_report(
                 & (detect_df.frame_no <= detect_df.sampling_end)
             ]
         # Keep only useful columns
-        detect_df = detect_df[
-            ["filename", "class_id", "frame_no", "x", "y", "w", "h", "conf"]
-        ]
+        detect_df = detect_df[out_col_list]
 
     # Sort dataframe by frame_no and filename
     detect_df = detect_df.sort_values(
