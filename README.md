@@ -30,17 +30,17 @@ Users can run these notebooks via Google Colab (by clicking on the Colab links i
 
 ### Notebooks
 
-Our notebooks are modular in nature and are grouped into task-related subgroups for simplicity. 
+Our notebooks are modular and grouped into four main task categories; Set up, Classify, Analyse and Publish. 
 
-| Name                                              | Description                                                                                 | Try it!  | 
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------|
-| setup/Check_metadata                     | Check format and contents of footage and sites, media and species csv files                 | [![Open In Colab][colablogo]][colab_tut_1] [![binder][binderlogo]][binder_tut] | 
-| classify/Upload_subjects_to_Zooniverse                    | Prepare original footage and upload short clips to Zooniverse, extract frames of interest from the original footage and upload them to Zooniverse                               | [![Open In Colab][colablogo]][colab_tut_3] [![binder][binderlogo]][binder_tut] |
-| classify/Process_classifications             | Pull and process up-to-date classifications from Zooniverse             | [![Open In Colab][colablogo]][colab_tut_8] [![binder][binderlogo]][binder_tut] |
-| analyse/Train_models                                | Prepare the training and test data, set model parameters and train models                   | [![Open In Colab][colablogo]][colab_tut_5] [![binder][binderlogo]][binder_tut] | 
-| analyse/Evaluate_models                            | Use ecologically relevant metrics to test the models                                        | [![Open In Colab][colablogo]][colab_tut_6] [![binder][binderlogo]][binder_tut]   |
-| publish/Publish_models                             | Publish the model to a public repository                                                   | [![Open In Colab][colablogo]][colab_tut_7] [![binder][binderlogo]][binder_tut]  | 
-| publish/Publish_observations                      | Automatically classify new footage and export observations to GBIF                                                          | [![Open In Colab][colablogo]][colab_tut_9] [![binder][binderlogo]][binder_tut] |
+| Task                                             | Notebook                                              | Description                                                                                 | Try it!  | 
+| ------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------|
+| Set up                                            | Check_metadata                     | Check format and contents of footage and sites, media and species csv files                 | [![Open In Colab][colablogo]][colab_tut_1] [![binder][binderlogo]][binder_tut] | 
+| Classify                                            | Upload_subjects_to_Zooniverse                    | Prepare original footage and upload short clips to Zooniverse, extract frames of interest from the original footage and upload them to Zooniverse                               | [![Open In Colab][colablogo]][colab_tut_3] [![binder][binderlogo]][binder_tut] |
+| Classify                                            | Process_classifications             | Pull and process up-to-date classifications from Zooniverse             | [![Open In Colab][colablogo]][colab_tut_8] [![binder][binderlogo]][binder_tut] |
+| Analyse                                            | Train_models                                | Prepare the training and test data, set model parameters and train models                   | [![Open In Colab][colablogo]][colab_tut_5] [![binder][binderlogo]][binder_tut] | 
+| Analyse                                            | Evaluate_models                            | Use ecologically relevant metrics to test the models                                        | [![Open In Colab][colablogo]][colab_tut_6] [![binder][binderlogo]][binder_tut]   |
+| Publish                                            | Publish_models                             | Publish the model to a public repository                                                   | [![Open In Colab][colablogo]][colab_tut_7] [![binder][binderlogo]][binder_tut]  | 
+| Publish                                            | Publish_observations                      | Automatically classify new footage and export observations to GBIF                                                          | [![Open In Colab][colablogo]][colab_tut_9] [![binder][binderlogo]][binder_tut] |
 
 
 ## Local Installation
