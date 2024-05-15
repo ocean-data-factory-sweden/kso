@@ -1982,6 +1982,7 @@ class MLProjectProcessor(ProjectProcessor):
         save_output: bool = True,
         test: bool = False,
         latest: bool = True,
+        out_format: str = "yolo",
     ):
         from yolov5.utils.general import increment_path
 
@@ -2077,9 +2078,11 @@ class MLProjectProcessor(ProjectProcessor):
             #         name=name,
             #         nosave=not save_output,
             #     )
-        self.save_detections(conf_thres, model.ckpt_path, self.eval_dir)
+        self.save_detections(conf_thres, model.ckpt_path, self.eval_dir, out_format)
 
-    def save_detections(self, conf_thres: float, model: str, eval_dir: str):
+    def save_detections(
+        self, conf_thres: float, model: str, eval_dir: str, out_format: str = "yolo"
+    ):
         if self.registry == "wandb":
             import yaml
 
@@ -2117,6 +2120,7 @@ class MLProjectProcessor(ProjectProcessor):
                 log=True,
                 registry=self.registry,
                 movie_csv_df=self.local_movies_csv,
+                out_format=out_format,
             )
             self.modules["yolo_utils"].add_data(
                 Path(eval_dir, "annotations.csv"),
@@ -2142,6 +2146,7 @@ class MLProjectProcessor(ProjectProcessor):
                 log=True,
                 registry=self.registry,
                 movie_csv_df=self.local_movies_csv,
+                out_format=out_format,
             )
             self.modules["yolo_utils"].add_data(
                 path=Path(eval_dir, "annotations.csv"),
