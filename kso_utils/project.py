@@ -2,6 +2,7 @@
 import os
 import pims
 import sys
+import time
 import logging
 import wandb
 import datetime
@@ -1977,9 +1978,11 @@ class MLProjectProcessor(ProjectProcessor):
         else:
             obj = pims.Video(src)  # store video capture object
         for r in results:
+            start = time.time()
             fc += 1
             t = sum(r.speed.values()) / 1000
-            t_left = (len(obj) - fc) * t
+            end = time.time()
+            t_left = (len(obj) - fc) * ((end-start)/1000)
             statement = f"Processed item {fc} / {len(obj)} in {t*1000} ms. Estimated remaining time: {round(t_left, 2)}s."
             if t_left < 60:
                 logging.info(f"{statement} Almost there! ⏳")
