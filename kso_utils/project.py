@@ -1973,7 +1973,7 @@ class MLProjectProcessor(ProjectProcessor):
     def process_results(self, src, results):
         fc = 0
         if Path(src).is_dir():
-            obj = [f for f in src.iterdir() if f.is_file()]
+            obj = [f for f in Path(src).iterdir() if f.is_file()]
         else:
             obj = pims.Video(src)  # store video capture object
         for r in results:
