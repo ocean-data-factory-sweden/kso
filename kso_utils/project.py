@@ -1982,7 +1982,7 @@ class MLProjectProcessor(ProjectProcessor):
             fc += 1
             t = sum(r.speed.values()) / 1000
             end = time.time()
-            t_left = (len(obj) - fc) * ((end-start)/1000)
+            t_left = (len(obj) - fc) * (end-start)
             statement = f"Processed item {fc} / {len(obj)} in {t*1000} ms. Estimated remaining time: {round(t_left, 2)}s."
             if t_left < 60:
                 logging.info(f"{statement} Almost there! ⏳")
