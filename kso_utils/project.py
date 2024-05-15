@@ -1972,12 +1972,15 @@ class MLProjectProcessor(ProjectProcessor):
 
     def process_results(self, src, results):
         fc = 0
-        vid = pims.Video(src)  # store video capture object
+        if Path(src).is_dir():
+            obj = [f for f in src.iterdir() if f.is_file()]
+        else:
+            obj = pims.Video(src)  # store video capture object
         for r in results:
             fc += 1
             t = sum(r.speed.values()) / 1000
-            t_left = (len(vid) - fc) * t
-            statement = f"Processed frame {fc} / {len(vid)} in {t*1000} ms. Estimated remaining time: {round(t_left, 2)}s."
+            t_left = (len(obj) - fc) * t
+            statement = f"Processed item {fc} / {len(obj)} in {t*1000} ms. Estimated remaining time: {round(t_left, 2)}s."
             if t_left < 60:
                 logging.info(f"{statement} Almost there! ⏳")
             else:
