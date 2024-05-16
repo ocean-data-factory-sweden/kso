@@ -1,5 +1,6 @@
 # base imports
 import os
+import time
 import pims
 import sys
 import logging
@@ -1976,10 +1977,15 @@ class MLProjectProcessor(ProjectProcessor):
             obj = [f for f in Path(src).iterdir() if f.is_file()]
         else:
             obj = pims.Video(src)  # store video capture object
+        inc = 0
         for r in results:
             fc += 1
+            if fc > 1:
+                end = time.time()
+                inc = end - st
             t = sum(r.speed.values()) / 1000
-            t_left = (len(obj) - fc) * (t+0.05) # conservative
+            t_left = (len(obj) - fc) * max(t, inc)  # conservative
+            st = time.time()
             statement = f"Processed item {fc} / {len(obj)} in {t*1000} ms. Estimated remaining time: {round(t_left, 2)}s."
             if t_left < 60:
                 logging.info(f"{statement} Almost there! ⏳")
