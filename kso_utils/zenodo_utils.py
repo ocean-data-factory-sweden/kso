@@ -2,6 +2,7 @@ import requests
 import os
 import json
 import zipfile
+import tarfile
 import logging
 from pathlib import Path
 
@@ -45,6 +46,107 @@ def upload_archive(access_key: str, artifact_dir: str):
     )
 
     return depo_id
+
+
+def download_and_extract_models_from_zenodo(api_token, download_dir="models"):
+    """
+    Download model archives from Zenodo associated with the account, extract the model files, and return their paths.
+
+    Parameters:
+    api_token (str): Zenodo API token.
+    download_dir (str): Directory where models will be downloaded and extracted.
+
+    Returns:
+    dict: Dictionary with model names as keys and local file paths as values.
+    """
+    if not os.path.exists(download_dir):
+        os.makedirs(download_dir)
+
+    headers = {"Authorization": f"Bearer {api_token}"}
+
+    model_paths = {}
+    page = 1
+    base_url = "https://zenodo.org/api/deposit/depositions"
+
+    while True:
+        response = requests.get(base_url, headers=headers, params={"page": page})
+        if response.status_code != 200:
+            print(
+                f"Failed to retrieve records. HTTP status code: {response.status_code}"
+            )
+            break
+
+        records = response.json()
+        if not records:
+            break
+
+        for record in records:
+            for file_info in record["files"]:
+                file_name = file_info["filename"]
+                if "ref" in file_name:
+                    download_url = file_info["links"]["download"]
+                    download_url = download_url.replace("/draft", "")
+                    local_filename = os.path.join(download_dir, file_name)
+
+                    print(f"Downloading {file_name} from {download_url}...")
+                    file_response = requests.get(
+                        download_url, headers=headers, stream=True
+                    )
+                    if file_response.status_code == 200:
+                        with open(local_filename, "wb") as f:
+                            for chunk in file_response.iter_content(chunk_size=8192):
+                                f.write(chunk)
+                        print(f"{file_name} downloaded successfully.")
+
+                        # Extract the archive
+                        extracted_files = extract_archive(local_filename, download_dir)
+                        for extracted_file in extracted_files:
+                            if extracted_file.endswith(".pt"):
+                                model_paths[
+                                    os.path.basename(local_filename).replace(".zip", "")
+                                ] = os.path.join(download_dir, extracted_file)
+
+                        # Remove the archive after extraction
+                        os.remove(local_filename)
+                    else:
+                        print(
+                            f"Failed to download {file_name}. HTTP status code: {file_response.status_code}"
+                        )
+
+        page += 1
+
+    return model_paths
+
+
+def extract_archive(archive_path, extract_to):
+    """
+    Extract an archive file and return a list of extracted file paths.
+
+    Parameters:
+    archive_path (str): Path to the archive file.
+    extract_to (str): Directory where the archive will be extracted.
+
+    Returns:
+    list: List of extracted file paths.
+    """
+    extracted_files = []
+
+    if archive_path.endswith(".zip"):
+        with zipfile.ZipFile(archive_path, "r") as zip_ref:
+            zip_ref.extractall(extract_to)
+            extracted_files = zip_ref.namelist()
+    elif archive_path.endswith((".tar.gz", ".tgz")):
+        with tarfile.open(archive_path, "r:gz") as tar_ref:
+            tar_ref.extractall(extract_to)
+            extracted_files = tar_ref.getnames()
+    elif archive_path.endswith(".tar"):
+        with tarfile.open(archive_path, "r:") as tar_ref:
+            tar_ref.extractall(extract_to)
+            extracted_files = tar_ref.getnames()
+    else:
+        print(f"Unsupported archive format: {archive_path}")
+
+    return extracted_files
 
 
 # Get deposition id, i.e. "id" field from this response and bucket

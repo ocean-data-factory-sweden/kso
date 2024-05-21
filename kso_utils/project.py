@@ -27,6 +27,7 @@ import kso_utils.zooniverse_utils as zoo_utils
 import kso_utils.general as g_utils
 import kso_utils.widgets as kso_widgets
 import kso_utils.yolo_utils as yolo_utils
+import kso_utils.zenodo_utils as zenodo_utils
 
 # Logging
 logging.basicConfig()
@@ -1793,6 +1794,7 @@ class MLProjectProcessor(ProjectProcessor):
     # t6
     #############
     # Function to choose a model to evaluate
+
     def choose_model(self, custom_project: str = ""):
         """
         It takes a project name that is defined in the class and returns a dropdown widget that displays the metrics of the model
@@ -1801,13 +1803,17 @@ class MLProjectProcessor(ProjectProcessor):
         :param project_name: The name of the project you want to load the model from
         :return: The model_widget is being returned.
         """
+        model_dict = zenodo_utils.download_and_extract_models_from_zenodo(
+            "pClzrdKwErArGWuPXMje0OtLEaq2gM8vHcAEeQN9CXyS2IjbuJsw05JLjVII"
+        )
+        model_info = {v: {"data": "No model info"} for k, v in model_dict.items()}
+        data_info = {v: {"data": "No data info"} for k, v in model_dict.items()}
         if self.registry == "mlflow":
             # Fetch model artifact list
             from mlflow import MlflowClient
 
             experiment = mlflow.get_experiment_by_name(self.project_name)
             client = MlflowClient()
-            model_dict = {}
 
             if experiment is not None:
                 experiment_id = experiment.experiment_id if experiment else None
@@ -1859,9 +1865,6 @@ class MLProjectProcessor(ProjectProcessor):
             return model_widget
 
         elif self.registry == "wandb":
-            model_dict = {}
-            model_info = {}
-            data_info = {}
             api = wandb.Api()
 
             # weird error fix (initialize api another time)
@@ -2374,6 +2377,8 @@ class MLProjectProcessor(ProjectProcessor):
         :type download_path: str
         :return: The path to the downloaded model checkpoint.
         """
+        if ".pt" in model_name:
+            return str(Path(model_name).parent)
         if self.registry == "mlflow":
             artifact_dir = mlflow.artifacts.download_artifacts(
                 model_name, dst_path=download_path
