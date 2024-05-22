@@ -674,11 +674,11 @@ class ProjectProcessor:
                     is_example=is_example,
                 )
 
-#               # Uncommented as it produces an error for Spyfish (it doesn't use the site_id column but sitename)
-                # Temporary workaround to ensure site_id is an integer
-#                 self.generated_clips["site_id"] = (
-#                     self.generated_clips["site_id"].astype(float).astype(np.int64)
-#                 )
+            #               # Uncommented as it produces an error for Spyfish (it doesn't use the site_id column but sitename)
+            # Temporary workaround to ensure site_id is an integer
+            #                 self.generated_clips["site_id"] = (
+            #                     self.generated_clips["site_id"].astype(float).astype(np.int64)
+            #                 )
 
             button.on_click(on_button_clicked)
             display(clip_modification)
