@@ -1,0 +1,14 @@
+names:
+- Algae
+- Seagrass
+- quadrant
+nc: 3
+roboflow:
+  license: Private
+  project: seafloor_footage
+  url: https://app.roboflow.com/footage/seafloor_footage/1
+  version: 1
+  workspace: footage
+test: ../test/images
+train: Seafloor_footage-1/train/images
+val: Seafloor_footage-1/valid/images
