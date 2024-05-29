@@ -1322,7 +1322,7 @@ class MLProjectProcessor(ProjectProcessor):
         self.model_type = 1  # set as 1 for testing
         self.train, self.run, self.test = (None,) * 3
 
-        self.registry = "wandb"
+        self.registry = None
         if "MLFLOW_TRACKING_URI" in os.environ:
             if os.environ["MLFLOW_TRACKING_URI"] is not None:
                 self.registry = "mlflow"
@@ -1934,6 +1934,16 @@ class MLProjectProcessor(ProjectProcessor):
             model_widget.observe(on_change, names="value")
             return model_widget
 
+        elif self.registry is None:
+            # Create the dropdown widget
+            model_widget = widgets.Dropdown(
+                options=[(name, model) for name, model in model_dict.items()],
+                description="Select model: ",
+            )
+
+            # Display the dropdown widget
+            display(model_widget)
+            return model_widget
         else:
             logging.error("The chosen registry is not available at the moment.")
             return
