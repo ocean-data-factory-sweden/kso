@@ -42,7 +42,7 @@ def find_project(
     os.chdir(dname)
 
     # Switch to cdn project list (temporary fix)
-    if Path("/bucket").exists():
+    if Path("../bucket").exists():
         project_csv = "db_starter/cdn_projects_list.csv"
 
     # Check path to the list of projects is a csv
@@ -51,10 +51,10 @@ def find_project(
 
     # If list of projects doesn't exist retrieve it from github
     elif not Path(project_csv).exists():
-        if Path("/bucket").exists():
-            github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/cdn_projects_list.csv?raw=true"
+        if Path("../bucket").exists():
+            github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/dev/kso_utils/db_starter/cdn_projects_list.csv?raw=true"
         else:
-            github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/projects_list.csv?raw=true"
+            github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/dev/kso_utils/db_starter/projects_list.csv?raw=true"
         read_file = pd.read_csv(github_path)
         read_file.to_csv(project_csv, index=None)
 
