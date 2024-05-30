@@ -41,8 +41,6 @@ def find_project(
     dname = abspath.parent
     os.chdir(dname)
 
-    import os
-
     # Get the full username from the environment variable
     full_username = os.environ.get('USER')
 
