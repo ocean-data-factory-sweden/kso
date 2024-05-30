@@ -41,8 +41,19 @@ def find_project(
     dname = abspath.parent
     os.chdir(dname)
 
+    import os
+
+    # Get the full username from the environment variable
+    full_username = os.environ.get('USER')
+
+    # Check if the username starts with 'jupyter-' and extract the part after it
+    if full_username and full_username.startswith('jupyter-'):
+        username = full_username.split('jupyter-', 1)[1]
+    else:
+        username = None  # Handle the case where the username does not start with 'jupyter-'
+
     # Switch to cdn project list (temporary fix)
-    if Path("../bucket").exists():
+    if Path(f"/cache/album/cache/{username}/bucket").exists():
         project_csv = "db_starter/cdn_projects_list.csv"
 
     # Check path to the list of projects is a csv
@@ -51,7 +62,7 @@ def find_project(
 
     # If list of projects doesn't exist retrieve it from github
     elif not Path(project_csv).exists():
-        if Path("../bucket").exists():
+        if Path(f"/cache/album/cache/{username}/bucket").exists():
             github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/dev/kso_utils/db_starter/cdn_projects_list.csv?raw=true"
         else:
             github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/dev/kso_utils/db_starter/projects_list.csv?raw=true"
