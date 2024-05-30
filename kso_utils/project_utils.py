@@ -42,7 +42,7 @@ def find_project(
     os.chdir(dname)
 
     # Switch to cdn project list (temporary fix)
-    if Path("/buckets").exists():
+    if Path("/bucket").exists():
         project_csv = "db_starter/cdn_projects_list.csv"
 
     # Check path to the list of projects is a csv
