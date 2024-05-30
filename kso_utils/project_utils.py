@@ -51,7 +51,7 @@ def find_project(
 
     # If list of projects doesn't exist retrieve it from github
     elif not Path(project_csv).exists():
-        if Path("/buckets").exists():
+        if Path("/bucket").exists():
             github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/cdn_projects_list.csv?raw=true"
         else:
             github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/projects_list.csv?raw=true"
