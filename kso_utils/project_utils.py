@@ -79,6 +79,7 @@ def find_project(
                     os.chdir(tut_path)
                     if "bucket" in row.csv_folder:
                         row.csv_folder = cdn_user + row.csv_folder
+                        row.movie_folder = cdn_user + row.movie_folder
                     return row
         except exceptions.CsvValueError:
             logging.error(
