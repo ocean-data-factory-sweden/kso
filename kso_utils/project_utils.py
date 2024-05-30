@@ -53,8 +53,8 @@ def find_project(
         )
 
     # Switch to cdn project list (temporary fix)
-    cdn_user_bucket = f"/cache/album/cache/{username}/bucket"
-    if Path(cdn_user_bucket).exists():
+    cdn_user = f"/cache/album/cache/{username}"
+    if Path(cdn_user, "bucket").exists():
         project_csv = "db_starter/cdn_projects_list.csv"
 
     # Check path to the list of projects is a csv
@@ -78,7 +78,7 @@ def find_project(
                     logging.info(f"{project_name} loaded succesfully")
                     os.chdir(tut_path)
                     if "bucket" in row.csv_folder:
-                        row.csv_folder = cdn_user_bucket
+                        row.csv_folder = cdn_user + row.csv_folder
                     return row
         except exceptions.CsvValueError:
             logging.error(
