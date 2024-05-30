@@ -42,16 +42,19 @@ def find_project(
     os.chdir(dname)
 
     # Get the full username from the environment variable
-    full_username = os.environ.get('USER')
+    full_username = os.environ.get("USER")
 
     # Check if the username starts with 'jupyter-' and extract the part after it
-    if full_username and full_username.startswith('jupyter-'):
-        username = full_username.split('jupyter-', 1)[1]
+    if full_username and full_username.startswith("jupyter-"):
+        username = full_username.split("jupyter-", 1)[1]
     else:
-        username = None  # Handle the case where the username does not start with 'jupyter-'
+        username = (
+            None  # Handle the case where the username does not start with 'jupyter-'
+        )
 
     # Switch to cdn project list (temporary fix)
-    if Path(f"/cache/album/cache/{username}/bucket").exists():
+    cdn_user_bucket = f"/cache/album/cache/{username}/bucket"
+    if Path(cdn_user_bucket).exists():
         project_csv = "db_starter/cdn_projects_list.csv"
 
     # Check path to the list of projects is a csv
@@ -74,6 +77,8 @@ def find_project(
                 if row.Project_name == project_name:
                     logging.info(f"{project_name} loaded succesfully")
                     os.chdir(tut_path)
+                    if "bucket" in row.csv_folder:
+                        row.csv_folder = cdn_user_bucket
                     return row
         except exceptions.CsvValueError:
             logging.error(
