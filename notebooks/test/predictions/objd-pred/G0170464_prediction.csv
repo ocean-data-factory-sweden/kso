@@ -1,0 +1,11 @@
+x,y,width,height,confidence,class,class_id,detection_id,image_path,prediction_type
+2944,1654,3314,2890,0.9603844881057739,quadrant,3,24551acb-0e63-4154-9450-714a7cee86c5,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0170464.JPG,ObjectDetectionModel
+3723,1105,643,711,0.8975301384925842,Seagrass,2,8f6d8781-ce71-4c4f-94c6-6520fd42c399,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0170464.JPG,ObjectDetectionModel
+2070,1119,278,332,0.8725147247314453,Seagrass,2,406868fa-6501-4003-9247-e9c15f8fc5ec,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0170464.JPG,ObjectDetectionModel
+4032,1660,374,176,0.8357820510864258,Seagrass,2,7e429e60-c8bf-454e-94bb-a39ae5af3e49,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0170464.JPG,ObjectDetectionModel
+1800,2417,469,880,0.782258927822113,Seagrass,2,c540be2e-2616-4d39-9716-99048efdd8a9,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0170464.JPG,ObjectDetectionModel
+2235,831,434,841,0.7433946132659912,Seagrass,2,4c88579c-c51e-4d75-bd69-25bb33dddc95,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0170464.JPG,ObjectDetectionModel
+2962,1164,809,1194,0.6649146676063538,Seagrass,2,144d3cd9-bea1-4c5c-abb3-c37c5ab615d9,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0170464.JPG,ObjectDetectionModel
+2092,2234,304,854,0.579793393611908,Seagrass,2,89be062f-adc1-4e54-98a5-e4a5ce24db58,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0170464.JPG,ObjectDetectionModel
+3136,2172,774,365,0.5534693598747253,Seagrass,2,9963a68b-3344-4e01-ad59-9f7e9dec8dee,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0170464.JPG,ObjectDetectionModel
+2810,1950,1131,1318,0.5347038507461548,Seagrass,2,1b049d49-547e-4d4a-834c-6b1daf6472fb,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0170464.JPG,ObjectDetectionModel

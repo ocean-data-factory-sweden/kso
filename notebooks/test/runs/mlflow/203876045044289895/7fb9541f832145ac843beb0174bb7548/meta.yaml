@@ -1,0 +1,15 @@
+artifact_uri: /cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/runs/mlflow/203876045044289895/7fb9541f832145ac843beb0174bb7548/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '203876045044289895'
+lifecycle_stage: active
+run_id: 7fb9541f832145ac843beb0174bb7548
+run_name: train6
+run_uuid: 7fb9541f832145ac843beb0174bb7548
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1717067698332
+status: 1
+tags: []
+user_id: X6yHFBYWW00mMIAx

@@ -1,0 +1,11 @@
+x,y,width,height,confidence,class,class_id,detection_id,image_path,prediction_type
+2964,2284,4163,3207,0.9709674119949341,quadrant,3,ffef145c-2d4e-4d97-a69f-9b7a634d8c41,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010135.JPG,ObjectDetectionModel
+2786,1849,1393,917,0.8347591757774353,Sand,1,7133726d-4a09-4fc1-bea5-6c6383e2978c,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010135.JPG,ObjectDetectionModel
+3896,2925,1117,1889,0.8323357701301575,Sand,1,851bf0ee-40f0-4482-825f-07490b0fdfbe,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010135.JPG,ObjectDetectionModel
+2438,3450,388,400,0.8180403113365173,Sand,1,8e08edc4-55bf-4220-9087-7fcb6268e5b7,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010135.JPG,ObjectDetectionModel
+1741,1342,421,364,0.7741508483886719,Sand,1,8842e1c3-8e9a-4c40-923c-46bb4e2cc9cd,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010135.JPG,ObjectDetectionModel
+1777,2697,1255,1385,0.7630414962768555,Sand,1,615d0398-c1f0-4cbf-a043-422a48f8f7bc,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010135.JPG,ObjectDetectionModel
+1595,1230,178,224,0.6868847608566284,Algae,0,c90fcec6-811d-4e42-94f5-cf1c496f761c,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010135.JPG,ObjectDetectionModel
+2701,3004,1514,1476,0.6021610498428345,Algae,0,7dc998aa-7483-403e-b88c-7e6e1f37626d,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010135.JPG,ObjectDetectionModel
+486,531,307,236,0.585699200630188,Sand,1,8f296068-6271-474e-8522-8ac33a0266fc,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010135.JPG,ObjectDetectionModel
+2855,2332,3021,2988,0.5199116468429565,Algae,0,9437853f-994c-465d-82ea-4adc2240c8a4,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010135.JPG,ObjectDetectionModel

@@ -1,0 +1,6 @@
+x,y,width,height,confidence,class,class_id,detection_id,image_path,prediction_type
+2960,2287,4187,3201,0.9759878516197205,quadrant,3,cfca3794-edd7-4b4d-b3e2-b2b9c8b25f9f,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010139.JPG,ObjectDetectionModel
+2766,2308,3134,2976,0.9400530457496643,Algae,0,252f742f-aa51-46eb-ac07-0c428f361cb2,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010139.JPG,ObjectDetectionModel
+2336,1315,591,783,0.9049591422080994,Sand,1,48e030cc-f311-44fc-8d71-c57acdc63654,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010139.JPG,ObjectDetectionModel
+3527,2946,688,1567,0.9041317105293274,Sand,1,7b903917-6d81-4480-8396-7508f4e203e9,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010139.JPG,ObjectDetectionModel
+899,258,696,516,0.7026845216751099,Sand,1,d43fb185-5b6a-410e-b686-070912856e82,/cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/Raw/G0010139.JPG,ObjectDetectionModel
