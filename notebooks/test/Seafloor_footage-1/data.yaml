@@ -9,6 +9,6 @@ roboflow:
   url: https://app.roboflow.com/footage/seafloor_footage/1
   version: 1
   workspace: footage
-test: ../test/images
-train: Seafloor_footage-1/train/images
-val: Seafloor_footage-1/valid/images
+test: /cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/test/images
+train: /cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/train/images
+val: /cache/album/cache/kso-benjamin/bucket/kso/notebooks/test/Seafloor_footage-1/train/images
