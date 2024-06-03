@@ -340,7 +340,7 @@ def choose_footage(
 
                         previews.append(html)
 
-                display(*previews)
+                    project.previews = previews
 
         # Observe changes in the widget
         select_movie_widg.observe(update_movie, "value")
