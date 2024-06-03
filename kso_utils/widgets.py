@@ -292,7 +292,7 @@ def choose_footage(
 
     if footage_source == "Existing Footage":
         # Initiate and display the movie_widget output
-        movie_output = widgets.Output()
+        #movie_output = widgets.Output()
 
         # Display the available movies
         select_movie_widg = select_movie(df)
@@ -319,28 +319,28 @@ def choose_footage(
 
             # Display the movie
             if preview_media:
-                with movie_output:
-                    clear_output()
-                    previews = []
+                #with movie_output:
+                    #clear_output()
+                previews = []
 
-                    # Display/preview each selected movie
-                    for (
-                        index,
-                        movie_row,
-                    ) in selected_movies_df.iterrows():
-                        movie_path = selected_movies_paths[index]
-                        movie_metadata = pd.DataFrame(
-                            [movie_row.values], columns=movie_row.index
-                        )
+                # Display/preview each selected movie
+                for (
+                    index,
+                    movie_row,
+                ) in selected_movies_df.iterrows():
+                    movie_path = selected_movies_paths[index]
+                    movie_metadata = pd.DataFrame(
+                        [movie_row.values], columns=movie_row.index
+                    )
 
-                        html = preview_movie(
-                            movie_path=movie_path,
-                            movie_metadata=movie_metadata,
-                        )
+                    html = preview_movie(
+                        movie_path=movie_path,
+                        movie_metadata=movie_metadata,
+                    )
 
-                        previews.append(html)
+                    previews.append(html)
 
-                    project.previews = previews
+                project.previews = previews
 
         # Observe changes in the widget
         select_movie_widg.observe(update_movie, "value")
