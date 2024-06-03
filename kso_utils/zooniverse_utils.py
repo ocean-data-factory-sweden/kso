@@ -1681,17 +1681,27 @@ def set_zoo_clip_metadata(
     # Add spyfish-specific info
     if project.Project_name in ["Spyfish_Aotearoa", "Spyfish_BOPRC"]:
         # Rename the site columns to match standard cols names
-        sitesdf = sitesdf.rename(columns={"schema_site_id": "id", "SiteID": "siteName"})
+        sitesdf = sitesdf.rename(
+            columns={
+                "schema_site_id": "id",
+                "SiteName": "old_siteName",
+                "SiteID": "#siteName",
+            }
+        )
+        generated_clipsdf = generated_clipsdf.rename(columns={"siteName": "#siteName"})
 
-    # Rename the id column to match generated_clipsdf
-    sitesdf = sitesdf.rename(columns={"id": "site_id", "siteName": "#siteName"})
+        upload_to_zoo = generated_clipsdf.merge(sitesdf, on="#siteName")
 
     # Combine site info to the generated_clips df
-    if "site_id" in generated_clipsdf.columns:
+    elif "site_id" in generated_clipsdf.columns:
+        # Rename the id column to match generated_clipsdf
+        sitesdf = sitesdf.rename(columns={"id": "site_id", "siteName": "#siteName"})
+
         upload_to_zoo = generated_clipsdf.merge(sitesdf, on="site_id")
-        sitename = upload_to_zoo["#siteName"].unique()[0]
     else:
         raise ValueError("Sites table empty. Perhaps try to rebuild the initial db.")
+
+    sitename = upload_to_zoo["#siteName"].unique()[0]
 
     # Rename columns to match schema names
     # (fields that begin with “#” or “//” will never be shown to volunteers)

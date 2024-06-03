@@ -675,10 +675,12 @@ class ProjectProcessor:
                     is_example=is_example,
                 )
 
-                # Temporary workaround to ensure site_id is an integer
-                self.generated_clips["site_id"] = (
-                    self.generated_clips["site_id"].astype(float).astype(np.int64)
-                )
+                if self.project.Project_name != "Spyfish_Aotearoa":
+                    # Excludes Spyfish as it doesn't use the site_id column but sitename
+                    # Temporary workaround to ensure site_id is an integer
+                    self.generated_clips["site_id"] = (
+                        self.generated_clips["site_id"].astype(float).astype(np.int64)
+                    )
 
             button.on_click(on_button_clicked)
             display(clip_modification)
