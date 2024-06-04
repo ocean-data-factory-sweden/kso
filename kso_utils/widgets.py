@@ -292,7 +292,7 @@ def choose_footage(
 
     if footage_source == "Existing Footage":
         # Initiate and display the movie_widget output
-        #movie_output = widgets.Output()
+        # movie_output = widgets.Output()
 
         # Display the available movies
         select_movie_widg = select_movie(df)
@@ -319,8 +319,8 @@ def choose_footage(
 
             # Display the movie
             if preview_media:
-                #with movie_output:
-                    #clear_output()
+                # with movie_output:
+                # clear_output()
                 previews = []
 
                 # Display/preview each selected movie
