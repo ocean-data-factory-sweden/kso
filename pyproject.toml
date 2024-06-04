@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kso_utils"
-version = "0.2.7"
+version = "0.2.8"
 description = "A package containing utility scripts for use with KSO analysis notebooks."
 authors = ["Jurie Germishuys <jurie.germishuys@combine.se>"]
 license = "MIT"
@@ -17,7 +17,7 @@ ffmpeg = "1.4"
 ffmpeg-python = "0.2.0"
 folium = "0.12.1"
 ftfy = "6.1.1"
-gdown = "4.6.4"
+gdown = "4.6.0"
 imagesize = "1.4.1"
 ipyfilechooser = "0.4.4"
 ipysheet = "0.4.4"
