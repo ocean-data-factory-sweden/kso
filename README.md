@@ -161,11 +161,7 @@ We are always excited to collaborate and help other marine scientists. Please fe
 
 ## Troubleshooting
 
-If you experience issues with the Panoptes package and/or uploading movies to Zooniverse, it might be related to the libmagic package. In Windows, the following commands might fix the issue:
-```python
-pip install python-libmagic
-pip install python-magic-bin
-```
+If you experience issues importing panoptes_client in Windows, it is a known [issue with the libmagic package](https://github.com/zooniverse/panoptes-python-client/issues/264). [Pmason's suggestions in the Talk board of Zooniverse](https://www.zooniverse.org/talk/18/3283063) can be useful for troubleshooting it.
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
