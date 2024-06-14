@@ -1,5 +1,9 @@
 This test directory contains the following directories:
 
+a. requirements.txt, to start: use the following command in your terminal: 
+      cd /path/to/directory/where/requirements.txt/is/stored
+      pip (or pip3) install -r requirements.txt
+
 1. models: a dir to store models
 2. notebooks: This is where i stored both the notebooks and the scripts that i worked on. 
                 - image_compression.py: script to compress images if u want to upload them to zooniverse
