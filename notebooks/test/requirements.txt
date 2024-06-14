@@ -1,0 +1,6 @@
+pandas
+folium
+Pillow
+shapely
+roboflow
+PyQt5
