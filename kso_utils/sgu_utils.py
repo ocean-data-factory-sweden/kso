@@ -6,7 +6,8 @@ import logging
 import imghdr
 from tqdm import tqdm
 from pathlib import Path
-#import splitfolders
+
+# import splitfolders
 import glob
 
 tqdm.pandas()
