@@ -22,7 +22,7 @@ numpy>=1.22.0,<1.24.1
 pandas>=1.5.3
 git+https://github.com/zooniverse/panoptes-python-client.git
 PIMS==0.6.1
-split-folder==0.5.1
+split-folders==0.5.1
 tqdm>=4.64.1
 ultralytics>=8.0.200
 wandb==0.17.0
