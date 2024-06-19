@@ -1,13 +1,5 @@
-### Perform these within the terminal to install all the necessary packages ###
-### Could be that u are currently working with pip and not pip3, just remove the "3" if that is the case ###
-
-# pip3 install roboflow
-# pip3 install PyQt5
-# pip3 install PyQtWebEngine
-# pip3 install pandas
-# pip3 install folium
-# pip3 install shapely
-# pip3 install pillow
+##### When u past the snippet in the textbox, make sure u remove the !pip install roboflow    ########
+##### and that model = project.version(version_nr).model() is added at the end of the snippet ########
 
 import sys
 import os
@@ -18,22 +10,17 @@ import folium
 from PIL import Image
 from shapely.geometry import Polygon
 from roboflow import Roboflow
-from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QFileDialog, QMessageBox, 
-                             QLineEdit, QFormLayout, QProgressBar)
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QUrl
-from PyQt5.QtWebEngineWidgets import QWebEngineView  # Import from PyQtWebEngine
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtWebEngineWidgets import QWebEngineView  
 import subprocess
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QWebEngineView
-from PyQt5.QtCore import QUrl
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-
+from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QMessageBox, 
+                             QLineEdit, QFormLayout, QProgressBar, QHBoxLayout)
 
 class MapWindow(QWidget):
     def __init__(self, map_path, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Seagrass Map")
-        self.resize(800, 600)  # Set a reasonable initial size
+        self.resize(1200, 800)  # Set a larger initial size for better usability
 
         layout = QVBoxLayout(self)
 
@@ -54,7 +41,6 @@ class MapWindow(QWidget):
         if url.scheme() == 'qrc':  # Check if it's a loading indicator URL
             self.map_label.setText("Map loaded.")
 
-
 class SeafloorSegmentationApp(QWidget):
     def __init__(self):
         super().__init__()
@@ -67,31 +53,25 @@ class SeafloorSegmentationApp(QWidget):
         layout = QVBoxLayout()
         form_layout = QFormLayout()
 
-        self.snippet_input = QLineEdit(self)
-        self.snippet_input.setFixedHeight(30)
-        self.snippet_input.setFixedWidth(300)
-        form_layout.addRow('Snippet:', self.snippet_input)
+        # Add documentation tooltips
+        def create_input_with_tooltip(label_text, tooltip_text):
+            hbox = QHBoxLayout()
+            line_edit = QLineEdit(self)
+            line_edit.setFixedHeight(30)
+            line_edit.setFixedWidth(300)
+            tooltip_label = QLabel('❓', self)
+            tooltip_label.setToolTip(tooltip_text)
+            hbox.addWidget(line_edit)
+            hbox.addWidget(tooltip_label)
+            form_layout.addRow(label_text, hbox)
+            return line_edit
 
-        self.base_output_dir_input = QLineEdit(self)
-        self.base_output_dir_input.setFixedHeight(30)
-        self.base_output_dir_input.setFixedWidth(300)
-        form_layout.addRow('Base Output Directory:', self.base_output_dir_input)
-
-        self.input_directory_input = QLineEdit(self)
-        self.input_directory_input.setFixedHeight(30)
-        self.input_directory_input.setFixedWidth(300)   
-        form_layout.addRow('Input Directory:', self.input_directory_input)
-
-        self.confidence_threshold_input = QLineEdit(self)
+        self.snippet_input = create_input_with_tooltip('Snippet:', 'After training a model on Roboflow, you can copy the snippet from the "Version - export dataset" tab and paste it here. Before pasting the snippet within this textbox, remove the "!pip install roboflow" part from the snippet. If the model is not defined within the snippet, add model = project.version(1).model() at the end.')
+        self.base_output_dir_input = create_input_with_tooltip('Base Output Directory:', 'Paste the path to the directory where you want to store the output files. A new directory will be created if it does not exist. If it does exist, a new directory will be created with an incremented number.')
+        self.input_directory_input = create_input_with_tooltip('Input Directory:', 'Fill in the path to the directory containing the images you want to run the segmentation on.')
+        self.confidence_threshold_input = create_input_with_tooltip('Confidence Threshold:', 'Set the confidence threshold for the predictions. Only predictions with a confidence score above this threshold will be saved.')
         self.confidence_threshold_input.setText('30')
-        self.confidence_threshold_input.setFixedHeight(30)
-        self.confidence_threshold_input.setFixedWidth(300)
-        form_layout.addRow('Confidence Threshold:', self.confidence_threshold_input)
-
-        self.csv_path_input = QLineEdit(self)
-        self.csv_path_input.setFixedHeight(30)
-        self.csv_path_input.setFixedWidth(300)
-        form_layout.addRow('CSV File Path:', self.csv_path_input)
+        self.csv_path_input = create_input_with_tooltip('CSV File Path:', "Fill in the path to the CSV file containing the geolocation data. The CSV file should have a 'filename' column with the image filenames and a 'PhotoPosition' column with the geolocation data in the format 'latitude,longitude'.")
 
         layout.addLayout(form_layout)
 
@@ -165,8 +145,6 @@ class SeafloorSegmentationApp(QWidget):
         else:
             QMessageBox.warning(self, 'Error', 'Map file not found.')
 
-
-
     def create_output_dir(self, base_dir):
         if not os.path.exists(base_dir):
             os.makedirs(base_dir)
@@ -181,9 +159,10 @@ class SeafloorSegmentationApp(QWidget):
                 counter += 1
 
     def run_processing(self, snippet, input_directory, output_dir, confidence_threshold, csv_path):
-        rf = Roboflow(api_key="YgqaFYQYMXIDYOCYoY2O") 
-        project = rf.workspace("footage").project("seafloor-segmentation") 
-        model = project.version("1").model
+   
+        local_vars = {}
+        exec(snippet, globals(), local_vars)
+        model = local_vars['model']
 
         for i, filename in enumerate(os.listdir(input_directory)):
             filepath = os.path.join(input_directory, filename)
