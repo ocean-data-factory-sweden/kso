@@ -24,6 +24,6 @@ git+https://github.com/zooniverse/panoptes-python-client.git
 PIMS==0.6.1
 split-folders==0.5.1
 tqdm>=4.64.1
-ultralytics>=8.0.200
+ultralytics==8.0.200
 wandb==0.17.0
 yolov5==7.0.13
