@@ -1367,6 +1367,7 @@ class MLProjectProcessor(ProjectProcessor):
             )
 
         self.team_name = "koster"
+        logging.info("ML Project successfully initialised.")
 
     def prepare_dataset(
         self,
@@ -2156,7 +2157,6 @@ class MLProjectProcessor(ProjectProcessor):
             )
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
                 evaluation_path=eval_dir,
-                run=self.run,
                 log=True,
                 registry=self.registry,
                 movie_csv_df=self.local_movies_csv,
@@ -2182,7 +2182,6 @@ class MLProjectProcessor(ProjectProcessor):
         elif self.registry == "mlflow":
             self.csv_report = self.modules["yolo_utils"].generate_csv_report(
                 evaluation_path=eval_dir,
-                run=self.run,
                 log=True,
                 registry=self.registry,
                 movie_csv_df=self.local_movies_csv,
@@ -2205,6 +2204,17 @@ class MLProjectProcessor(ProjectProcessor):
                 registry=self.registry,
                 run=self.run,
             )
+        elif self.registry is None:
+            self.csv_report = self.modules["yolo_utils"].generate_csv_report(
+                evaluation_path=eval_dir,
+                log=True,
+                registry=self.registry,
+                movie_csv_df=self.local_movies_csv,
+                out_format=out_format,
+            )
+        else:
+            logging.error("Invalid registry name")
+            return
 
     def save_detections_wandb(self, conf_thres: float, model: str, eval_dir: str):
         self.modules["yolo_utils"].set_config(
@@ -2221,7 +2231,6 @@ class MLProjectProcessor(ProjectProcessor):
         )
         self.csv_report = self.modules["yolo_utils"].generate_csv_report(
             eval_dir,
-            self.run,
             log=True,
             registry=self.registry,
             movie_csv_df=self.local_movies_csv,
@@ -2390,11 +2399,13 @@ class MLProjectProcessor(ProjectProcessor):
         :return: The path to the downloaded model checkpoint.
         """
         if ".pt" in model_name:
+            logging.info("Local model successfully loaded.")
             return str(Path(model_name).parent)
         if self.registry == "mlflow":
             artifact_dir = mlflow.artifacts.download_artifacts(
                 model_name, dst_path=download_path
             )
+            logging.info("MLFLow model successfully loaded.")
             return str(Path(artifact_dir).parent)
 
         elif self.registry == "wandb":

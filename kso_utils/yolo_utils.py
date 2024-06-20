@@ -1160,7 +1160,6 @@ def add_data(path: str, name: str, registry: str, run):
 def generate_csv_report(
     evaluation_path: str,
     movie_csv_df: pd.DataFrame,
-    run,
     log: bool = False,
     registry: str = "wandb",
     out_format: str = "yolo",
