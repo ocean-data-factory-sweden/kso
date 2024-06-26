@@ -814,6 +814,7 @@ def frame_aggregation(
             column_names = ["species_id", "filename", "f_w", "f_h"]
             if out_format == "yolo":
                 column_names.extend(["x", "y", "w", "h"])
+                full_rows = pd.DataFrame(new_rows, columns=column_names)
             elif out_format == "yolo-seg":
                 # Determine the maximum number of (x, y) pairs in new_rows
                 max_num_points = max(len(entry[4:]) for entry in new_rows)
@@ -1160,7 +1161,6 @@ def add_data(path: str, name: str, registry: str, run):
 def generate_csv_report(
     evaluation_path: str,
     movie_csv_df: pd.DataFrame,
-    run,
     log: bool = False,
     registry: str = "wandb",
     out_format: str = "yolo",
