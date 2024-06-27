@@ -707,7 +707,7 @@ def frame_aggregation(
                 bboxes[named_tuple], tboxes[named_tuple] = [], []
                 if out_format == "yolo":
                     bboxes[named_tuple].extend(
-                        tuple(i[len(grouped_fields) :]) for i in group.values
+                        tuple(i[len(grouped_fields) : -1]) for i in group.values
                     )
                 elif out_format == "yolo-seg":
                     # Add polygons
@@ -759,7 +759,7 @@ def frame_aggregation(
             bboxes[named_tuple] = []
             if out_format == "yolo":
                 bboxes[named_tuple].extend(
-                    tuple(i[len(grouped_fields) :]) for i in group.values
+                    tuple(i[len(grouped_fields) : -1]) for i in group.values
                 )
             elif out_format == "yolo-seg":
                 # Add polygons
