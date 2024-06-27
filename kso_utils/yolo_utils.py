@@ -815,6 +815,7 @@ def frame_aggregation(
             if out_format == "yolo":
                 column_names.extend(["x", "y", "w", "h"])
                 full_rows = pd.DataFrame(new_rows, columns=column_names)
+                f_group_fields = ["species_id", "filename"]
             elif out_format == "yolo-seg":
                 # Determine the maximum number of (x, y) pairs in new_rows
                 max_num_points = max(len(entry[4:]) for entry in new_rows)
