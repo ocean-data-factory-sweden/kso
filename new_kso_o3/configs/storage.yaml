@@ -1,0 +1,9 @@
+# Local + optional S3 remote storage configuration
+local_root: ./data
+# Uncomment to enable S3-compatible remote sync
+# remote:
+#   provider: s3
+#   endpoint: https://s3.amazonaws.com
+#   bucket: my-kso-bucket
+#   aws_access_key_id: ${AWS_ACCESS_KEY_ID}
+#   aws_secret_access_key: ${AWS_SECRET_ACCESS_KEY}

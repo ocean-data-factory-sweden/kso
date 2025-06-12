@@ -1,0 +1,5 @@
+# Hyper-parameters for YoloTrainer
+arch: yolov8n.pt
+imgsz: 640
+epochs: 50
+batch: 16

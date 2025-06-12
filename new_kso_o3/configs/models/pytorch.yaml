@@ -1,0 +1,6 @@
+# Hyper-parameters for TorchTrainer (image classification)
+arch: resnet18
+num_classes: 2
+batch_size: 32
+learning_rate: 0.0003
+epochs: 5

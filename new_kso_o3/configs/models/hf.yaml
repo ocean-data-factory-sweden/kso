@@ -1,0 +1,5 @@
+# Hyper-parameters for HFTrainer (ViT fine-tune)
+model_name: google/vit-base-patch16-224
+num_classes: 2
+batch_size: 8
+epochs: 3

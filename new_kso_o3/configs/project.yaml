@@ -1,0 +1,6 @@
+# Sample project configuration for new_kso_o3 demo runs
+project_name: toy_classification
+# Select model backend to use: pytorch | yolo | hf
+model: pytorch
+# Where to store experiment outputs (checkpoints, logs, etc.)
+output_dir: ./outputs
