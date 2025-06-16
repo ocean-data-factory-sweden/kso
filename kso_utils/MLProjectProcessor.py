@@ -14,7 +14,6 @@ import yaml
 import ultralytics
 import pims
 import itertools
-import mlflow
 import cv2
 
 # util imports
@@ -49,11 +48,7 @@ class MLProjectProcessor(ProjectProcessor):
         self.best_model_path = None
         self.model_type = 1  # set as 1 for testing
         self.train, self.run, self.test = (None,) * 3
-
         self.registry = None
-        if "MLFLOW_TRACKING_URI" in os.environ:
-            if os.environ["MLFLOW_TRACKING_URI"] is not None:
-                self.registry = "mlflow"
 
         # Before t6_utils gets loaded in, the val.py file in yolov5_tracker repository needs to be removed
         # to prevent the batch_size error, see issue kso-object-detection #187
@@ -190,100 +185,6 @@ class MLProjectProcessor(ProjectProcessor):
 
             model_widget.observe(on_change, names="value")
             return model_widget
-
-        elif self.registry == "mlflow":
-            # Fetch model artifact list
-
-            experiment = mlflow.get_experiment_by_name(self.project_name)
-            client = mlflow.MlflowClient()
-
-            if experiment is not None:
-                experiment_id = experiment.experiment_id if experiment else None
-                runs = mlflow.search_runs(
-                    experiment_ids=experiment_id, output_format="list"
-                )
-                run_ids = [run.info.run_id for run in runs][-1:]
-                # Choose only the project directory
-                try:
-                    artifacts = [
-                        (
-                            list(
-                                filter(
-                                    lambda x: x.is_dir
-                                    and "input_datasets" not in x.path,
-                                    client.list_artifacts(i),
-                                )
-                            )[0],
-                            i,
-                        )
-                        for i in run_ids
-                    ]
-                    model_names = [
-                        str(
-                            Path(
-                                "runs:/",
-                                run_id,
-                                artifact.path,
-                                "best.pt",
-                            )
-                        )
-                        for artifact, run_id in artifacts
-                    ]
-                    model_names = [m for m in model_names if "detection" not in m]
-                except IndexError:
-                    model_names = []
-            else:
-                model_names = []
-            model_names.append("Yolov8 Baseline Object Detection Model")
-            model_names.append("Yolov8 Baseline Object Segmentation Model")
-
-            model_widget = widgets.Dropdown(
-                options=model_names,
-                value=None,
-                description="Select model:",
-                ensure_option=False,
-                disabled=False,
-                layout=widgets.Layout(width="50%"),
-                style={"description_width": "initial"},
-            )
-
-            main_out = widgets.Output()
-            display(model_widget, main_out)
-
-            def on_change(change):
-                with main_out:
-                    clear_output()
-                    try:
-                        for af in model_names:
-                            artifact_dir = mlflow.download_artifacts(
-                                artifact_uri=af, dst_path=download_path
-                            )
-                            artifact_file = [
-                                str(i)
-                                for i in Path(artifact_dir).iterdir()
-                                if str(i).endswith(".pt")
-                            ][-1]
-                            logging.info(
-                                f"Baseline {af.name} successfully downloaded from WANDB"
-                            )
-                            model_widget.artifact_path = artifact_file
-                    except Exception as e:
-                        logging.error(
-                            f"Failed to download the baseline model from MLFlow. The default baseline model will be used. {e}"
-                        )
-                        if change["new"] == "Yolov8 Baseline Object Detection Model":
-                            model_widget.artifact_path = "yolov8m.pt"
-                        elif (
-                            change["new"] == "Yolov8 Baseline Object Segmentation Model"
-                        ):
-                            model_widget.artifact_path = "yolov8m-seg.pt"
-                        else:
-                            model_widget.artifact_path = "yolov8m.pt"
-
-            model_widget.observe(on_change, names="value")
-
-            # Display the dropdown widget
-            return model_widget
         else:
             logging.error("Registry not supported.")
 
@@ -322,88 +223,7 @@ class MLProjectProcessor(ProjectProcessor):
         # Disable wandb (not necessary yet)
         if self.registry == "wandb":
             ultralytics.settings.update({"wandb": True})
-        elif self.registry == "mlflow":
-            ultralytics.settings.update({"mlflow": True})
 
-        if self.registry == "mlflow":
-            active_run = mlflow.active_run()
-
-            from mlflow.data.pandas_dataset import PandasDataset
-
-            parent_dir = Path(self.data_path).parent
-            train_path = str(Path(parent_dir, "train.txt"))
-            valid_path = str(Path(parent_dir, "valid.txt"))
-            train_df = pd.read_csv(train_path, delimiter="\t")
-            val_df = pd.read_csv(valid_path, delimiter="\t")
-            train_dataset: PandasDataset = mlflow.data.from_pandas(
-                train_df, source=train_path
-            )
-            val_dataset: PandasDataset = mlflow.data.from_pandas(
-                val_df, source=valid_path
-            )
-
-            from mlflow.exceptions import MlflowException
-
-            try:
-                experiment_id = mlflow.create_experiment(
-                    self.project_name,
-                )
-            except MlflowException as e:
-                # Check if the experiment already exists
-                if "RESOURCE_ALREADY_EXISTS" in str(e):
-                    current_experiment = mlflow.get_experiment_by_name(
-                        self.project_name
-                    )
-                    experiment_id = current_experiment.experiment_id
-                else:
-                    # Handle other MlflowExceptions
-                    raise e
-
-            mlflow.start_run(experiment_id=experiment_id, run_name=exp_name)
-            # Wait 1 minute for MLFlow to register the new run
-            time.sleep(60)
-            mlflow.log_input(train_dataset, context="training")
-            mlflow.log_input(val_dataset, context="validation")
-
-            if not Path(Path(self.data_path).parent, "images.zip").exists():
-                shutil.make_archive(
-                    Path(Path(self.data_path).parent, "images"),
-                    "zip",
-                    Path(Path(self.data_path).parent, "images"),
-                )
-
-            if not Path(Path(self.data_path).parent, "labels.zip").exists():
-                shutil.make_archive(
-                    Path(Path(self.data_path).parent, "labels"),
-                    "zip",
-                    Path(Path(self.data_path).parent, "labels"),
-                )
-
-            # Upload zip files
-            mlflow.log_artifact(
-                Path(Path(self.data_path).parent, "images.zip"),
-                artifact_path="input_datasets",
-            )
-            mlflow.log_artifact(
-                Path(Path(self.data_path).parent, "labels.zip"),
-                artifact_path="input_datasets",
-            )
-
-            # Upload yaml files
-            # Iterate over all files in the specified directory
-            for yaml_file in Path(self.data_path).parent.rglob(
-                "*.yaml"
-            ):  # rglob searches recursively for all .yaml files
-                # Log each .yaml file as an artifact
-                mlflow.log_artifact(yaml_file, artifact_path="input_datasets")
-
-            # Upload txt files
-            # Iterate over all files in the specified directory
-            for txt_file in Path(self.data_path).parent.glob(
-                "*.txt"
-            ):  # rglob searches recursively for all .yaml files
-                # Log each .yaml file as an artifact
-                mlflow.log_artifact(txt_file, artifact_path="input_datasets")
         try:
             if "yolov5" in weights:
                 weights = str(Path(weights).name)
@@ -422,8 +242,6 @@ class MLProjectProcessor(ProjectProcessor):
         # Close down run
         if self.registry == "wandb":
             wandb.finish()
-        elif self.registry == "mlflow":
-            mlflow.end_run()
 
     def enhance_yolo(
         self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
@@ -475,62 +293,7 @@ class MLProjectProcessor(ProjectProcessor):
         )
         model_info = {v: {"data": "No model info"} for k, v in model_dict.items()}
         data_info = {v: {"data": "No data info"} for k, v in model_dict.items()}
-        if self.registry == "mlflow" and not publish:
-            # Fetch model artifact list
-
-            experiment = mlflow.get_experiment_by_name(self.project_name)
-            client = mlflow.MlflowClient()
-
-            if experiment is not None:
-                experiment_id = experiment.experiment_id if experiment else None
-                runs = mlflow.search_runs(
-                    experiment_ids=experiment_id, output_format="list"
-                )
-
-                for run in runs:
-                    # Choose only the project directory
-                    try:
-                        artifacts = [
-                            list(
-                                filter(
-                                    lambda x: x.is_dir
-                                    and "input_datasets" not in x.path,
-                                    client.list_artifacts(run.info.run_id),
-                                ),
-                            )
-                        ]
-
-                        if len(artifacts) > 0:
-                            model_dict[run.info.run_name] = str(
-                                Path(
-                                    "runs:/",
-                                    run.info.run_id,
-                                    artifacts[0][0].path,
-                                    "best.pt",
-                                )
-                            )
-                            model_dict = {
-                                m_name: m_path
-                                for m_name, m_path in model_dict.items()
-                                if "detection" not in m_name
-                            }
-
-                    except IndexError:
-                        pass
-            else:
-                model_dict = {"No model": "yolov8m.pt"}
-
-            # Create the dropdown widget
-            model_widget = widgets.Dropdown(
-                options=[(name, model) for name, model in model_dict.items()],
-                description="Select model: ",
-            )
-
-            # Display the dropdown widget
-            display(model_widget)
-            return model_widget
-
-        elif self.registry == "wandb" and not publish:
+        if self.registry == "wandb" and not publish:
             api = wandb.Api()
 
             # weird error fix (initialize api another time)
@@ -673,17 +436,7 @@ class MLProjectProcessor(ProjectProcessor):
     ):
         from yolov5.utils.general import increment_path
 
-        if self.registry == "mlflow":
-            active_run = mlflow.active_run()
-            if active_run:
-                mlflow.end_run()
-            experiment = mlflow.get_experiment_by_name(self.project_name)
-            mlflow.start_run(
-                run_name=self.project_name + "_detection",
-                experiment_id=experiment.experiment_id,
-            )
-            self.run = mlflow.active_run()
-        elif self.registry == "wandb":
+        if self.registry == "wandb":
             self.run = wandb.init(
                 entity=self.team_name,
                 project="model-evaluations",
@@ -801,30 +554,6 @@ class MLProjectProcessor(ProjectProcessor):
                 self.registry,
                 self.run,
             )
-        elif self.registry == "mlflow":
-            self.csv_report = yolo_utils.generate_csv_report(
-                evaluation_path=eval_dir,
-                log=True,
-                registry=self.registry,
-                movie_csv_df=self.local_movies_csv,
-                out_format=out_format,
-            )
-            yolo_utils.add_data(
-                path=Path(eval_dir, "annotations.csv"),
-                name="detection_output",
-                registry=self.registry,
-                run=self.run,
-            )
-
-            shutil.make_archive(
-                Path(eval_dir, "labels"), "zip", Path(eval_dir, "labels")
-            )
-            yolo_utils.add_data(
-                path=Path(eval_dir, "labels.zip"),
-                name="detection_output",
-                registry=self.registry,
-                run=self.run,
-            )
         elif self.registry is None:
             self.csv_report = yolo_utils.generate_csv_report(
                 evaluation_path=eval_dir,
@@ -921,8 +650,6 @@ class MLProjectProcessor(ProjectProcessor):
         )
         if self.registry == "wandb":
             wandb.finish()
-        elif self.registry == "mlflow":
-            mlflow.end_run()
 
     def get_model(self, model_name: str, download_path: str, custom_project: str = ""):
         """
@@ -940,14 +667,7 @@ class MLProjectProcessor(ProjectProcessor):
             logging.info("Local model successfully loaded.")
             return str(Path(model_name).parent)
 
-        if self.registry == "mlflow":
-            artifact_dir = mlflow.artifacts.download_artifacts(
-                model_name, dst_path=download_path
-            )
-            logging.info("MLFLow model successfully loaded.")
-            return str(Path(artifact_dir).parent)
-
-        elif self.registry == "wandb":
+        if self.registry == "wandb":
             # weird error fix (initialize api another time)
             if len(custom_project) > 0:
                 logging.info(
@@ -1005,10 +725,7 @@ class MLProjectProcessor(ProjectProcessor):
         :type model: str
         :return: The return value is a list of two directories, one for the training data and one for the validation data.
         """
-        if self.registry == "mlflow":
-            logging.error("This is not currently supported for MLflow")
-            return "", ""
-        elif self.registry == "wandb":
+        if self.registry == "wandb":
             api = wandb.Api()
             if "_" in model:
                 run_id = model.split("_")[1]

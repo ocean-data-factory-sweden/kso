@@ -15,7 +15,6 @@ import wandb
 import imagesize
 import base64
 import ffmpeg
-import mlflow
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 from jupyter_bbox_widget import BBoxWidget
@@ -970,8 +969,6 @@ def add_data(path: str, name: str, registry: str, run):
         else:
             my_data.add_file(path)
             run.log_artifact(my_data)
-    elif registry == "mlflow":
-        mlflow.log_artifact(path, artifact_path=name)
 
 
 def generate_csv_report(
@@ -1183,8 +1180,6 @@ def generate_counts(
             if registry == "wandb":
                 # wandb.init(resume="must", id=run.id)
                 wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
-            elif registry == "mlflow":
-                pass
         return final_df
 
 
@@ -1737,41 +1732,6 @@ def _get_species_mapping(model, project_name, team_name="koster", registry="wand
                 # Handle the case where species mapping cannot be found in either location
                 logging.error("Error reading species mapping from config or file.")
                 species_mapping = {}
-    elif registry == "mlflow":
-        from mlflow import MlflowClient
-
-        experiment = mlflow.get_experiment_by_name(project_name)
-        client = MlflowClient()
-        pattern = r"runs:/([^/]+)/weights/best\.pt"
-        # Use re.search() to find the match
-        try:
-            run_id = re.search(pattern, model).group(1)
-        except:
-            logging.error("No valid run found.")
-        if experiment is not None:
-            # Get the path of the artifact with the labels and class_id
-            artifacts = client.list_artifacts(run_id, path="input_datasets")
-            run = mlflow.get_run(run_id)
-            artifact_uri = run.info.artifact_uri
-
-            yaml_fpaths = [
-                Path(artifact_uri, af.path)
-                for af in artifacts
-                if ".yaml" in af.path and "hyp.yaml" not in af.path
-            ]
-            if yaml_fpaths:
-                yaml_fpath = yaml_fpaths[0]
-                # Download the artifact using yaml_fpath
-                # Temporarily download the artifact with mapping labels
-                local_artifact = mlflow.artifacts.download_artifacts(str(yaml_fpath))
-
-                # Attempt to read species mapping from a YAML file specified in the configuration
-                data_dict = read_yaml_file(local_artifact)
-                species_mapping = data_dict["names"]
-                species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
-            else:
-                # Handle the case where no artifacts meet the criteria
-                logging.error(f"No artifacts found in run{run.info.artifact_uri}.")
     else:
         logging.error("Registry invalid.")
         species_mapping = {}
@@ -1799,8 +1759,8 @@ def process_detections(
     :param db_connection: SQL connection object
     :param csv_paths: a dictionary with the paths of the csvs used to initiate the db
     :param annotations_csv_path: the path to the folder containing the annotations.csv file or the annotations.csv
-    :param selected_movies_id: the ids of the movies selected in earlier steps (note if the selection changes b, mlflow)
-    :param model_registry: the name of the model register (e.g wandb, mlflow)
+    :param selected_movies_id: the ids of the movies selected in earlier steps (note if the selection changes b)
+    :param model_registry: the name of the model register (e.g wandb)
     :param model: the name of the model in wandb used to obtain the detections
     :param project_name: name of the project in wandb
     :param team_name: name of the team in wandb.
