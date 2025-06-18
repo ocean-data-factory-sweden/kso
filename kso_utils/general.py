@@ -1,31 +1,4 @@
-# base imports
-import logging
 import multiprocessing
-
-# Logging
-logging.basicConfig()
-logging.getLogger().setLevel(logging.INFO)
-
-
-def import_model_modules(module_names):
-    """
-    This function imports specified modules and returns them as a dictionary.
-
-    :param module_names: A list of strings representing the names of the modules to be imported. The
-    order of the names in the list should correspond to the order of the modules in the returned
-    dictionary. In this case, the expected order is ["train", "detect", "val"]
-    :return: a dictionary containing the imported modules with keys "train", "detect", and "val". If a
-    module fails to import, an error message is logged and that module is not included in the returned
-    dictionary.
-    """
-    importlib = __import__("importlib")
-    modules = {}
-    for module_name, module_full in zip(["train", "detect", "val"], module_names):
-        try:
-            modules[module_name] = importlib.import_module(module_full)
-        except ModuleNotFoundError:
-            logging.error(f"Module {module_name} could not be imported.")
-    return modules
 
 
 def parallel_map(func, iterable, args=()):

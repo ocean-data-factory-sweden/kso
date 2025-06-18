@@ -18,7 +18,6 @@ import cv2
 
 # util imports
 import kso_utils.project_utils as project_utils
-import kso_utils.general as g_utils
 import kso_utils.widgets as kso_widgets
 import kso_utils.yolo_utils as yolo_utils
 import kso_utils.zenodo_utils as zenodo_utils
@@ -48,7 +47,7 @@ class MLProjectProcessor(ProjectProcessor):
         self.best_model_path = None
         self.model_type = 1  # set as 1 for testing
         self.train, self.run, self.test = (None,) * 3
-        self.registry = None
+        self.registry = "wandb"  # TODO: make this a config and read it in here instead of hardcoding
 
         # Before t6_utils gets loaded in, the val.py file in yolov5_tracker repository needs to be removed
         # to prevent the batch_size error, see issue kso-object-detection #187
@@ -70,12 +69,6 @@ class MLProjectProcessor(ProjectProcessor):
 
         # Replace cv2.VideoWriter with the patched version
         cv2.VideoWriter = CustomVideoWriter
-
-        # Import model models for backwards compatibility
-        if self.registry == "wandb":
-            self.modules = g_utils.import_model_modules(
-                ["yolov5.train", "yolov5.detect", "yolov5.val"],
-            )
 
         self.team_name = "koster"
         logging.info("ML Project successfully initialised.")
