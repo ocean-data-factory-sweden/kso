@@ -4,10 +4,43 @@ from IPython.display import display, clear_output
 from pathlib import Path
 import logging
 import itertools
+import ultralytics
 
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
+
+
+def init():
+    """
+    WandB traking of the training is managed via YOLO, so we don't need many wandb statements in our own code.
+    When for example YOLO.train is called, it automatically logs in and initiates the tracking, and closes the run.
+    It can happen that the closing fails, when the training itself fails, or if it was a very short session. For this
+    we should have a check: close_run() and call it after every yolo function.
+
+    Only if we would want to log any extra analysis, we would need to open up a certain run again
+    (wandb.init(resume="must", id=run.id)), log it there with wandb.log and finish the session with wandb.finish()
+
+    WandB will automatically log in by using the environment variable WANDB_API_KEY, so this should be specified.
+
+    For future development: If we want to support other model packages than YOLO, we might need to specify the start and
+    end of a run (tracking) ourselves and not rely on this init() function anymore.
+    """
+    ultralytics.settings.update({"wandb": True})
+
+
+def start_run(self, project, name):
+    self.run = wandb.init(
+        entity=self.team_name,
+        project=project,
+        name=name,
+        settings=wandb.Settings(start_method="thread"),
+    )
+
+
+def close_run():
+    if wandb.run is not None:
+        wandb.finish()
 
 
 def choose_baseline_model(download_path: str):

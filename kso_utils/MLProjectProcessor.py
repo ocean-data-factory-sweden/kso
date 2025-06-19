@@ -1,5 +1,4 @@
 # base imports
-import os
 import time
 import sys
 import logging
@@ -7,22 +6,21 @@ import pandas as pd
 import ipywidgets as widgets
 import shutil
 from pathlib import Path
-from IPython.display import display, clear_output
+from IPython.display import display
 import torch
-import wandb
 import yaml
 import ultralytics
 import pims
-import itertools
 import cv2
+from importlib import import_module
 
 # util imports
 import kso_utils.project_utils as project_utils
 import kso_utils.widgets as kso_widgets
 import kso_utils.yolo_utils as yolo_utils
 import kso_utils.zenodo_utils as zenodo_utils
-import kso_utils.wandb_utils as wandb_utils
 from kso_utils.ProjectProcessor import ProjectProcessor
+import kso_utils.general as g_utils
 
 # Logging
 logging.basicConfig()
@@ -49,6 +47,20 @@ class MLProjectProcessor(ProjectProcessor):
         self.model_type = 1  # set as 1 for testing
         self.train, self.run, self.test = (None,) * 3
         self.registry = "wandb"  # TODO: make this a config and read it in here instead of hardcoding
+        self.registry_utils = import_module(f"kso_utils.{self.registry}_utils")
+
+        g_utils.validate_utils(
+            self.registry_utils,
+            [
+                "init",
+                "start_run",
+                "close_run",
+                "choose_baseline_model",
+                "choose_model",
+                "get_model",
+                "get_dataset",
+            ],
+        )
 
         # Before t6_utils gets loaded in, the val.py file in yolov5_tracker repository needs to be removed
         # to prevent the batch_size error, see issue kso-object-detection #187
@@ -71,7 +83,7 @@ class MLProjectProcessor(ProjectProcessor):
         # Replace cv2.VideoWriter with the patched version
         cv2.VideoWriter = CustomVideoWriter
 
-        self.team_name = "koster"
+        self.team_name = "koster"  # TODO: Should be part of the config
         logging.info("ML Project successfully initialised.")
 
     def prepare_dataset(
@@ -127,10 +139,7 @@ class MLProjectProcessor(ProjectProcessor):
         It downloads the latest version of the baseline model from the model registry
         :return: The path to the baseline model.
         """
-        if self.registry == "wandb":
-            wandb_utils.choose_baseline_model()
-        else:
-            logging.error("Registry not supported.")
+        return self.registry_utils.choose_baseline_model(download_path)
 
     def choose_entity(self, alt_name: bool = False):
         if self.team_name is None:
@@ -164,10 +173,6 @@ class MLProjectProcessor(ProjectProcessor):
         batch_size: int = 16,
         img_size: int = 128,
     ):
-        # Disable wandb (not necessary yet)
-        if self.registry == "wandb":
-            ultralytics.settings.update({"wandb": True})
-
         try:
             if "yolov5" in weights:
                 weights = str(Path(weights).name)
@@ -183,9 +188,7 @@ class MLProjectProcessor(ProjectProcessor):
             )
         except Exception as e:
             logging.info(f"Training failed due to: {e}")
-        # Close down run
-        if self.registry == "wandb":
-            wandb.finish()
+            self.registry_utils.close_run()
 
     def enhance_yolo(
         self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
@@ -204,9 +207,6 @@ class MLProjectProcessor(ProjectProcessor):
             save=True,
             imgsz=img_size,
         )
-
-        if wandb.run is not None:
-            wandb.finish()
 
     def enhance_replace(self, data_path: str):
         if self.model_type == 1:
@@ -234,9 +234,7 @@ class MLProjectProcessor(ProjectProcessor):
         model_dict = zenodo_utils.download_and_extract_models_from_zenodo(
             "pClzrdKwErArGWuPXMje0OtLEaq2gM8vHcAEeQN9CXyS2IjbuJsw05JLjVII"
         )
-        if self.registry == "wandb" and not publish:
-            wandb_utils.choose_model(self, model_dict, custom_project)
-        elif self.registry is None or publish:
+        if publish:
             # Create the dropdown widget
             model_widget = widgets.Dropdown(
                 options=[(name, model) for name, model in model_dict.items()],
@@ -249,9 +247,7 @@ class MLProjectProcessor(ProjectProcessor):
             # Display the dropdown widget
             display(model_widget)
             return model_widget
-        else:
-            logging.error("The chosen registry is not available at the moment.")
-            return
+        return self.registry_utils.choose_model(self, model_dict, custom_project)
 
     def eval_yolo(self, exp_name: str, conf_thres: float):
         # Find trained model weights
@@ -263,11 +259,10 @@ class MLProjectProcessor(ProjectProcessor):
                 data=self.data_path,
                 conf=conf_thres,
             )
+            logging.info("Run succeeded, finishing run...")
         except Exception as e:
             logging.error(f"Encountered {e}, terminating run...")
-            wandb.finish()
-        logging.info("Run succeeded, finishing run...")
-        wandb.finish()
+            self.registry_utils.close_run()
 
     def _process_results(self, src, results):
         fc = 0
@@ -307,12 +302,7 @@ class MLProjectProcessor(ProjectProcessor):
     ):
         from yolov5.utils.general import increment_path
 
-        if self.registry == "wandb":
-            self.run = wandb.init(
-                entity=self.team_name,
-                project="model-evaluations",
-                settings=wandb.Settings(start_method="thread"),
-            )
+        self.registry_utils.start_run(self, "model-evaluations", None)
         models = [
             str(f)
             for f in Path(artifact_dir).iterdir()
@@ -368,6 +358,7 @@ class MLProjectProcessor(ProjectProcessor):
             )
             return
         self._save_detections(conf_thres, model.ckpt_path, self.eval_dir, out_format)
+        self.registry_utils.close_run()
 
     def _save_detections(
         self, conf_thres: float, model: str, eval_dir: str, out_format: str = "yolo"
@@ -489,13 +480,9 @@ class MLProjectProcessor(ProjectProcessor):
         )
 
         # Create a new run for tracking only if necessary
+        self.registry_utils.start_run(self, "model-evaluations", "track")
+
         if self.registry == "wandb":
-            self.run = wandb.init(
-                entity=self.team_name,
-                project="model-evaluations",
-                name="track",
-                settings=wandb.Settings(start_method="thread"),
-            )
             yolo_utils.set_config(
                 conf=conf_thres,
                 model_name=artifact_dir,
@@ -519,8 +506,7 @@ class MLProjectProcessor(ProjectProcessor):
             self.registry,
             self.run,
         )
-        if self.registry == "wandb":
-            wandb.finish()
+        self.registry_utils.close_run()
 
     def get_model(self, model_name: str, download_path: str, custom_project: str = ""):
         """
@@ -538,10 +524,9 @@ class MLProjectProcessor(ProjectProcessor):
             logging.info("Local model successfully loaded.")
             return str(Path(model_name).parent)
 
-        if self.registry == "wandb":
-            wandb_utils.get_model(self, model_name, download_path, custom_project)
-        else:
-            return
+        return self.registry_utils.get_model(
+            self, model_name, download_path, custom_project
+        )
 
     def get_dataset(
         self,
@@ -557,8 +542,4 @@ class MLProjectProcessor(ProjectProcessor):
         :type model: str
         :return: The return value is a list of two directories, one for the training data and one for the validation data.
         """
-        if self.registry == "wandb":
-            wandb_utils.get_dataset()
-        else:
-            logging.error("Unsupported registry")
-            return "", ""
+        return self.registry_utils.get_dataset(self, model, team_name)
