@@ -47,7 +47,11 @@ class MLProjectProcessor(ProjectProcessor):
         self.model_type = 1  # set as 1 for testing
         self.train, self.run, self.test = (None,) * 3
         self.registry = "wandb"  # TODO: make this a config and read it in here instead of hardcoding
-        self.registry_utils = import_module(f"kso_utils.{self.registry}_utils")
+        # TODO: To be able to support more registries, new registries must be written, and
+        # a configuraiton option added to the project config. In the meanwhile do the import 
+        # dynamically, even with a hard-coded wandb, so that adding more registries requires
+        # no more refactoring
+        self.registry_utils = import_module(f"kso_utils.registries.wandb_utils")
 
         g_utils.validate_utils(
             self.registry_utils,
