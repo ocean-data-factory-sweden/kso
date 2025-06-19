@@ -7,13 +7,13 @@ import ipywidgets as widgets
 from pathlib import Path
 from IPython.display import display
 from typing import List
+import multiprocessing
 
 # util imports
 import kso_utils.project_utils as project_utils
 import kso_utils.db_utils as db_utils
 import kso_utils.movie_utils as movie_utils
 import kso_utils.server_utils as server_utils
-import kso_utils.general as g_utils
 import kso_utils.widgets as kso_widgets
 import kso_utils.yolo_utils as yolo_utils
 import kso_utils.zooniverse_utils as zoo_utils
@@ -574,6 +574,27 @@ class ProjectProcessor:
         display(frame_modification)
         display(button)
 
+    def _parallel_map(func, iterable, args=()):
+        """
+        The function `_parallel_map` uses multiprocessing to apply a given function to each element of an
+        iterable in parallel.
+
+        :param func: The function to be applied to each element of the iterable
+        :param iterable: The iterable is a sequence of elements that can be iterated over, such as a list,
+        tuple, or range object. The function `func` will be applied to each element of the iterable in
+        parallel using multiple processes
+        :param args: args is a tuple of additional arguments that can be passed to the function being mapped
+        in parallel. These arguments will be unpacked and passed to the function along with the
+        corresponding element from the iterable. If no additional arguments are needed, the default value of
+        an empty tuple can be used
+        :return: The function `_parallel_map` returns a list of results obtained by applying the function
+        `func` to each element of the `iterable` in parallel using multiple processes. The `args` parameter
+        is optional and can be used to pass additional arguments to the function `func`.
+        """
+        with multiprocessing.Pool() as pool:
+            results = pool.starmap(func, zip(iterable, *args))
+        return results
+
     def generate_custom_frames(
         self,
         skip_start: int,
@@ -598,9 +619,9 @@ class ProjectProcessor:
         frames to skip between each extracted frame. For example, if `frames_skip` is set to 2, every other
         frame will be extracted. If `frames_skip` is not specified, all frames will be extracted
         :type frames_skip: int
-        :return: the results of calling the `parallel_map` function with the `extract_custom_frames` function from
+        :return: the results of calling the `p_arallel_map` function with the `extract_custom_frames` function from
         the `t4_utils` module, passing in the `movie_files` list as the input and the `args` tuple
-        containing `output_dir`, `num_frames`, and `frames_skip`. The `parallel_map` function is a custom
+        containing `output_dir`, `num_frames`, and `frames_skip`. The `_parallel_map` function is a custom
         function that applies the given function to each element of a list of movie_files.
         """
         if backend not in ["av", "cv"]:
@@ -634,7 +655,7 @@ class ProjectProcessor:
                 Path(output_path).mkdir(parents=True)
                 Path(output_path).chmod(0o777)
 
-            results = g_utils.parallel_map(
+            results = self._parallel_map(
                 kso_widgets.extract_custom_frames,
                 movie_files,
                 args=(

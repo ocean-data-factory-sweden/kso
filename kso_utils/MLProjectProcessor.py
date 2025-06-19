@@ -20,7 +20,6 @@ import kso_utils.widgets as kso_widgets
 import kso_utils.yolo_utils as yolo_utils
 import kso_utils.zenodo_utils as zenodo_utils
 from kso_utils.ProjectProcessor import ProjectProcessor
-import kso_utils.general as g_utils
 
 # Logging
 logging.basicConfig()
@@ -48,23 +47,10 @@ class MLProjectProcessor(ProjectProcessor):
         self.train, self.run, self.test = (None,) * 3
         self.registry = "wandb"  # TODO: make this a config and read it in here instead of hardcoding
         # TODO: To be able to support more registries, new registries must be written, and
-        # a configuraiton option added to the project config. In the meanwhile do the import 
+        # a configuraiton option added to the project config. In the meanwhile do the import
         # dynamically, even with a hard-coded wandb, so that adding more registries requires
         # no more refactoring
         self.registry_utils = import_module(f"kso_utils.registries.wandb_utils")
-
-        g_utils.validate_utils(
-            self.registry_utils,
-            [
-                "init",
-                "start_run",
-                "close_run",
-                "choose_baseline_model",
-                "choose_model",
-                "get_model",
-                "get_dataset",
-            ],
-        )
 
         # Before t6_utils gets loaded in, the val.py file in yolov5_tracker repository needs to be removed
         # to prevent the batch_size error, see issue kso-object-detection #187
