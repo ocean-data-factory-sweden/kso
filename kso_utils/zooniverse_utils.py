@@ -1299,9 +1299,16 @@ def populate_subjects(
 
     # Set the subject columns in the right order
     subjects = subjects[required_cols]
+    print(subjects)
 
     from kso_utils.db_utils import test_table, add_to_table, get_df_from_db_table
 
+    subjects = subjects.fillna("FIX")
+    subjects = subjects.drop_duplicates()
+    if "commonName" in subjects.columns:
+        subjects = subjects.drop_duplicates(subset=["commonName"])
+    if "id" in subjects.columns:
+        subjects = subjects.drop_duplicates(subset=["id"])
     # Test table validity
     test_table(subjects, "subjects", keys=["id"])
 
@@ -1897,25 +1904,44 @@ def upload_clips_to_zooniverse(
     # Estimate the number of clips
     n_clips = upload_to_zoo.shape[0]
 
+    try: 
     # Create a new subject set to host the clips
-    subject_set = SubjectSet()
-    subject_set_name = "clips_" + sitename + "_" + str(int(n_clips)) + "_" + created_on
-    subject_set.links.project = project.Zooniverse_number
-    subject_set.display_name = subject_set_name
-    subject_set.save()
+        subject_set = SubjectSet()
+        subject_set_name = "clips_" + sitename + "_" + str(int(n_clips)) + "_" + created_on
+        subject_set.links.project = project.Zooniverse_number
+        subject_set.display_name = subject_set_name
+        subject_set.save()
+        logging.info(f"{subject_set_name} subject set created")
+    except:
+        user_input = input("what is the current subject_set")
+        # user_input = 129113
+        subject_set = SubjectSet.find(user_input)
+        logging.info(f"{subject_set} subject set found")
+        # if subject set 180 pass
 
-    logging.info(f"{subject_set_name} subject set created")
+    # get existing subjects in the subject set
+    existing_subjects = list(subject_set.subjects)
+    n_existing = len(existing_subjects)
+    logging.info(f"{n_existing} subjects already in the subject set")
 
-    # Save the df as the subject metadata
-    subject_metadata = upload_to_zoo.set_index("clip_path").to_dict("index")
+    # remove the first n_existing rows from your dataframe
+    upload_to_zoo_remaining = upload_to_zoo.iloc[n_existing:].copy()
+    logging.info(f"{len(upload_to_zoo_remaining)} new subjects to upload")
+    
 
-    # Upload the clips to Zooniverse (with metadata)
+    # build subject metadata
+    subject_metadata = upload_to_zoo_remaining.set_index("clip_path").to_dict("index")
+
+    # upload the remaining clips
     new_subjects = []
 
+
     logging.info("Uploading subjects to Zooniverse")
-    for clip_path, metadata in tqdm(
-        subject_metadata.items(), total=len(subject_metadata)
-    ):
+    for clip_path, metadata in tqdm(subject_metadata.items(), total=len(subject_metadata)):
+        print(clip_path)
+
+
+  
         # Create a subject
         subject = Subject()
 
@@ -1930,10 +1956,15 @@ def upload_clips_to_zooniverse(
 
         # Save subject info
         subject.save()
+        # new_subjects.append(subject)
+        new_subject = []
         new_subjects.append(subject)
 
-    # Upload all subjects
-    subject_set.add(new_subjects)
+        # Upload all subjects
+        subject_set.add(new_subjects)
+
+    # # Upload all subjects
+    # subject_set.add(new_subjects)
 
     logging.info("Subjects uploaded to Zooniverse")
 

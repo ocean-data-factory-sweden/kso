@@ -2,6 +2,7 @@
 import sqlite3
 import logging
 from pathlib import Path
+from importlib import import_module
 import pandas as pd
 
 # util imports
@@ -13,134 +14,66 @@ from kso_utils.project_utils import Project
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
-
 # SQL specific functions
-def create_connection(db_file: str):
-    """create a database connection to the SQLite database
-        specified by db_file
-
-    :param db_file: database file
-    :return: Connection object or None
+def empty_table(conn: sqlite3.Connection, table_name: str):
     """
-    conn = None
-    db_path = Path(db_file)
-    try:
-        if not db_path.parent.exists():
-            if not db_path.parent == Path(""):
-                db_path.parent.mkdir(parents=True)
-                db_path.parent.chmod(0o777)
-        conn = sqlite3.connect(db_file)
-        conn.execute("PRAGMA foreign_keys = 1")
-        db_path.chmod(0o777)
-        return conn
-    except sqlite3.Error as e:
-        logging.error(e)
-
-    return conn
-
-
-def drop_table(conn: sqlite3.Connection, table_name: str):
-    """
-    Safely remove a table from a Sql db
+    Safely empty a table from its data in a Sql db
 
     :param conn: the Connection object
     :param table_name: table of interest
     """
     # Creating a cursor object using the cursor() method
     cursor = conn.cursor()
-
     try:
         cursor.execute(f"DELETE FROM {table_name}")
-    except Exception as e:
-        logging.info(f"Table doesn't exist, {e}")
-        return
-    logging.debug(f"Previous content from the {table_name} table have been cleared.")
-
-    # Commit your changes in the database
-    conn.commit()
-
-
-def insert_many(conn: sqlite3.Connection, data: list, table: str, count: int):
-    """
-    Insert multiple rows into table
-
-    :param conn: the Connection object
-    :param data: data to be inserted into table
-    :param table: table of interest
-    :param count: number of fields
-    :return:
-    """
-
-    values = (1,) * count
-    values = str(values).replace("1", "?")
-
-    cur = conn.cursor()
-    cur.executemany(f"INSERT INTO {table} VALUES {values}", data)
+        logging.info(
+            f"Previous content from the '{table_name}' table have been cleared."
+        )
+        conn.commit()  # Commit your changes in the database
+    except sqlite3.Error:
+        cursor.execute("PRAGMA table_list;")
+        raise sqlite3.Error(
+            f"Table '{table_name}' does not exist, only tables {[row[1] for row in cursor.fetchall()]}"
+        )
 
 
-def retrieve_query(conn: sqlite3.Connection, query: str):
-    """
-    Execute SQL query and returns output
-
-    :param conn: the Connection object
-    :param query: a SQL query
-    :return:
-    """
-    try:
-        cur = conn.cursor()
-        cur.execute(query)
-    except sqlite3.Error as e:
-        logging.error(e)
-
-    rows = cur.fetchall()
-
-    return rows
-
-
-def execute_sql(conn: sqlite3.Connection, sql: str):
-    """Execute multiple SQL statements without return
-
-    :param conn: Connection object
-    :param sql: a string of SQL statements
-    :return:
-    """
-    try:
-        c = conn.cursor()
-        c.executescript(sql)
-    except sqlite3.Error as e:
-        logging.error(e)
-
-
-def add_to_table(
-    conn: sqlite3.Connection, table_name: str, values: list, num_fields: int
-):
+def add_to_table(conn: sqlite3.Connection, table_name: str, values: list):
     """
     This function adds multiple rows of data to a specified table in a SQLite database.
 
     :param conn: SQL connection object
     :param table_name: The name of the table in the database where the values will be added
     :type table_name: str
-    :param values: The `values` parameter is a list of tuples, where each tuple represents a row of data
-    to be inserted into the specified table. The number of values in each tuple should match the
-    `num_fields` parameter, which specifies the number of columns in the table
+    :param values: The `values` parameter is a list of tuples, where each tuple represents
+    a row of data to be inserted into the specified table. The lenght of the tuples should
+    be equal to the amount of columns in the table.
     :type values: list
-    :param num_fields: The parameter `num_fields` is an integer that represents the number of fields or
-    columns in the table where the values will be inserted. This parameter is used to ensure that the
-    correct number of values are being inserted into the table
-    :type num_fields: int
     """
+    
+    # l = [i[0] for i in values]
+    # print(values[0])
+    # print(len(l), len(set(l)))
+    # print({', '.join(['?' for _ in values[0]])})
+
+    # Check if 'id' column exists in sites
+
+    
+    # # Check site_id values in movies that are not in sites
+    # invalid_sites = local_df[~local_df["site_id"].isin(site_ids)]
+    # print(invalid_sites)
 
     try:
-        insert_many(
-            conn,
+        cur = conn.cursor()
+        cur.executemany(
+            f"INSERT INTO {table_name} VALUES ({', '.join(['?' for _ in values[0]])})",
             values,
-            table_name,
-            num_fields,
         )
+        conn.commit()
 
     except sqlite3.Error as e:
         # Check if the error code indicates a foreign key constraint violation
-        if e.args[0].startswith("FOREIGN KEY constraint failed"):
+        print(e)
+        if e.args[0].startswith("FOREIGN KEY constraint failed") :
             # Get the table of the problematic value
             df1 = get_df_from_db_table(conn, table_name)
 
@@ -149,19 +82,16 @@ def add_to_table(
 
             # Save the problematic value
             foreign_key_value = values[value_i]
-
-            logging.error(f"Foreign Key Constraint Error (table: {table_name}):")
-            logging.error(f"Error values: {foreign_key_value}")
-            logging.error(f"Full Error: {e}")
+            raise sqlite3.DataError(
+                f"Foreign Key Constraint Error (table: {table_name}), Error values: {foreign_key_value}, Full Error: {e} "
+            )
         else:
-            logging.error(e)  # Log the full error for other errors
-
-    conn.commit()
+            raise sqlite3.Error(f"add_to_table failed: {e}")
 
     logging.info(f"Updated {table_name} table from the temporary database")
 
 
-def test_table(df: pd.DataFrame, table_name: str, keys: list = ["id"]):
+def test_table_for_none(df: pd.DataFrame, table_name: str, keys: list = ["id"]):
     """
     The function checks if a given DataFrame has any NULL values in the specified key columns and logs
     an error message if it does.
@@ -171,18 +101,13 @@ def test_table(df: pd.DataFrame, table_name: str, keys: list = ["id"]):
     :param table_name: The name of the table being tested, which is a string
     :type table_name: str
     :param keys: The `keys` parameter is a list of column names that are used as keys to uniquely
-    identify each row in the DataFrame `df`. The function `test_table` checks that there are no NULL
+    identify each row in the DataFrame `df`. The function `test_table_for_none` checks that there are no NULL
     values in these key columns, which would indicate that some rows were not properly matched
     :type keys: list
     """
-    try:
-        # check that there are no id columns with a NULL value, which means that they were not matched
-        assert len(df[df[keys].isnull().any(axis=1)]) == 0
-    except AssertionError:
-        logging.error(
-            f"The table {table_name} has invalid entries, please ensure that all columns are non-zero"
-        )
-        logging.error(f"The invalid entries are {df[df[keys].isnull().any(axis=1)]}")
+    assert (
+        len(df[df[keys].isnull().any(axis=1)]) == 0
+    ), f"The table {table_name} has invalid entries, please ensure that all columns are non-zero. The invalid entries are {df[df[keys].isnull().any(axis=1)]}"
 
 
 def get_df_from_db_table(conn: sqlite3.Connection, table_name: str):
@@ -221,7 +146,7 @@ def get_schema_table_names(conn: sqlite3.Connection):
     """
 
     cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    cursor.execute("SELECT name FROM sqlite_master WHERE type=\'table\'")
     tables = cursor.fetchall()
     table_names = [table[0] for table in tables]
 
@@ -264,60 +189,83 @@ def cols_rename_to_schema(
     :param table_name: The name of the table in the database where the data is stored
     :param reverse_lookup: a boolean value to reverse the dict if formatting from schema to csv
     """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(f"Expected a pandas Dataframe for df, got {type(df)} instead.")
 
-    # Get the spyfish-specific column names and their correspondent
-    # schema fields
-    if project.Project_name in ["Spyfish_Aotearoa", "Spyfish_BOPRC"]:
-        from kso_utils.spyfish_utils import get_spyfish_col_names
-
-        col_names_lookup = get_spyfish_col_names(table_name)
-
-    # Get the koster-specific column names and their correspondent
-    # schema fields
-    if project.Project_name == "Koster_Seafloor_Obs":
-        from kso_utils.koster_utils import get_koster_col_names
-
-        col_names_lookup = get_koster_col_names(table_name)
-
-    # Rename project-specific columns using the dictionary
-    if "col_names_lookup" in locals():
-        if reverse_lookup:
-            # Reverse the dictionaries if formatting from schema to csv
-            col_names_lookup = dict(
-                zip(col_names_lookup.values(), col_names_lookup.keys())
+    # Check if there is a function to rename the columns
+    try:
+        mod = import_module(project.utils_path)
+        func_get_col_names = getattr(mod, "get_col_names")
+        col_names_lookup = func_get_col_names(table_name)
+        logging.info(
+            f"{project.Project_name} has colums to rename, these are successfully retrieved."
+        )
+    except ModuleNotFoundError as e:
+        if e.name == project.utils_path:
+            logging.info(
+                f"{project.Project_name} does not define a utils module for renaming. Skipping renaming."
             )
+            return df
+        else:
+            raise  # re-raise unexpected import errors
+    except AttributeError as e:
+        logging.info(
+            f"{project.Project_name} does not define a 'get_col_names' function. Skipping renaming."
+        )
+        return df
 
-        df = df.rename(columns=col_names_lookup)
+    if not isinstance(col_names_lookup, dict):
+        raise TypeError(
+            f"The get_col_names function needs to return a dict, got a {type(col_names_lookup)}"
+        )
 
+    # Actually rename the columns
+    if reverse_lookup:
+        # Reverse the dictionaries if formatting from schema to csv
+        col_names_lookup = dict(zip(col_names_lookup.values(), col_names_lookup.keys()))
+    df = df.rename(columns=col_names_lookup)
+    logging.info("The columns are successfully renamed.")
     return df
 
 
 # Utility functions for common database operations
-def create_db(db_path: str):
+def create_db(db_path_str: str) -> sqlite3.Connection:
     """Create a new database for the project
 
-    :param db_path: path of the database file
+    :param db_path: str of the path of the database file
     :return:
     """
-    db_file = Path(db_path)
-
+    db_path = Path(db_path_str)
     # Delete previous database versions if exists
-    if db_file.exists():
-        db_file.unlink()
+    if db_path.exists():
+        db_path.unlink()
 
     # Get sql command for db setup
     sql_setup = schema.sql
+    # create the DB file if it does not exist
+    if not db_path.exists():
+        if not db_path.parent == Path(""):
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            db_path.parent.chmod(0o777)
+        with open(db_path, "w") as f:
+            pass
+    db_path.chmod(0o777)
+    # And connect to it
+    try:
+        conn = sqlite3.connect(db_path_str)
+        conn.execute("PRAGMA foreign_keys = 1")
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"Failed to connect to {db_path_str}: {e}")
 
-    # create a database connection
-    conn = create_connection(str(db_file))
-
-    # create tables
-    if conn is not None:
-        # execute sql
-        execute_sql(conn, sql_setup)
-        return "Database creation success"
-    else:
-        return "Database creation failure"
+    try:
+        c = conn.cursor()
+        c.executescript(sql_setup)
+    except sqlite3.Error as e:
+        raise sqlite3.Error(
+            f"Failed to init DB schema: {e}. SQL statements: {sql_setup}"
+        )
+    logging.info("Database creation success")
+    return conn
 
 
 def populate_db(
@@ -341,6 +289,13 @@ def populate_db(
         init_key=init_key,
     )
 
+    print(init_key, "yo111", local_df.columns)
+    if 'id' in local_df.columns:
+        duplicates = local_df[local_df.duplicated('id', keep=False)]
+        if not duplicates.empty:
+            print("Duplicate id entries:")
+            print(duplicates)
+        local_df = local_df.drop_duplicates(subset='id', keep='first')
     # Only populate the tables if df is not empty
     if not local_df.empty:
         # Add values of the processed csv to the sql table of interest
@@ -348,7 +303,6 @@ def populate_db(
             conn=conn,
             table_name=init_key,
             values=[tuple(i) for i in local_df.values],
-            num_fields=len(local_df.columns),
         )
 
 
@@ -373,87 +327,88 @@ def process_test_csv(
         df=local_df,
     )
 
-    # Set the id of the df of interest
-    if init_key == "sites":
-        table_id = "site_id"
+    # Map the init_key to the table_id from the csv
+    table_id = {
+        "sites": "site_id",
+        "movies": "movie_id",
+        "species": "species_id",
+        "photos": "ID",
+    }
+    assert (
+        init_key in table_id.keys()
+    ), f"init_key should be one of {table_id.keys()} so that the db has a table for it, but instead got {init_key}"
 
-    elif init_key == "movies":
-        table_id = "movie_id"
+    # For Spyfish_Aotearoa: Select only movies that are a good deployment / have good visibility
+    if init_key == "movies":
+        if project.Project_name in ["Spyfish_Aotearoa"]:
+            assert (
+                "IsBadDeployment" in local_df
+            ), "The movies csv from Spyfish_Aotearoa expects to have a column called IsBadDeployment, but it is missing."
+            # Check for missing values in IsBadDeployment column
+            if local_df["IsBadDeployment"].isnull().any():
+                raise ValueError(
+                    "The 'IsBadDeployment' column contains missing values. Please handle missing values before proceeding."
+                )
+            else:
+                local_df = local_df.loc[~local_df.IsBadDeployment].drop(
+                    "IsBadDeployment", axis=1
+                )
 
-        from kso_utils.movie_utils import select_project_movies
 
-        # Select only the movies that are relevant to the project
-        local_df = select_project_movies(project, local_df)
 
-        # Reference movies with their respective sites
-        sites_df = get_df_from_db_table(conn, "sites")[["id", "siteName"]].rename(
-            columns={"id": "site_id"}
-        )
+    if init_key=="movies":
+        
+        local_df = local_df.drop(columns=['DepthStrata', 'Created By', 'NotesDeployment', 
+       'SurveyID',  'EventTimeEnd',
+       'ReplicateWithinSite', 'EventTimeStart',  'NZMHCS_Abiotic', 'Weather', 'TideLevel',
+        'DepthDeployment', 'UnderwaterVisibility','DropID',
+       'NZMHCS_Biotic'] , errors='ignore')
+        # Step 1: Read valid site_ids from the sites table
+        site_ids = pd.read_sql_query("SELECT siteName FROM sites", conn)
+        print(site_ids.columns)
+        site_ids=  site_ids["siteName"].tolist()
+        
+        # Step 2: Filter local_df to only include rows with site_id in sites table
+        local_df = local_df[local_df["siteName"].isin(site_ids)]
+        local_df = local_df.dropna(subset=["fileName"])
 
-        # Merge df (aka movies) and sites dfs
-        local_df = pd.merge(local_df, sites_df, how="left", on="siteName")
+    # Rename id columns to simply "id"
+    local_df = local_df.rename(columns={table_id[init_key]: "id", 
+                                        # 'Targeted':  'kingdom', 
+                                        'kingdom': 'Targeted', 
+                                        # 'aphiaID2' : 'DOC_TaxonID'
+                                        # 'DOC_TaxonID':'aphiaID'
+                                        'fileName': 'filename',
+                                        # 'DropID' : 'id'
+                                       })
 
-    elif init_key == "species":
-        table_id = "species_id"
-
-    elif init_key == "photos":
-        table_id = "ID"
-
-    else:
-        logging.error(
-            f"{init_key} has not been processed because the db schema does not have a table for it"
-        )
-
-    # Create a dictionary with the table-specific column id and its schema match
-    id_lookup = {table_id: "id"}
-
-    # Rename id columns using the dictionary
-    local_df = local_df.rename(columns=id_lookup)
-
-    # Roadblock to ensure cols match schema
-    ##################
-    # Get the "standard" schema column names of the table of interest
-    col_names_dic = get_column_names_db(conn, init_key)
-
-    # Check the column names of the df are standard
-    column_names = local_df.columns
-    required_columns = col_names_dic.values()
-
-    # Modify the dictionary if the df has different column names
-    if not all(col in column_names for col in required_columns):
-        missing_cols = [col for col in required_columns if col not in column_names]
-        # Log the issue
-        logging.error(
-            f"{missing_cols} column(s) not found and"
-            f" are required for the {init_key}'s schema table"
-            f" The col names are:{column_names}"
-        )
-
-    # Select only columns that have fields in the sql table
-    local_df = local_df[[c for c in required_columns if c in local_df.columns]]
+    local_df = local_df.drop(columns=[ 'SiteExposure','ControlToMR02',
+       'SiteCode', 'ProtectionStatus', 'ControlToMR03',  'ControlToMR01',
+       'ProtectionStatusDetails', 'IsControlSite', 'Region',
+       'LinkToMarineReserve', 'SiteNameOld' ], errors='ignore')
+    
+    # Ensure cols of df match db schema
+    schema_col_names = get_column_names_db(conn, init_key).values()
+    assert set(local_df.columns) == set(
+        schema_col_names
+    ), f"csv columns and db table columns for {init_key} do not match. The df contains {local_df.columns} and the sql table requires {schema_col_names}. Make sure they contain the same columns."
 
     # Roadblock to prevent empty rows in id_columns
-    test_table(local_df, init_key, [local_df.columns[0]])
+    test_table_for_none(local_df, init_key, [local_df.columns[0]])
+
+    # Reorder the colums so they are in the order of schema
+    # Otherwise the data will be added to the wrong key
+    local_df = local_df[[c for c in schema_col_names]]
+
+    
+    # print(local_df.columns)
+    # print(schema_col_names)
+
+
+    if init_key=="movies" or init_key=="sites":
+        print(local_df.sample(5))
 
     return local_df
-
-
-def check_basic_meta(
-    meta_key: str, meta_path: str, conn: sqlite3.Connection, keys: list = []
-):
-    # Load the csv with movies information
-    test_df = pd.read_csv(meta_path)
-    # Retrieve the names of the basic columns in the sql db
-    field_names = list(get_column_names_db(conn, meta_key).values())
-    # Select the basic fields for the db check
-    df_to_db = test_df[[c for c in test_df.columns if c in field_names]]
-    # Double-check to prevent missing key information
-    if len(keys) == 0:
-        test_table(df_to_db, meta_key, df_to_db.columns)
-    else:
-        test_table(df_to_db, meta_key, keys)
-
-    logging.info(f"The {meta_key} dataframe is complete")
 
 
 def check_species_meta(csv_paths: dict, conn: sqlite3.Connection):
@@ -474,7 +429,7 @@ def check_species_meta(csv_paths: dict, conn: sqlite3.Connection):
     df_to_db = species_df[[c for c in species_df.columns if c in field_names]]
 
     # Roadblock to prevent empty lat/long/datum/countrycode
-    test_table(df_to_db, "species", df_to_db.columns)
+    test_table_for_none(df_to_db, "species", df_to_db.columns)
 
     logging.info("The species dataframe is complete")
 
@@ -541,7 +496,7 @@ def add_db_info_to_df(
         if "label" in df.columns:
             df[right_on_col] = df["label"]
 
-        from kso_utils.zooniverse_utils import clean_label
+        from kso_upload_copy.notebooks.classify.hold.zooniverse_utils import clean_label
 
         # Match format of species name to Zooniverse labels
         sql_df[right_on_col] = sql_df[right_on_col].apply(clean_label)

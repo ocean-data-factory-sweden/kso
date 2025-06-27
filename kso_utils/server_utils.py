@@ -64,7 +64,7 @@ def connect_to_server(project: Project):
 
     elif project.server == ServerType.AWS:
         # Connect to AWS as a client
-        server_connection["client"] = get_aws_client()
+        server_connection["client"] = _get_aws_client()
 
     else:
         raise ValueError(
@@ -89,7 +89,7 @@ def download_init_csv(project: Project, init_keys: list, server_connection: dict
 
     if project.server == ServerType.TEMPLATE:
         gdrive_id = "1PZGRoSY_UpyLfMhRphMUMwDXw4yx1_Fn"
-        download_gdrive(
+        _download_gdrive(
             gdrive_id=gdrive_id, folder_name=project.csv_folder, fix_encoding=False
         )
 
@@ -138,7 +138,7 @@ def download_init_csv(project: Project, init_keys: list, server_connection: dict
     return db_initial_info
 
 
-def get_ml_data(project: Project, test: bool = False):
+def get_ml_data(project: Project):
     """
     It downloads the training data from Google Drive.
     Currently only applies to the Template Project as other projects do not have prepared
@@ -154,10 +154,7 @@ def get_ml_data(project: Project, test: bool = False):
             ml_folder = project.ml_folder
 
             # Download template training files from Gdrive
-            if test:
-                download_gdrive(gdrive_id, Path("../test/test_output") / ml_folder)
-            else:
-                download_gdrive(gdrive_id, Path(ml_folder))
+            _download_gdrive(gdrive_id, Path(ml_folder))
             logging.info("Template data downloaded successfully")
         else:
             logging.info("No download method implemented for this data")
@@ -196,7 +193,7 @@ def update_csv_server(
     elif project.server == ServerType.AWS:
         logging.info("Updating csv file in AWS server")
         # Update csv to AWS
-        upload_file_to_s3(
+        _upload_file_to_s3(
             client=server_connection["client"],
             bucket=project.bucket,
             key=str(csv_paths[orig_csv]),
@@ -233,7 +230,7 @@ def upload_file_server(
 
     elif project.server == ServerType.AWS:
         # Update csv to AWS
-        upload_file_to_s3(
+        _upload_file_to_s3(
             client=server_connection["client"],
             bucket=project.bucket,
             key=f_path,
@@ -253,7 +250,7 @@ def upload_file_server(
 # ####################
 
 
-def aws_credentials():
+def _aws_credentials():
     # Save your access key for the s3 bucket.
     aws_access_key_id = getpass.getpass("Enter the key id for the aws server")
     aws_secret_access_key = getpass.getpass(
@@ -263,7 +260,7 @@ def aws_credentials():
     return aws_access_key_id, aws_secret_access_key
 
 
-def connect_s3(aws_access_key_id: str, aws_secret_access_key: str):
+def _connect_s3(aws_access_key_id: str, aws_secret_access_key: str):
     # Connect to the s3 bucket
     client = boto3.client(
         "s3",
@@ -273,21 +270,21 @@ def connect_s3(aws_access_key_id: str, aws_secret_access_key: str):
     return client
 
 
-def get_aws_client():
+def _get_aws_client():
     # Set aws account credentials
     aws_access_key_id, aws_secret_access_key = os.getenv("SPY_KEY"), os.getenv(
         "SPY_SECRET"
     )
     if aws_access_key_id is None or aws_secret_access_key is None:
-        aws_access_key_id, aws_secret_access_key = aws_credentials()
+        aws_access_key_id, aws_secret_access_key = _aws_credentials()
 
     # Connect to S3
-    client = connect_s3(aws_access_key_id, aws_secret_access_key)
+    client = _connect_s3(aws_access_key_id, aws_secret_access_key)
 
     return client
 
 
-def get_matching_s3_objects(
+def _get_matching_s3_objects(
     client: boto3.client, bucket: str, prefix: str = "", suffix: str = ""
 ):
     """
@@ -344,7 +341,7 @@ def get_matching_s3_keys(
 
     # Select the relevant bucket
     s3_keys = [
-        obj["Key"] for obj in get_matching_s3_objects(client, bucket, prefix, suffix)
+        obj["Key"] for obj in _get_matching_s3_objects(client, bucket, prefix, suffix)
     ]
 
     return s3_keys
@@ -397,7 +394,7 @@ def download_object_from_s3(
         )
 
 
-def upload_file_to_s3(client: boto3.client, *, bucket: str, key: str, filename: str):
+def _upload_file_to_s3(client: boto3.client, *, bucket: str, key: str, filename: str):
     """
     > Upload a file to S3, and show a progress bar if the file is large enough
 
@@ -435,26 +432,12 @@ def upload_file_to_s3(client: boto3.client, *, bucket: str, key: str, filename: 
         )
 
 
-def delete_file_from_s3(client: boto3.client, *, bucket: str, key: str):
-    """
-    > Delete a file from S3.
-
-    :param client: boto3.client - the client object that you created in the previous step
-    :type client: boto3.client
-    :param bucket: The name of the bucket that contains the object to delete
-    :type bucket: str
-    :param key: The name of the file
-    :type key: str
-    """
-    client.delete_object(Bucket=bucket, Key=key)
-
-
 #####################
 # ## Google Drive functions ###
 # ####################
 
 
-def download_gdrive(gdrive_id: str, folder_name: str, fix_encoding: bool = True):
+def _download_gdrive(gdrive_id: str, folder_name: str, fix_encoding: bool = True):
     # Specify the url of the file to download
     url_input = f"https://drive.google.com/uc?&confirm=s5vl&id={gdrive_id}"
 

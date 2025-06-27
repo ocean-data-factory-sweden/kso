@@ -1,10 +1,10 @@
 # base imports
 import os
+import csv
 from pathlib import Path
 import logging
-import pandas as pd
 from dataclasses import dataclass
-from dataclass_csv import DataclassReader, exceptions
+import pandas as pd
 
 # Logging
 logging.basicConfig()
@@ -13,10 +13,9 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 @dataclass
 class Project:
-    # This is defining a data class called `Project` with several attributes including `Project_name`,
-    # `Zooniverse_number`, `db_path`, `server`, `bucket`, `key`, `csv_folder`, `movie_folder`,
-    # `photo_folder`, and `ml_folder`. The `@dataclass` decorator is used to automatically generate
-    # several special methods such as `__init__`, `__repr__`, and `__eq__` for the class. This makes it
+    # This is defining a data class called `Project` with several attributes.
+    # The `@dataclass` decorator is used to automatically generate several special
+    # methods such as `__init__`, `__repr__`, and `__eq__` for the class. This makes it
     # easier to create and work with instances of the `Project` class.
     Project_name: str
     Zooniverse_number: int = 0
@@ -28,22 +27,12 @@ class Project:
     movie_folder: str = None
     photo_folder: str = None
     ml_folder: str = None
+    utils_path: str = None
 
 
-def find_project(
-    project_name: str = "", project_csv: str = "db_starter/projects_list.csv"
-):
-    """Find project information using
-    project csv path and project name"""
-    # Specify the path to the list of projects
-    tut_path = Path.cwd()
-    abspath = Path(__file__).resolve()
-    dname = abspath.parent
-    os.chdir(dname)
-
-    # Get the full username from the environment variable
+def get_cdn_user():
+    # The code below makes sure to use the cloudina project file when working on Cloudina
     full_username = os.environ.get("USER")
-
     # Check if the username starts with 'jupyter-' and extract the part after it
     if full_username and full_username.startswith("jupyter-"):
         username = full_username.split("jupyter-", 1)[1]
@@ -51,61 +40,73 @@ def find_project(
         username = (
             None  # Handle the case where the username does not start with 'jupyter-'
         )
-
-    # Switch to cdn project list (temporary fix)
     cdn_user = f"/cache/album/cache/{username}"
+    return cdn_user
+
+
+def get_projects_csv_file():
+    cdn_user = get_cdn_user()
     if Path(cdn_user, "bucket").exists():
-        project_csv = "db_starter/cdn_projects_list.csv"
+        # If this path exists, we are on cloudina and use the cloudina csv
+        project_csv = "kso_utils/db_starter/cdn_projects_list.csv"
+    else:
+        # We are not on cloudina, so use the normal csv
+        # Get the directory of this utils file
+        base_dir = Path(__file__).resolve().parent
+        # Build path to the data file
+        project_csv = base_dir / "db_starter" / "projects_list.csv"
 
-    # Check path to the list of projects is a csv
-    if Path(project_csv).exists() and not project_csv.endswith(".csv"):
-        logging.error("A csv file was not selected. Please try again.")
-
-    # If list of projects doesn't exist retrieve it from github
-    elif not Path(project_csv).exists():
-        if Path(f"/cache/album/cache/{username}/bucket").exists():
+    # Check if the csv exists, otherwise retrieve it from github
+    if not Path(project_csv).exists():
+        logging.info(
+            f"The csv {project_csv} did not exist yet, so it is retrieved from gitlab."
+        )
+        if Path(cdn_user, "bucket").exists():
+            # We are on cloudina
             github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/dev/kso_utils/db_starter/cdn_projects_list.csv?raw=true"
         else:
             github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/dev/kso_utils/db_starter/projects_list.csv?raw=true"
         read_file = pd.read_csv(github_path)
         read_file.to_csv(project_csv, index=None)
 
-    with open(project_csv) as csv:
-        reader = DataclassReader(csv, Project)
-        try:
-            for row in reader:
-                if row.Project_name == project_name:
-                    logging.info(f"{project_name} loaded succesfully")
-                    os.chdir(tut_path)
-                    if "bucket" in row.csv_folder:
-                        row.csv_folder = cdn_user + row.csv_folder
-                        row.movie_folder = cdn_user + row.movie_folder
-                    return row
-        except exceptions.CsvValueError:
-            logging.error(
-                f"This project {project_name} does not contain any csv information. Please select another."
-            )
-    os.chdir(tut_path)
-    return
+    if not Path(project_csv).exists():
+        raise FileNotFoundError(
+            f"The CSV {project_csv} does not exist and could not be retrieved from Gitlab."
+        )
+    return project_csv
 
 
-# def add_project(project_info: dict = {}):
-#     """Add new project information to
-#     project csv using a project_info dictionary
-#     """
-#     tut_path = os.getcwd()
-#     abspath = os.path.abspath(__file__)
-#     dname = os.path.dirname(abspath)
-#     os.chdir(dname)
-#     # Specify standard project list location
-#     project_path = "db_starter/projects_list.csv"
-#     # Specify volume allocated by SNIC
-#     snic_path = "/mimer/NOBACKUP/groups/snic2021-6-9"
+def find_project(project_name: str = ""):
+    """Find project information using project csv path and project name"""
+    project_csv = get_projects_csv_file()
+    cdn_user = get_cdn_user()  # is used if on cloudina, otherwise not used
 
-#     if not os.path.exists(project_path) and os.path.exists(snic_path):
-#         project_path = os.path.join(snic_path, "db_starter/projects_list.csv")
-#     with open(project_path, "a") as f:
-#         project = [Project(*list(project_info.values()))]
-#         w = DataclassWriter(f, project, Project)
-#         w.write(skip_header=True)
-#     os.chdir(tut_path)
+    with open(project_csv, mode="r", newline="", encoding="utf-8") as file:
+        reader = csv.DictReader(file)  # Reads rows as dictionaries
+        for row in reader:
+            if row["Project_name"] == project_name:
+                logging.info(f"{project_name} loaded successfully")
+
+                if "bucket" in row.get("csv_folder"):
+                    row["csv_folder"] = cdn_user + row.get("csv_folder")
+                    row["movie_folder"] = cdn_user + row.get("movie_folder")
+
+                # Convert CSV row (dict) into a Project instance
+                project = Project(
+                    Project_name=row["Project_name"],
+                    Zooniverse_number=int(row.get("Zooniverse_number")),
+                    db_path=row.get("db_path"),
+                    server=row.get("server"),
+                    bucket=row.get("bucket"),
+                    key=row.get("key"),
+                    csv_folder=row.get("csv_folder"),
+                    movie_folder=row.get("movie_folder"),
+                    photo_folder=row.get("photo_folder"),
+                    ml_folder=row.get("ml_folder"),
+                    utils_path=row.get("utils_path"),
+                )
+                return project
+
+    raise AttributeError(
+        f"Project {project_name} is not found in CSV {project_csv}. Please select another project or add the information to the csv."
+    )

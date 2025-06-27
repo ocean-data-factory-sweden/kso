@@ -8,7 +8,6 @@ from typing import Tuple, Iterator
 
 import av
 import cv2
-from more_itertools import first
 import numpy as np
 import sys
 
@@ -18,7 +17,7 @@ BGRImageArray = np.ndarray
 TimeIntervalTuple = Tuple[Optional[float], Optional[float]]
 
 
-def get_memory_footprint(item: Any) -> int:
+def _get_memory_footprint(item: Any) -> int:
     # TODO: Recurse through dataclasses
     if isinstance(item, np.ndarray):
         return item.itemsize * item.size
@@ -26,7 +25,7 @@ def get_memory_footprint(item: Any) -> int:
         return sys.getsizeof(item)  # Only returns pointer-size, no recursion
 
 
-class CacheDict(Generic[KeyType, ItemType]):
+class _CacheDict(Generic[KeyType, ItemType]):
     """A simple buffer that just keeps a cache of recent entries
     Example
         cache = ItemCache(buffer_len=3)
@@ -52,9 +51,9 @@ class CacheDict(Generic[KeyType, ItemType]):
 
     def _remove_oldest_item(self):
         if len(self._buffer) > 0:
-            first_key = first(self._buffer.keys())
+            first_key = self._buffer.keys()[0]
             value, itemsize = self._buffer[first_key]
-            del self._buffer[first(self._buffer.keys())]
+            del self._buffer[first_key]
             if itemsize is not None:
                 self._current_buffer_size -= itemsize
 
@@ -65,7 +64,7 @@ class CacheDict(Generic[KeyType, ItemType]):
 
         if self._buffer_size_bytes is not None:
             size = (
-                get_memory_footprint(value)
+                _get_memory_footprint(value)
                 if not self._calculate_size_once or self._first_object_size is None
                 else self._first_object_size
             )
@@ -97,7 +96,7 @@ class CacheDict(Generic[KeyType, ItemType]):
         return key in self._buffer
 
 
-def fit_image_to_max_size(image: BGRImageArray, max_size: Tuple[int, int]):
+def _fit_image_to_max_size(image: BGRImageArray, max_size: Tuple[int, int]):
     """Make sure image fits within (width, height) max_size while preserving aspect ratio"""
     if image.shape[0] > max_size[1] or image.shape[1] > max_size[0]:
         scale_factor = min(max_size[1] / image.shape[0], max_size[0] / image.shape[1])
@@ -106,12 +105,12 @@ def fit_image_to_max_size(image: BGRImageArray, max_size: Tuple[int, int]):
         return image
 
 
-def compute_fixed_hash(array):
+def _compute_fixed_hash(array):
     return hashlib.md5(array.tostring()).hexdigest()
 
 
 @dataclass
-class VideoFrameInfo:
+class _VideoFrameInfo:
     image: BGRImageArray
     seconds_into_video: float
     frame_ix: int
@@ -163,7 +162,7 @@ class VideoReader:
         # self.stream = self.container.streams.video[0]
 
         # self._cap = cv2.VideoCapture(path)
-        self._frame_cache: CacheDict[int, VideoFrameInfo] = CacheDict(
+        self._frame_cache: _CacheDict[int, _VideoFrameInfo] = _CacheDict(
             buffer_size_bytes=buffer_size_bytes, always_allow_one_item=True
         )
         self._next_index_to_be_read: int = 0
@@ -172,7 +171,7 @@ class VideoReader:
         self._fps = float(self.container.streams.video[0].guessed_rate)
 
         self._n_frames = self.container.streams.video[0].frames
-        self._cached_last_frame: Optional[VideoFrameInfo] = (
+        self._cached_last_frame: Optional[_VideoFrameInfo] = (
             None  # Helps fix weird bug... see notes below
         )
         self._max_size_xy = max_size_xy
@@ -224,7 +223,7 @@ class VideoReader:
         self,
         time_interval: TimeIntervalTuple = (None, None),
         frame_interval: Tuple[Optional[int], Optional[int]] = (None, None),
-    ) -> Iterator[VideoFrameInfo]:
+    ) -> Iterator[_VideoFrameInfo]:
         for i in self.iter_frame_ixs(
             time_interval=time_interval, frame_interval=frame_interval
         ):
@@ -234,7 +233,7 @@ class VideoReader:
         for frame in self.container.decode(self.container.streams.video[0]):
             yield frame
 
-    def request_frame(self, index: int) -> VideoFrameInfo:
+    def request_frame(self, index: int) -> _VideoFrameInfo:
         """
         Request a frame of the video.  If the requested frame is out of bounds, this will return the frame
         on the closest edge.
@@ -262,8 +261,8 @@ class VideoReader:
                 image = frame_data.to_rgb().to_ndarray(format="bgr24")
 
                 if self._max_size_xy is not None:
-                    image = fit_image_to_max_size(image, self._max_size_xy)
-                frame = VideoFrameInfo(
+                    image = _fit_image_to_max_size(image, self._max_size_xy)
+                frame = _VideoFrameInfo(
                     image=image,
                     seconds_into_video=self._next_index_to_be_read / self._fps,
                     frame_ix=self._next_index_to_be_read,
@@ -291,73 +290,3 @@ class VideoReader:
                     break
             self._next_index_to_be_read = index
             return self.request_frame(index)
-
-
-def test_video_reader(video_path: str, show=False):
-    for use_cache in (False, True):
-        reader = VideoReader(path=video_path, use_cache=use_cache)
-
-        all_frame_hashes = [compute_fixed_hash(f.image) for f in reader.iter_frames()]
-        all_frame_hashes_again = [
-            compute_fixed_hash(f.image) for f in reader.iter_frames()
-        ]
-        assert all_frame_hashes == all_frame_hashes_again
-
-        # With just the top lines:
-        # Starting block 'Running with use_cache=False...
-        #   EasyProfile: Running with use_cache=False took 2260.51ms
-        # Starting block 'Running with use_cache=True...
-        # EasyProfile: Running with use_cache=True took 1942.80ms
-        count = 0
-        time_snoppet_hashes = []
-        for frame in reader.iter_frames(time_interval=(1, 2)):
-            if show:
-                cv2.imshow("frame", frame.image)
-                cv2.waitKey(1)
-            time_snoppet_hashes.append(compute_fixed_hash(frame.image))
-            count += 1
-        start_ix = reader.time_to_nearest_frame(1)
-        assert count > 20
-        assert all_frame_hashes[start_ix : start_ix + count] == time_snoppet_hashes
-
-        index_snippet_hashes = []
-
-        for i, frame in enumerate(reader.iter_frames(frame_interval=(10, 20))):
-            if show:
-                cv2.imshow("frame", frame.image)
-                cv2.waitKey(1)
-            index_snippet_hashes.append(compute_fixed_hash(frame.image))
-            assert frame.frame_ix == 10 + i
-        assert len(index_snippet_hashes) == 10
-        assert all_frame_hashes[10:20] == index_snippet_hashes
-
-        last_frame = reader.request_frame(-1)
-        assert last_frame.frame_ix == reader.get_n_frames() - 1
-        assert compute_fixed_hash(last_frame.image) == all_frame_hashes[-1]
-        assert (
-            reader.request_frame(reader.get_n_frames() - 1).frame_ix
-            == reader.get_n_frames() - 1
-        )
-        assert (
-            reader.request_frame(reader.get_n_frames()).frame_ix
-            == reader.get_n_frames() - 1
-        )
-
-        second_last_frame = reader.request_frame(reader.get_n_frames() - 2)
-        assert second_last_frame.frame_ix == reader.get_n_frames() - 2
-        assert compute_fixed_hash(second_last_frame.image) == all_frame_hashes[-2]
-
-        third_last_frame = reader.request_frame(reader.get_n_frames() - 3)
-        assert third_last_frame.frame_ix == reader.get_n_frames() - 3
-        assert compute_fixed_hash(third_last_frame.image) == all_frame_hashes[-3]
-
-        last_frame_again = reader.request_frame(-1)
-        assert compute_fixed_hash(last_frame_again.image) == all_frame_hashes[-1]
-
-        first_frame = reader.request_frame(0)
-        assert first_frame.frame_ix == 0
-        assert compute_fixed_hash(first_frame.image) == all_frame_hashes[0]
-
-        random_frame = reader.request_frame(20)
-        assert random_frame.frame_ix == 20
-        assert compute_fixed_hash(random_frame.image) == all_frame_hashes[20]

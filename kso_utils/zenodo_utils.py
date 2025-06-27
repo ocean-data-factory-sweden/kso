@@ -37,9 +37,9 @@ def upload_archive(access_key: str, artifact_dir: str):
     :type artifact_dir: str
     """
 
-    depo_id, bucket_url = get_zenodo_id_bucket(access_key=access_key)
+    depo_id, bucket_url = _get_zenodo_id_bucket(access_key=access_key)
 
-    add_file_to_zenodo_upload(
+    _add_file_to_zenodo_upload(
         access_key,
         bucket_url,
         artifact_dir,
@@ -48,7 +48,7 @@ def upload_archive(access_key: str, artifact_dir: str):
     return depo_id
 
 
-def get_files_from_record(record_id: str):
+def _get_files_from_record(record_id: str):
     record_url = f"https://zenodo.org/api/records/{record_id}"
     record_response = requests.get(record_url)
 
@@ -61,7 +61,7 @@ def get_files_from_record(record_id: str):
     return []
 
 
-def download_and_process_file(file_info, download_dir, headers):
+def _download_and_process_file(file_info, download_dir, headers):
     file_name = file_info["key"]
     if "ref" not in file_name:
         return None
@@ -83,7 +83,7 @@ def download_and_process_file(file_info, download_dir, headers):
     print(f"{file_name} downloaded successfully.")
 
     # Extract the archive
-    extracted_files = extract_archive(local_filename, download_dir)
+    extracted_files = _extract_archive(local_filename, download_dir)
     model_path = next(
         (os.path.join(download_dir, f) for f in extracted_files if f.endswith(".pt")),
         None,
@@ -99,7 +99,7 @@ def download_and_process_file(file_info, download_dir, headers):
     )
 
 
-def fetch_records(base_url, headers, page):
+def _fetch_records(base_url, headers, page):
     response = requests.get(base_url, headers=headers, params={"page": page})
     if response.status_code != 200:
         print(
@@ -129,15 +129,17 @@ def download_and_extract_models_from_zenodo(api_token, download_dir="models"):
     page = 1
 
     while True:
-        records = fetch_records(base_url, headers, page)
+        records = _fetch_records(base_url, headers, page)
         if not records:
             break
 
         for record in records:
-            file_list = get_files_from_record(record["id"])
+            file_list = _get_files_from_record(record["id"])
             if file_list:
                 for file_info in file_list:
-                    result = download_and_process_file(file_info, download_dir, headers)
+                    result = _download_and_process_file(
+                        file_info, download_dir, headers
+                    )
                     if result:
                         model_paths[result[0]] = result[1]
 
@@ -146,7 +148,7 @@ def download_and_extract_models_from_zenodo(api_token, download_dir="models"):
     return model_paths
 
 
-def extract_archive(archive_path, extract_to):
+def _extract_archive(archive_path, extract_to):
     """
     Extract an archive file and return a list of extracted file paths.
 
@@ -178,7 +180,7 @@ def extract_archive(archive_path, extract_to):
 
 
 # Get deposition id, i.e. "id" field from this response and bucket
-def get_zenodo_id_bucket(access_key: str):
+def _get_zenodo_id_bucket(access_key: str):
     headers = {"Content-Type": "application/json"}
     params = {"access_token": access_key}
     r = requests.post(
@@ -195,7 +197,7 @@ def get_zenodo_id_bucket(access_key: str):
     return response["id"], response["links"]["bucket"]
 
 
-def add_file_to_zenodo_upload(access_key: str, bucket_url: str, file_path: str):
+def _add_file_to_zenodo_upload(access_key: str, bucket_url: str, file_path: str):
     filename = os.path.basename(file_path)
     # The target URL is a combination of the bucket link with the desired filename
     # seperated by a slash.

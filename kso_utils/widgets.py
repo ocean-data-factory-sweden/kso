@@ -24,7 +24,7 @@ from PIL import Image as PILImage
 
 # util imports
 from kso_utils.video_reader import VideoReader
-from kso_utils.project_utils import Project
+from kso_utils.project_utils import Project, get_projects_csv_file
 import kso_utils.movie_utils as movie_utils
 
 # Logging
@@ -32,38 +32,10 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 ######################################
-# ###### Functions for interactive widgets ###########
-# #####################################
-
-
-# Function to update widget based on user interaction (eg. click)
-def wait_for_change(widget1: widgets.Widget, widget2: widgets.Widget):
-    future = asyncio.Future()
-
-    def getvalue(change):
-        future.set_result(change.description)
-        widget1.on_click(getvalue, remove=True)
-        widget2.on_click(getvalue, remove=True)
-
-    widget1.on_click(getvalue)
-    widget2.on_click(getvalue)
-    return future
-
-
-def single_wait_for_change(widget, value):
-    future = asyncio.Future()
-
-    def getvalue(change):
-        future.set_result(change.new)
-        widget.unobserve(getvalue, value)
-
-    widget.observe(getvalue, value)
-    return future
-
-
-######################################
 # ###### Common widgets ###########
 # #####################################
+
+
 
 
 def choose_species(db_connection, species_list=None):
@@ -98,9 +70,7 @@ def choose_species(db_connection, species_list=None):
     return w
 
 
-def choose_project(
-    projects_csv: str = "../kso_utils/db_starter/projects_list.csv",
-):
+def choose_project():
     """
     This function generates a dropdown menu with project names listed based on a CSV file.
 
@@ -109,24 +79,8 @@ def choose_project(
     :return: A dropdown widget with the project names as options
     :rtype: ipywidgets.Dropdown
     """
-    projects_csv_path = Path(projects_csv)
-
-    # Check if the specified path exists and it's a CSV file
-    if projects_csv_path.exists() and projects_csv_path.suffix != ".csv":
-        raise ValueError(
-            "The provided file is not a CSV. Please select a valid CSV file."
-        )
-
-    # If the file doesn't exist, try to retrieve it from GitHub
-    if not projects_csv_path.exists():
-        projects_csv_url = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/main/kso_utils/db_starter/projects_list.csv?raw=true"
-        projects_csv_path = Path.cwd() / "projects_list.csv"
-        # Download the CSV file
-        projects_df = pd.read_csv(projects_csv_url)
-        # Save the downloaded CSV file
-        projects_df.to_csv(projects_csv_path, index=False)
-    else:
-        projects_df = pd.read_csv(projects_csv_path)
+    projects_csv_path = get_projects_csv_file()
+    projects_df = pd.read_csv(projects_csv_path)
 
     if "Project_name" not in projects_df.columns:
         raise ValueError("The CSV file does not contain a 'Project_name' column.")
@@ -215,7 +169,7 @@ def gpu_select():
 
 
 # Select the movie(s) you want
-def select_movie(available_movies_df: pd.DataFrame):
+def _select_movie(available_movies_df: pd.DataFrame):
     """
     > This function takes in a dataframe of available movies and returns a widget that allows the user
     to select movie(s) of interest
@@ -274,7 +228,6 @@ def choose_footage(
     server_connection: dict,
     footage_source: str,
     preview_media: bool,
-    test: bool,
 ):
     """
     > The function `choose_footage` is a function that takes in a `self` argument and returns a
@@ -286,26 +239,24 @@ def choose_footage(
     :param server_connection: a dictionary with the connection to the server
     :param footage_source: a string specifying whether the footage is already in the system or is new
     :param preview_media: a boolean parameter to display or not the movie selected
-    :param test: a boolean parameter to specify if running the test scripts
 
     """
 
     if footage_source == "Existing Footage":
         # Initiate and display the movie_widget output
-        # movie_output = widgets.Output()
+        movie_output = widgets.Output()
 
         # Display the available movies
-        select_movie_widg = select_movie(df)
+        select_movie_widg = _select_movie(df)
+        # print(select_movie_widg)
 
         def update_movie(change):
-            if test:
-                selected_movies = [change["new"]]
-            else:
-                selected_movies = change["new"]
+
+            selected_movies = change["new"]
 
             # Get the df and paths of the selected movies
             (
-                selected_movie_path,
+                selected_movies_paths,
                 selected_movies,
                 selected_movies_df,
                 selected_movies_ids,
@@ -316,6 +267,8 @@ def choose_footage(
                 project=project,
                 server_connection=server_connection,
             )
+            print(selected_movies_paths, selected_movies, selected_movies_df,selected_movies_ids)
+            project.selected_movies = selected_movies
 
             # Display the movie
             if preview_media:
@@ -328,12 +281,12 @@ def choose_footage(
                     index,
                     movie_row,
                 ) in selected_movies_df.iterrows():
-                    movie_path = selected_movie_path[index]
+                    movie_path = selected_movies_paths[index]
                     movie_metadata = pd.DataFrame(
                         [movie_row.values], columns=movie_row.index
                     )
 
-                    html = preview_movie(
+                    html = _preview_movie(
                         movie_path=movie_path,
                         movie_metadata=movie_metadata,
                     )
@@ -343,13 +296,19 @@ def choose_footage(
                 project.previews = previews
 
         # Observe changes in the widget
+        # todo kalindi
+        
+        # select_movie_widg.value = ('HOR_20240408_BUV_HOR_002_01.mp4',)
+        # update_movie({"new" : ('HOR_20240408_BUV_HOR_002_01.mp4',))
+        # print(select_movie_widg.value)
+        # print(select_movie_widg.options)
+        
         select_movie_widg.observe(update_movie, "value")
-        display(select_movie_widg)
-
-        if test:
-            # For the test case, directly call the update_movie logic
-            select_movie_widg.options = (select_movie_widg.options[0],)
-            update_movie({"new": select_movie_widg.options[0]})
+        # select_movie_widg.value = (select_movie_widg.options[0],)
+        select_movie_widg.value = ('HOR_20240408_BUV_HOR_010_01.mp4',)
+        display(select_movie_widg)  
+        
+        
 
     elif footage_source == "New Footage":
 
@@ -391,8 +350,6 @@ def request_latest_zoo_info():
     :return: an interactive widget object with the value of the boolean
 
     """
-
-    generate = False
 
     def generate_export(retrieve_option):
         if retrieve_option == "No, just download the last available information":
@@ -440,7 +397,7 @@ def choose_aggregation_users(info_dict: dict):
 
     def get_users_list(info_dict: dict, option: str):
         if "specific" in option:
-            users = select_users(info_dict)
+            users = _select_users(info_dict)
             return users
         else:
             clear_output()
@@ -465,7 +422,7 @@ def choose_aggregation_users(info_dict: dict):
     return users
 
 
-def select_users(info_dict: dict):
+def _select_users(info_dict: dict):
     """
     Returns a widget showing all the citizen scientits that made classifications in the project,
     sorted in descending order according to the number of classifications they have made.
@@ -634,7 +591,7 @@ def choose_agg_parameters(subject_type: str = "clip"):
         return agg_users, min_users
 
 
-def choose_w_version(workflows_df: pd.DataFrame, workflow_id: str):
+def _choose_w_version(workflows_df: pd.DataFrame, workflow_id: str):
     """
     It takes a workflow ID and returns a dropdown widget with the available versions of the workflow
 
@@ -705,13 +662,13 @@ def choose_workflows(workflows_df: pd.DataFrame):
         layout=layout,
     )
 
-    workflow_version, versions = choose_w_version(workflows_df, workflow_name.value)
+    workflow_version, versions = _choose_w_version(workflows_df, workflow_name.value)
 
     def on_change(change):
         with out:
             if change["name"] == "value":
                 clear_output()
-                workflow_version.options = choose_w_version(
+                workflow_version.options = _choose_w_version(
                     workflows_df, change["new"]
                 )[1]
                 workflow_name.observe(on_change)
@@ -791,98 +748,8 @@ def map_sites(project: Project, csv_paths: dict):
     return kso_map
 
 
-def select_sheet_range(project: Project, csv_paths: dict, orig_csv: str):
-    """
-    > This function loads the csv file of interest into a pandas dataframe and enables users
-    to pick a range of rows and columns to display
-
-    :param project: the project object
-    :param csv_paths: a dictionary with the paths of the csv files used to initiate the db
-    :param orig_csv: the original csv file name
-    :type orig_csv: str
-    :return: A dataframe with the sites information
-    """
-
-    # Load the csv with the information of interest
-    df = pd.read_csv(csv_paths[orig_csv])
-
-    df_range_rows = widgets.SelectionRangeSlider(
-        options=range(0, len(df.index) + 1),
-        index=(0, len(df.index)),
-        description="Rows to display",
-        orientation="horizontal",
-        layout=Layout(width="90%", padding="35px"),
-        style={"description_width": "initial"},
-    )
-
-    display(df_range_rows)
-
-    df_range_columns = widgets.SelectMultiple(
-        options=df.columns,
-        description="Columns",
-        disabled=False,
-        layout=Layout(width="50%", padding="35px"),
-    )
-
-    display(df_range_columns)
-
-    return df, df_range_rows, df_range_columns
-
-
-def display_ipysheet_changes(isheet: ipysheet.Sheet, df_filtered: pd.DataFrame):
-    """
-    It takes the dataframe from the ipysheet and compares it to the dataframe from the local csv file.
-    If there are any differences, it highlights them and returns the dataframe with the changes
-    highlighted
-
-    :param isheet: The ipysheet object that contains the data
-    :param sites_df_filtered: a pandas dataframe with information of a range of sites
-    :return: A tuple with the highlighted changes and the sheet_df
-    """
-    # Convert ipysheet to pandas
-    sheet_df = ipysheet.to_dataframe(isheet)
-
-    # Check the differences between the modified and original spreadsheets
-    sheet_diff_df = pd.concat([df_filtered, sheet_df]).drop_duplicates(keep=False)
-
-    # If changes in dataframes display them and ask the user to confirm them
-    if sheet_diff_df.empty:
-        logging.info("No changes were made.")
-        return sheet_df, sheet_df
-    else:
-        # Retrieve the column name of the id of interest (Sites, movies,..)
-        id_col = [col for col in df_filtered.columns if "_id" in col][0]
-
-        # Concatenate DataFrames and distinguish each frame with the keys parameter
-        df_all = pd.concat(
-            [df_filtered.set_index(id_col), sheet_df.set_index(id_col)],
-            axis="columns",
-            keys=["Origin", "Update"],
-        )
-
-        # Rearrange columns to have them next to each other
-        df_final = df_all.swaplevel(axis="columns")[
-            [x for x in df_filtered.columns if x != id_col]
-        ]
-
-        # Create a function to highlight the changes
-        def highlight_diff(data, color="yellow"):
-            attr = "background-color: {}".format(color)
-            other = data.xs("Origin", axis="columns", level=-1)
-            return pd.DataFrame(
-                np.where(data.ne(other, level=0), attr, ""),
-                index=data.index,
-                columns=data.columns,
-            )
-
-        # Return the df with the changes highlighted
-        highlight_changes = df_final.style.apply(highlight_diff, axis=None)
-
-        return highlight_changes, sheet_df
-
-
 # Function to preview underwater movies
-def preview_movie(
+def _preview_movie(
     movie_path: str,
     movie_metadata: pd.DataFrame,
 ):
@@ -965,254 +832,13 @@ def choose_movie_review():
     return choose_movie_review_widget
 
 
-def log_meta_changes(
-    project: Project,
-    meta_key: str,
-    new_sheet_df: pd.DataFrame,
-    csv_paths: dict,
-):
-    """Records changes to csv files in log file (json format)"""
-
-    from csv_diff import compare
-    import time
-    import json
-
-    diff = {
-        "timestamp": int(time.time()),
-        "change_info": compare(
-            {
-                int(k): v
-                for k, v in pd.read_csv(csv_paths[meta_key]).to_dict("index").items()
-            },
-            {int(k): v for k, v in new_sheet_df.to_dict("index").items()},
-        ),
-    }
-
-    if len(diff) == 0:
-        logging.info("No changes were logged")
-        return
-
-    else:
-        try:
-            with open(Path(project.csv_folder, "change_log.json"), "r+") as f:
-                try:
-                    existing_data = json.load(f)
-                except json.decoder.JSONDecodeError:
-                    existing_data = []
-                existing_data.append(diff)
-                f.seek(0)
-                json.dump(existing_data, f)
-        except FileNotFoundError:
-            with open(Path(project.csv_folder, "change_log.json"), "w") as f:
-                json.dump([diff], f)
-        logging.info(
-            f"Changelog updated at: {Path(project.csv_folder, 'change_log.json')}"
-        )
-        return
-
-
-def update_meta(
-    project: Project,
-    conn,
-    server_connection: dict,
-    sheet_df: pd.DataFrame,
-    df: pd.DataFrame,
-    meta_name: str,
-    csv_paths: dict,
-    test=False,
-):
-    """
-    `update_meta` takes a new table, a meta name, and updates the local and server meta files
-
-    :param sheet_df: The dataframe of the sheet you want to update
-    :param meta_name: the name of the metadata file (e.g. "movies")
-    :param server_connection: a dictionary with the connection to the server
-
-    """
-
-    from kso_utils.db_utils import process_test_csv
-    from kso_utils.server_utils import update_csv_server
-
-    # Create button to confirm changes
-    confirm_button = widgets.Button(
-        description="Yes, details are correct",
-        layout=widgets.Layout(width="25%"),
-        style={"description_width": "initial"},
-        button_style="danger",
-    )
-
-    # Create button to deny changes
-    deny_button = widgets.Button(
-        description="No, I will go back and fix them",
-        layout=widgets.Layout(width="45%"),
-        style={"description_width": "initial"},
-        button_style="danger",
-    )
-
-    # Save changes in survey csv locally and in the server
-    async def f(sheet_df, df, meta_name):
-        if not test:
-            x = await wait_for_change(
-                confirm_button, deny_button
-            )  # <---- Pass both buttons into the function
-        else:
-            x = "Yes, details are correct"
-        if (
-            x == "Yes, details are correct"
-        ):  # <--- use if statement to trigger different events for the two buttons
-            logging.info("Checking if changes can be incorporated to the database")
-
-            # Retrieve the column name of the id of interest (Sites, movies,..)
-            id_col = [col for col in df.columns if "_id" in col][0]
-
-            # Replace the different values based on id
-            df_orig = df.copy()
-            df_new = sheet_df.copy()
-            df_orig.set_index(id_col, inplace=True)
-            df_new.set_index(id_col, inplace=True)
-            df_orig.update(df_new)
-            df_orig.reset_index(drop=False, inplace=True)
-
-            # Process the csv of interest and tests for compatibility with sql table
-            process_test_csv(
-                conn=conn, project=project, local_df=df_orig, init_key=meta_name
-            )
-
-            # Log changes locally
-            log_meta_changes(
-                project=project,
-                meta_key="local_" + meta_name + "_csv",
-                new_sheet_df=sheet_df,
-                csv_paths=csv_paths,
-            )
-
-            # Save the updated df locally
-            df_orig.to_csv(csv_paths["local_" + meta_name + "_csv"], index=False)
-            logging.info("The local csv file has been updated")
-
-            if project.server == "AWS":
-                # Save the updated df in the server
-                update_csv_server(
-                    project=project,
-                    csv_paths=csv_paths,
-                    server_connection=server_connection,
-                    orig_csv="server_" + meta_name + "_csv",
-                    updated_csv="local_" + meta_name + "_csv",
-                )
-
-        else:
-            logging.info("Run this cell again when the changes are correct!")
-
-    logging.info("")
-    logging.info("Are the changes above correct?")
-    display(
-        widgets.HBox([confirm_button, deny_button])
-    )  # <----Display both buttons in an HBox
-    if not test:
-        asyncio.create_task(f(sheet_df, df, meta_name))
-    else:
-        f(sheet_df=sheet_df, df=df, meta_name=meta_name)
-
-
-def open_csv(
-    df: pd.DataFrame, df_range_rows: widgets.Widget, df_range_columns: widgets.Widget
-):
-    """
-    > This function loads the dataframe with the information of interest, filters the range of rows and columns selected and then loads the dataframe into
-    an ipysheet
-
-    :param df: a pandas dataframe of the information of interest:
-    :param df_range_rows: the rows range widget selection:
-    :param df_range_columns: the columns range widget selection:
-    :return: A (subset) dataframe with the information of interest and the same data in an interactive sheet
-    """
-    # Extract the first and last row to display
-    range_start = int(df_range_rows[0])
-    range_end = int(df_range_rows[1])
-
-    # Display the range of sites selected
-    logging.info(f"Displaying # {range_start} to # {range_end}")
-
-    # Filter the dataframe based on the selection: rows and columns
-    df_filtered_row = df.filter(items=range(range_start, range_end), axis=0)
-    if not len(df_range_columns) == 0:
-        df_filtered = df_filtered_row.filter(items=df_range_columns, axis=1)
-        # Display columns
-        logging.info(f"Displaying {df_range_columns}")
-    else:
-        df_filtered = df_filtered_row.filter(items=df.columns, axis=1)
-        # Display columns
-        logging.info(f"Displaying {df.columns.tolist()}")
-
-    # Load the df as ipysheet
-    sheet = ipysheet.from_dataframe(df_filtered)
-
-    return df_filtered, sheet
-
-
-######################################
-# ###### Tut 2 widgets ###########
-# #####################################
-
-
-def choose_new_videos_to_upload():
-    """
-    Simple widget for uploading videos from a file browser.
-    returns the list of movies to be added.
-    Supports multi-select file uploads
-    """
-
-    movie_list = []
-
-    fc = FileChooser()
-    fc.title = "First choose your directory of interest and then the movies you would like to upload"
-    print("Choose the file that you want to upload: ")
-
-    def change_dir(chooser):
-        sel.options = [
-            str(Path(chooser.selected, item)) for item in os.listdir(chooser.selected)
-        ]
-        fc.children[1].children[2].layout.display = "none"
-        sel.layout.visibility = "visible"
-
-    fc.register_callback(change_dir)
-
-    sel = widgets.SelectMultiple(options=[])
-
-    display(fc)
-    display(sel)
-
-    sel.layout.visibility = "hidden"
-
-    button_add = widgets.Button(description="Add selected file")
-    output_add = widgets.Output()
-
-    print("Showing paths to the selected movies:\nRerun cell to reset\n--------------")
-
-    display(button_add, output_add)
-
-    def on_button_add_clicked(b):
-        with output_add:
-            if sel.value is not None:
-                for movie in sel.value:
-                    if Path(movie).suffix in [".mp4", ".mov"]:
-                        movie_list.append([Path(movie), movie])
-                        print(Path(movie))
-                    else:
-                        print("Invalid file extension")
-                    fc.reset()
-
-    button_add.on_click(on_button_add_clicked)
-    return movie_list
-
-
 ######################################
 # ###### Tut 3 widgets ###########
 # #####################################
 
 
 # Display the number of clips to generate based on the user's selection
-def to_clips(clip_length, clips_range, is_example: bool):
+def _to_clips(clip_length, clips_range, is_example: bool):
     # Calculate the number of clips to generate
     clips = int((clips_range[1] - clips_range[0]) / clip_length)
 
@@ -1248,19 +874,29 @@ def select_n_clips(
         f"SELECT filename, duration, sampling_start, sampling_end FROM movies WHERE filename='{selected_movies}'",
         db_connection,
     )
-
+    print(movie_df)
     # Select the number of clips to upload
     # Create a boolean widget and hide it so that it can be added to the interactive layout
     example_widget = widgets.Checkbox(value=is_example, description="Random examples")
     example_widget.layout.visibility = "hidden"
+
+    # todo kalindi
+    movie_df.duration = 2000
+    movie_df.sampling_start = 329 
+    movie_df.sampling_end = 339
+    
     clip_length_number = widgets.interactive(
-        to_clips,
+        _to_clips,
         is_example=example_widget,
-        clip_length=select_clip_length(),
+        clip_length=_select_clip_length(),
         clips_range=widgets.IntRangeSlider(
             value=[movie_df.sampling_start.values, movie_df.sampling_end.values],
+            # value=[0, 2000],
+
             min=0,
+            # TODO: kalindi
             max=int(movie_df.duration.values),
+            # max=2000,
             step=1,
             description="Movie range to generate clips from (seconds):",
             style={"description_width": "initial"},
@@ -1271,7 +907,7 @@ def select_n_clips(
     return clip_length_number
 
 
-def select_clip_length():
+def _select_clip_length():
     """
     > This function creates a dropdown widget that allows the user to select the length of the clips
     :return: The widget is being returned.
@@ -1317,7 +953,7 @@ class clip_modification_widget(widgets.VBox):
         num_bools = widg["new"]
         new_widgets = []
         for _ in range(num_bools):
-            new_widget = select_modification()
+            new_widget = _select_modification()
             for wdgt in [new_widget]:
                 wdgt.description = wdgt.description + f" #{_}"
             new_widgets.extend([new_widget])
@@ -1329,9 +965,10 @@ class clip_modification_widget(widgets.VBox):
 
 
 # Function to specify the frame modification
-def select_modification():
+def _select_modification():
 
     # Widget to select the frame modification
+
     frame_modifications = {
         "Zoo_low_compression": {
             "b:v": "10M",
@@ -1343,15 +980,15 @@ def select_modification():
             "b:v": "3M",
         },
         "Blur_sensitive_info": {
-            "filter": "drawbox=0:0:iw:ih*(15/100):color=black:thickness=fill,drawbox=0:ih*(95/100):iw:ih*(15/100):color=black:thickness=fill",
+            "filter": '.drawbox(0, 0, "iw", "ih*(15/100)", color="black", thickness="fill").drawbox(0, "ih*(95/100)", "iw", "ih*(15/100)", color="black", thickness="fill")',
         },
-        # Increase brightness
+        # Increase brightness (useful for low-light)
         "Increase_brightness": {
-            "filter": "eq=brightness=0.1",
+            "filter": '.filter("eq", brightness=0.1)',  # Slight increase in brightness
         },
-        # Increase contrast
+        # Increase contrast (useful for low-light)
         "Increase_contrast": {
-            "filter": "eq=contrast=1.5",
+            "filter": '.filter("eq", contrast=1.5)',  # Higher contrast for better distinction
         },
         # Increase both brightness and contrast together
         "Increase_brightness_and_contrast": {
@@ -1391,7 +1028,7 @@ def select_modification():
 
 
 # Display the clips side-by-side
-def view_clips(example_clips: list, modified_clips: list, modified_clip_selected: str):
+def _view_clips(example_clips: list, modified_clips: list, modified_clip_selected: str):
     """
     > This function takes in a list of example clips and a path to a modified clip, and returns a widget
     that displays the original and modified clips side-by-side
@@ -1454,7 +1091,7 @@ def compare_clips(example_clips: list, modified_clips: list):
             if change["new"] == "0 No movie":
                 logging.info("It is OK to modify the clips again")
             else:
-                a = view_clips(example_clips, modified_clips, change["new"])
+                a = _view_clips(example_clips, modified_clips, change["new"])
                 display(a)
 
     clip_path_widget.observe(on_change, names="value")
@@ -1585,7 +1222,7 @@ def extract_custom_frames(
 
 
 # Display the frames using html
-def view_frames(df: pd.DataFrame, frame_path: str):
+def _view_frames(df: pd.DataFrame, frame_path: str):
     # Get path of the modified clip selected
     modified_frame_path = df[df["frame_path"] == frame_path].modif_frame_path.values[0]
     extension = os.path.splitext(frame_path)[1]
@@ -1630,7 +1267,7 @@ def compare_frames(df):
             if change["new"] == "No frame":
                 logging.info("It is OK to modify the frames again")
             else:
-                a = view_frames(df, change["new"])
+                a = _view_frames(df, change["new"])
                 display(a)
 
     clip_path_widget.observe(on_change, names="value")
@@ -1861,7 +1498,7 @@ def format_to_gbif(
         #         work_df["workflow_version"] = work_df["workflow_version"] - 1
 
         # Store df of all the common names and the labels into a list of df
-        from kso_utils.zooniverse_utils import get_workflow_labels
+        from kso_upload_copy.notebooks.classify.hold.zooniverse_utils import get_workflow_labels
 
         commonName_labels_list = [
             get_workflow_labels(zoo_info_dict["workflows"], x, y)
@@ -2010,7 +1647,7 @@ def format_to_gbif(
 # #####################################
 
 
-def view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
+def _view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
     """
     It takes a subject id, a dataframe containing the annotations for that subject, and the type of
     subject (clip or frame) and returns an HTML object that can be displayed in a notebook
@@ -2166,7 +1803,7 @@ def launch_classifications_viewer(class_df: pd.DataFrame, subject_type: str):
     # Display the subject and classifications on change
     def on_change(change):
         with main_out:
-            a = view_subject(int(change["new"]), class_df, subject_type)
+            a = _view_subject(int(change["new"]), class_df, subject_type)
             clear_output()
             display(a)
 
@@ -2283,15 +1920,6 @@ def choose_eval_params():
     return z1
 
 
-def choose_viewer(viewer):
-    if viewer == "image":
-        image_viewer()
-    elif viewer == "video":
-        movie_viewer()
-    else:
-        logging.error("Invalid option selected.")
-
-
 def select_viewer():
     viewer_dropdown = widgets.Dropdown(
         options=["image", "video"],
@@ -2305,7 +1933,12 @@ def select_viewer():
     def on_change(change):
         with output:
             output.clear_output()
-            choose_viewer(change.new)
+            if change.new == "image":
+                _image_viewer()
+            elif change.new == "video":
+                _movie_viewer()
+            else:
+                logging.error("Invalid option selected.")
 
     viewer_dropdown.observe(on_change, names="value")
 
@@ -2313,7 +1946,7 @@ def select_viewer():
     display(output)
 
 
-def image_viewer():
+def _image_viewer():
     def check_image(change):
         filepath = file_chooser.selected
         if filepath.lower().endswith((".jpg", ".jpeg")):
@@ -2341,7 +1974,7 @@ def image_viewer():
     display(file_chooser_widget)
 
 
-def movie_viewer():
+def _movie_viewer():
     def check_movie(change):
         filepath = file_chooser.selected
         if filepath.endswith(".mp4"):

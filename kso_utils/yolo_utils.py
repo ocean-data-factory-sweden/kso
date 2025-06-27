@@ -1,6 +1,4 @@
 # base imports
-import argparse
-import time
 import cv2 as cv2
 import numpy as np
 import re
@@ -17,7 +15,7 @@ import wandb
 import imagesize
 import base64
 import ffmpeg
-import mlflow
+# import mlflow
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 from jupyter_bbox_widget import BBoxWidget
@@ -25,10 +23,8 @@ from IPython.display import display, clear_output, HTML
 from PIL import Image as PILImage, ImageDraw
 from ast import literal_eval
 
-from functools import partial
 from tqdm import tqdm
 from pathlib import Path
-from collections.abc import Callable
 from natsort import index_natsorted
 from IPython import get_ipython
 
@@ -54,206 +50,7 @@ trackerTypes = [
 ]
 
 
-def applyMask(frame: np.ndarray):
-    """
-    It takes a frame and returns a frame with the top 50 pixels and bottom 100 pixels blacked out
-
-    :param frame: the frame to apply the mask to
-    :type frame: np.ndarray
-    :return: The frame with the mask applied.
-    """
-    h, w, c = frame.shape
-    cv2.rectangle(frame, (0, h), (0 + w, h - 100), 0, -1)
-    cv2.rectangle(frame, (0, 0), (0 + w, 50), 0, -1)
-    return frame
-
-
-def clearImage(frame: np.ndarray):
-    """
-    We take the maximum value of each channel, and then take the minimum value of the three channels.
-    Then we blur the image, and then we take the maximum value of the blurred image and the value 0.5.
-    Then we take the maximum value of the difference between the channel and the maximum value of the
-    channel, divided by the blurred image, and the maximum value of the channel. Then we divide the
-    result by the maximum value of the channel and multiply by 255
-
-    :param frame: the image to be processed
-    :return: The clear image
-    """
-    channels = cv2.split(frame)
-    # Get the maximum value of each channel
-    # and get the dark channel of each image
-    # record the maximum value of each channel
-    a_max_dst = [float("-inf")] * len(channels)
-    for idx in range(len(channels)):
-        a_max_dst[idx] = channels[idx].max()
-
-    dark_image = cv2.min(channels[0], cv2.min(channels[1], channels[2]))
-
-    # Gaussian filtering the dark channel
-    dark_image = cv2.GaussianBlur(dark_image, (25, 25), 0)
-
-    image_t = (255.0 - 0.95 * dark_image) / 255.0
-    image_t = cv2.max(image_t, 0.5)
-
-    # Calculate t(x) and get the clear image
-    for idx in range(len(channels)):
-        channels[idx] = (
-            cv2.max(
-                cv2.add(
-                    cv2.subtract(channels[idx].astype(np.float32), int(a_max_dst[idx]))
-                    / image_t,
-                    int(a_max_dst[idx]),
-                ),
-                0.0,
-            )
-            / int(a_max_dst[idx])
-            * 255
-        )
-        channels[idx] = channels[idx].astype(np.uint8)
-
-    return cv2.merge(channels)
-
-
-def ProcFrames(proc_frame_func: Callable, frames_path: str):
-    """
-    It takes a function that processes a single frame and a path to a folder containing frames, and
-    applies the function to each frame in the folder
-
-    :param proc_frame_func: The function that will be applied to each frame
-    :type proc_frame_func: Callable
-    :param frames_path: The path to the directory containing the frames
-    :type frames_path: str
-    :return: The time it took to process all the frames in the folder, and the number of frames processed.
-    """
-    start = time.time()
-    files = Path(frames_path).iterdir()
-    for f in files:
-        if str(f).endswith((".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".gif")):
-            if Path(frames_path, f).exists():
-                new_frame = proc_frame_func(cv2.imread(str(Path(frames_path, f))))
-                cv2.imwrite(str(Path(frames_path, f)), new_frame)
-            else:
-                from kso_utils.koster_utils import fix_text_encoding
-
-                new_frame = proc_frame_func(
-                    cv2.imread(fix_text_encoding(str(Path(frames_path, f))))
-                )
-                cv2.imwrite(str(Path(frames_path, f)), new_frame)
-    end = time.time()
-    return (end - start) * 1000 / len(files), len(files)
-
-
-def ProcVid(proc_frame_func: Callable, vidPath: str):
-    """
-    It takes a function that processes a frame and a video path, and returns the average time it takes
-    to process a frame and the number of frames in the video
-
-    :param proc_frame_func: This is the function that will be called on each frame
-    :type proc_frame_func: Callable
-    :param vidPath: The path to the video file
-    :type vidPath: str
-    :return: The average time to process a frame in milliseconds and the number of frames processed.
-    """
-    cap = cv2.VideoCapture(vidPath)
-    if cap.isOpened() is False:
-        logging.error("Error opening video stream or file")
-        return
-    n_frames = 0
-    start = time.time()
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if ret:
-            n_frames += 1
-            proc_frame_func(frame)
-        else:
-            break
-    end = time.time()
-    cap.release()
-    return (end - start) * 1000 / n_frames, n_frames
-
-
-def ProcFrameCuda(frame: np.ndarray, size=(416, 416), use_gpu=False):
-    """
-    It takes a frame, resizes it to a smaller size, converts it to RGB, and then clears it
-
-    :param frame: the frame to be processed
-    :type frame: np.ndarray
-    :param size: the size of the image to be processed
-    :return: the processed frame.
-    """
-    if use_gpu:
-        frame_device.upload(frame)
-        frame_device_small = cv2.resize(frame_device, dsize=size)
-        fg_device = cv2.cvtColor(frame_device_small, cv2.COLOR_BGR2RGB)
-        fg_host = fg_device.download()
-        return fg_host
-    else:
-        frame_device_small = cv2.resize(frame, dsize=size)
-        fg_device = cv2.cvtColor(frame_device_small, cv2.COLOR_BGR2RGB)
-        return fg_device
-
-
-def prepare(data_path, percentage_test, out_path):
-    """
-    It takes a path to a folder containing images, a percentage of the images to be used for testing,
-    and a path to the output folder. It then creates two files, train.txt and test.txt, which contain
-    the paths to the images to be used for training and testing, respectively
-
-    :param data_path: the path to the dataset
-    :param percentage_test: The percentage of the images that we want to be in the test set
-    :param out_path: The path to the output directory
-    """
-
-    dataset_path = Path(data_path, "images")
-
-    # Create and/or truncate train.txt and test.txt
-    file_train = open(Path(data_path, "train.txt"), "w")
-    file_test = open(Path(data_path, "test.txt"), "w")
-
-    # Populate train.txt and test.txt
-    counter = 1
-    index_test = int((1 - percentage_test) / 100 * len(Path(dataset_path).iterdir()))
-    latest_movie = ""
-    for pathAndFilename in Path(dataset_path).rglob("*.jpg"):
-        file_path = Path(pathAndFilename)
-        title, _ = file_path.name, file_path.suffix
-        movie_name = title.replace("_frame_*", "", regex=True)
-
-        if counter == index_test + 1:
-            if movie_name != latest_movie:
-                file_test.write(out_path + Path(title).name + ".jpg" + "\n")
-            else:
-                file_train.write(out_path + Path(title).name + ".jpg" + "\n")
-            counter += 1
-        else:
-            latest_movie = movie_name
-            file_train.write(out_path + Path(title).name + ".jpg" + "\n")
-            counter += 1
-
-
-# utility functions
-def process_frames(frames_path: str, size: tuple = (416, 416)):
-    """
-    It takes a path to a directory containing frames, and returns a list of processed frames
-
-    :param frames_path: the path to the directory containing the frames
-    :param size: The size of the image to be processed
-    """
-    # Run tests
-    gpu_time_0, n_frames = ProcFrames(partial(ProcFrameCuda, size=size), frames_path)
-    logging.info(
-        f"Processing performance: {n_frames} frames, {gpu_time_0:.2f} ms/frame"
-    )
-
-
-def process_path(path: str):
-    """
-    Process a single path
-    """
-    return Path(re.split("_[0-9]+", path)[0]).name.replace("_frame", "")
-
-
-def clean_species_name(species_name: str):
+def _clean_species_name(species_name: str):
     """
     Clean species name
     """
@@ -267,7 +64,7 @@ def clean_species_name(species_name: str):
     )
 
 
-def split_frames(data_path: str, perc_test: float):
+def _split_frames(data_path: str, perc_test: float):
     """
     Split frames into train and test sets
     """
@@ -345,10 +142,7 @@ def frame_aggregation(
     :type n_tracked_frames: int (optional)
     """
     # Establish connection to database
-    from kso_utils.db_utils import create_connection
-    from kso_utils.zooniverse_utils import clean_label
-
-    conn = create_connection(project.db_path)
+    from kso_upload_copy.notebooks.classify.hold.zooniverse_utils import clean_label
 
     # Select the id/s of species of interest
     if class_list[0] == "":
@@ -416,7 +210,7 @@ def frame_aggregation(
     Path(label_dir).mkdir()
 
     # Create timestamped koster yaml file with model configuration
-    species_list = [clean_species_name(sp) for sp in class_list]
+    species_list = [_clean_species_name(sp) for sp in class_list]
 
     # Write config file
     data = dict(
@@ -474,20 +268,16 @@ def frame_aggregation(
 
     # Clean species names
     species_df = pd.read_sql_query(
-        "SELECT id, commonName, scientificName FROM species", conn
+        "SELECT id, commonName, scientificName FROM species", db_connection
     )
 
     # Add species_id to train_rows
     if "species_id" not in train_rows.columns:
         if "ZooClassification" in train_rows.columns:
             train_rows["species_id"] = train_rows.ZooClassification
-            # species_df["clean_label"] = species_df.ZooClassification.apply(clean_species_name)
-            # species_df["zoo_label"] = species_df.ZooClassification.apply(clean_label)
             sp_id2mod_id = {}
             m_id = 0
             for ix, item in enumerate(species_list):
-                # match = species_df[species_df.clean_label == species_list[ix]].id.values
-                # if len(match) == 1:
                 sp_id2mod_id[item.capitalize().replace("_", " ")] = m_id
                 m_id += 1
 
@@ -509,7 +299,7 @@ def frame_aggregation(
                     1,
                 )
                 species_df["clean_label"] = species_df.commonName.apply(
-                    clean_species_name
+                    _clean_species_name
                 )
                 species_df["zoo_label"] = species_df.commonName.apply(clean_label)
             except IndexError:
@@ -531,7 +321,7 @@ def frame_aggregation(
                     lambda x: get_species_id(x), 1
                 )
                 species_df["clean_label"] = species_df.scientificName.apply(
-                    clean_species_name
+                    _clean_species_name
                 )
                 species_df["zoo_label"] = species_df.scientificName.apply(clean_label)
 
@@ -754,7 +544,7 @@ def frame_aggregation(
                 if track_frames:
                     # Track n frames after object is detected
                     tboxes[named_tuple].extend(
-                        tracking_frames(
+                        _tracking_frames(
                             video_dict[final_name],
                             grouped_fields[-1],
                             bboxes[named_tuple],
@@ -990,9 +780,7 @@ def frame_aggregation(
                     PIL.Image.fromarray(img_array).save(img_out)
             else:
                 if link_bool:
-                    image_output = PIL.Image.open(
-                        requests.get(name, stream=True).raw
-                    )
+                    image_output = PIL.Image.open(requests.get(name, stream=True).raw)
                 else:
                     image_output = np.asarray(PIL.Image.open(name))
                 img_array = np.asarray(image_output)
@@ -1011,10 +799,10 @@ def frame_aggregation(
     # process_frames(out_path + "/images", size=tuple(img_size))
 
     # Create training/test sets
-    split_frames(out_path, perc_test)
+    _split_frames(out_path, perc_test)
 
 
-def createTrackerByName(trackerType: str):
+def _createTrackerByName(trackerType: str):
     """
     It creates a tracker based on the tracker name
 
@@ -1048,7 +836,7 @@ def createTrackerByName(trackerType: str):
     return tracker
 
 
-def tracking_frames(
+def _tracking_frames(
     video, class_ids: list, bboxes: list, start_frame: int, last_frame: int
 ):
     """
@@ -1077,7 +865,7 @@ def tracking_frames(
 
     # Initialize MultiTracker
     for bbox in bboxes:
-        multiTracker.add(createTrackerByName(trackerType), frame, bbox)
+        multiTracker.add(_createTrackerByName(trackerType), frame, bbox)
 
     t_bbox = []
     t = 0
@@ -1305,7 +1093,7 @@ def generate_csv_report(
     return detect_df
 
 
-def generate_tracking_report(tracker_dir: str, eval_dir: str):
+def _generate_tracking_report(tracker_dir: str, eval_dir: str):
     """
     > It takes the tracking output from the tracker and creates a csv file that can be used for
     evaluation
@@ -1364,6 +1152,18 @@ def generate_counts(
 ):
     import torch
 
+    # Allow this class to be loaded when torch.load is called inside YOLO
+    from ultralytics.nn.tasks import ClassificationModel, PoseModel, SegmentationModel, DetectionModel
+    
+    torch.serialization.add_safe_globals([
+        DetectionModel,
+        ClassificationModel,
+        PoseModel,
+        SegmentationModel
+    ])
+
+
+
     model = torch.load(
         Path(
             [
@@ -1374,7 +1174,7 @@ def generate_counts(
         )
     )
     names = {i: model["model"].names[i] for i in range(len(model["model"].names))}
-    tracker_df = generate_tracking_report(tracker_dir, eval_dir)
+    tracker_df = _generate_tracking_report(tracker_dir, eval_dir)
     if tracker_df is None:
         logging.error("No tracks to count.")
     else:
@@ -1408,7 +1208,6 @@ def track_objects(
     conf_thres: float = 0.5,
     img_size: tuple = (720, 540),
     gpu: bool = False,
-    test: bool = False,
 ):
     """
     This function takes in the source directory of the video, the artifact directory, the tracker
@@ -1441,7 +1240,7 @@ def track_objects(
         and "best" in str(f)
     ]
 
-    if len(models) > 0 and not test:
+    if len(models) > 0:
         best_model = models[0]
     else:
         logging.info("No trained model found, using yolov8 base model...")
@@ -1483,7 +1282,7 @@ def track_objects(
     return latest_tracker
 
 
-def encode_image(filepath):
+def _encode_image(filepath):
     """
     It takes a filepath to an image, opens the image, reads the bytes, encodes the bytes as base64, and
     returns the encoded string
@@ -1495,190 +1294,6 @@ def encode_image(filepath):
         image_bytes = f.read()
     encoded = str(base64.b64encode(image_bytes), "utf-8")
     return "data:image/jpg;base64," + encoded
-
-
-# def get_annotator(image_path: str, species_list: list, autolabel_model: str = None):
-#     """
-#     It takes a path to a folder containing images and annotations, and a list of species names, and
-#     returns a widget that allows you to view the images and their annotations, and to edit the
-#     annotations
-
-#     :param data_path: the path to the image folder
-#     :type data_path: str
-#     :param species_list: a list of species names
-#     :type species_list: list
-#     :return: A VBox widget containing a progress bar and a BBoxWidget.
-#     """
-#     images = sorted(
-#         [
-#             f
-#             for f in Path(image_path).iterdir()
-#             if Path(image_path, f).is_file() and f.suffix == ".jpg"
-#         ]
-#     )
-
-#     annot_path = Path(Path(image_path).parent, "labels")
-
-#     # a progress bar to show how far we got
-#     w_progress = widgets.IntProgress(value=0, max=len(images), description="Progress")
-#     w_status = widgets.Label(value="")
-
-#     def get_bboxes(image, bboxes, labels, predict: bool = False):
-#         logging.getLogger("yolov5").setLevel(logging.WARNING)
-#         if predict:
-#             detect.run(
-#                 weights=autolabel_model,
-#                 source=image,
-#                 conf_thres=0.5,
-#                 nosave=True,
-#                 name="labels",
-#             )
-#         label_file = [
-#             f
-#             for f in Path(annot_path).iterdir()
-#             if Path(annot_path, f).is_file()
-#             and f.suffix == ".txt"
-#             and Path(f).stem == Path(image).stem
-#         ]
-#         if len(label_file) == 1:
-#             label_file = label_file[0]
-#             with open(Path(annot_path, label_file), "r") as f:
-#                 for line in f:
-#                     s = line.split(" ")
-#                     labels.append(s[0])
-
-#                     left = (float(s[1]) - (float(s[3]) / 2)) * width
-#                     top = (float(s[2]) - (float(s[4]) / 2)) * height
-
-#                     bboxes.append(
-#                         {
-#                             "x": left,
-#                             "y": top,
-#                             "width": float(s[3]) * width,
-#                             "height": float(s[4]) * height,
-#                             "label": species_list[int(s[0])],
-#                         }
-#                     )
-#             w_status.value = "Annotations loaded"
-#         else:
-#             w_status.value = "No annotations found"
-#         return bboxes, labels
-
-#     # the bbox widget
-#     image = Path(image_path, images[0])
-#     width, height = imagesize.get(image)
-#     bboxes, labels = [], []
-#     if autolabel_model is not None:
-#         w_status.value = "Loading annotations..."
-#         bboxes, labels = get_bboxes(image, bboxes, labels, predict=True)
-#     else:
-#         w_status.value = "No predictions, using existing labels if available"
-#         bboxes, labels = get_bboxes(image, bboxes, labels)
-#     w_bbox = BBoxWidget(image=encode_image(image), classes=species_list)
-
-#     # here we assign an empty list to bboxes but
-#     # we could also run a detection model on the file
-#     # and use its output for creating initial bboxes
-#     w_bbox.bboxes = bboxes
-
-#     # combine widgets into a container
-#     w_container = widgets.VBox(
-#         [
-#             w_status,
-#             w_progress,
-#             w_bbox,
-#         ]
-#     )
-
-#     def on_button_clicked(b):
-#         w_progress.value = 0
-#         image = Path(image_path, images[0])
-#         width, height = imagesize.get(image)
-#         bboxes, labels = [], []
-#         if autolabel_model is not None:
-#             w_status.value = "Loading annotations..."
-#             bboxes, labels = get_bboxes(image, bboxes, labels, predict=True)
-#         else:
-#             w_status.value = "No annotations found"
-#             bboxes, labels = get_bboxes(image, bboxes, labels)
-#         w_bbox.image = encode_image(image)
-
-#         # here we assign an empty list to bboxes but
-#         # we could also run a detection model on the file
-#         # and use its output for creating inital bboxes
-#         w_bbox.bboxes = bboxes
-#         w_container.children = tuple(list(w_container.children[1:]))
-#         b.close()
-
-#     # when Skip button is pressed we move on to the next file
-#     def on_skip():
-#         w_progress.value += 1
-#         if w_progress.value == len(images):
-#             button = widgets.Button(
-#                 description="Click to restart.",
-#                 disabled=False,
-#                 display="flex",
-#                 flex_flow="column",
-#                 align_items="stretch",
-#             )
-#             if isinstance(w_container.children[0], widgets.Button):
-#                 w_container.children = tuple(list(w_container.children[1:]))
-#             w_container.children = tuple([button] + list(w_container.children))
-#             button.on_click(on_button_clicked)
-
-#         # open new image in the widget
-#         else:
-#             image_file = images[w_progress.value]
-#             image_p = Path(image_path, image_file)
-#             width, height = imagesize.get(image_p)
-#             w_bbox.image = encode_image(image_p)
-#             bboxes, labels = [], []
-#             if autolabel_model is not None:
-#                 w_status.value = "Loading annotations..."
-#                 bboxes, labels = get_bboxes(image_p, bboxes, labels, predict=True)
-#             else:
-#                 w_status.value = "No annotations found"
-#                 bboxes, labels = get_bboxes(image_p, bboxes, labels)
-
-#             # here we assign an empty list to bboxes but
-#             # we could also run a detection model on the file
-#             # and use its output for creating initial bboxes
-#             w_bbox.bboxes = bboxes
-
-#     w_bbox.on_skip(on_skip)
-
-#     # when Submit button is pressed we save current annotations
-#     # and then move on to the next file
-#     def on_submit():
-#         image_file = images[w_progress.value]
-#         width, height = imagesize.get(Path(image_path, image_file))
-#         # save annotations for current image
-#         label_file = Path(image_file).name.replace(".jpg", ".txt")
-#         # if the label_file needs to be created
-#         if not Path(annot_path).exists():
-#             Path(annot_path).mkdir(parents=True, exist_ok=True)
-#         open(Path(annot_path, label_file), "w").write(
-#             "\n".join(
-#                 [
-#                     "{} {:.6f} {:.6f} {:.6f} {:.6f}".format(
-#                         species_list.index(
-#                             i["label"]
-#                         ),  # single class vs multiple classes
-#                         min((i["x"] + i["width"] / 2) / width, 1.0),
-#                         min((i["y"] + i["height"] / 2) / height, 1.0),
-#                         min(i["width"] / width, 1.0),
-#                         min(i["height"] / height, 1.0),
-#                     )
-#                     for i in w_bbox.bboxes
-#                 ]
-#             )
-#         )
-#         # move on to the next file
-#         on_skip()
-
-#     w_bbox.on_submit(on_submit)
-
-#     return w_container
 
 
 def get_annotations_viewer(data_path: str, species_list: list):
@@ -1728,7 +1343,7 @@ def get_annotations_viewer(data_path: str, species_list: list):
                     "label": species_list[int(s[0])],
                 }
             )
-    w_bbox = BBoxWidget(image=encode_image(image), classes=species_list)
+    w_bbox = BBoxWidget(image=_encode_image(image), classes=species_list)
 
     # here we assign an empty list to bboxes but
     # we could also run a detection model on the file
@@ -1767,7 +1382,7 @@ def get_annotations_viewer(data_path: str, species_list: list):
                         "label": species_list[int(s[0])],
                     }
                 )
-        w_bbox.image = encode_image(image)
+        w_bbox.image = _encode_image(image)
 
         # here we assign an empty list to bboxes but
         # we could also run a detection model on the file
@@ -1797,7 +1412,7 @@ def get_annotations_viewer(data_path: str, species_list: list):
             image_file = images[w_progress.value]
             image_p = Path(image_path, image_file)
             width, height = imagesize.get(image_p)
-            w_bbox.image = encode_image(image_p)
+            w_bbox.image = _encode_image(image_p)
             label_file = annotations[w_progress.value]
             bboxes = []
             with open(Path(annot_path, label_file), "r") as f:
@@ -1871,12 +1486,12 @@ def get_data_viewer(data_path: str):
     ]
 
     def loadimg(k, scale=0.4):
-        display(draw_box(Path(data_path, imgs[k]), scale))
+        display(_draw_box(Path(data_path, imgs[k]), scale))
 
     return widgets.interact(loadimg, k=(0, len(imgs) - 1), scale=(0.1, 1.0))
 
 
-def draw_box(path: str, scale: float):
+def _draw_box(path: str, scale: float):
     """
     It takes a path to an image and a scale parameter, opens the image and resizes it to the specified scale,
     opens the corresponding label file, and draws a box around each object in the image
@@ -1946,7 +1561,7 @@ def choose_files(path: str):
             if change["new"] == "No file":
                 logging.info("Choose another file")
             else:
-                a = view_file(change["new"])
+                a = _view_file(change["new"])
                 display(a)
 
     clip_path_widget.observe(on_change, names="value")
@@ -1954,7 +1569,7 @@ def choose_files(path: str):
 
 
 # Display the frames using html
-def view_file(path: str):
+def _view_file(path: str):
     """
     It takes a path to a file, opens it, and returns a widget that can be displayed in the notebook
 
@@ -2007,6 +1622,18 @@ def adjust_tracking(
     tracking_df = pd.read_csv(str(Path(tracking_folder, "tracking.csv")))
 
     import torch
+
+    # Allow this class to be loaded when torch.load is called inside YOLO
+    from ultralytics.nn.tasks import ClassificationModel, PoseModel, SegmentationModel, DetectionModel
+    
+    torch.serialization.add_safe_globals([
+        DetectionModel,
+        ClassificationModel,
+        PoseModel,
+        SegmentationModel
+    ])
+
+
 
     try:
         # Find the latest model file named "best.pt" in the directory
@@ -2099,7 +1726,7 @@ def adjust_tracking(
 
 
 # Auxiliary function to obtain a dictionary with the mapping between the class ids used by the detection model and the species names
-def get_species_mapping(model, project_name, team_name="koster", registry="wandb"):
+def _get_species_mapping(model, project_name, team_name="koster", registry="wandb"):
     import yaml
 
     def read_yaml_file(file_path):
@@ -2249,7 +1876,7 @@ def process_detections(
             project_name = "spyfish_aotearoa"
 
     # Obtain a dictionary with the mapping between the class ids and the species names
-    species_mapping = get_species_mapping(
+    species_mapping = _get_species_mapping(
         model, project_name, team_name, model_registry
     )
 
@@ -2405,20 +2032,3 @@ def plot_processed_detections(
         plt.title(f"Max Individuals Recorded Every Minute for Movie {movie_id}")
         plt.legend()
         plt.show()
-
-
-def main():
-    "Handles argument parsing and launches the correct function."
-    parser = argparse.ArgumentParser()
-    parser.add_argument("data_path", help="path to data folder", type=str)
-    parser.add_argument(
-        "perc_test", help="percentage of data to use as part of test set", type=float
-    )
-    parser.add_argument("out_path", help="path to save into text files", type=str)
-    args = parser.parse_args()
-
-    prepare(args.data_path, args.perc_test, args.out_path)
-
-
-if __name__ == "__main__":
-    main()

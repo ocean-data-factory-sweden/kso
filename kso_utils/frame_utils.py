@@ -15,48 +15,7 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 
-def drawBoxes(df: pd.DataFrame, movie_dir: str, out_path: str):
-    """
-    For each unique movie, create a dictionary of movie paths and their corresponding pims.Video
-    objects. Then, for each unique movie, frame number, species id, and filename, get the corresponding
-    frame, get the bounding boxes for that frame, and draw the bounding boxes on the frame. Then, write
-    the frame to the output directory
-
-    :param df: the dataframe containing the bounding box coordinates
-    :param movie_dir: The directory where the movies are stored
-    :param out_path: The path to the directory where you want to save the images with the bounding boxes
-           drawn on them
-    :return:
-    """
-    df["movie_path"] = df["filename"].apply(
-        lambda x: str(
-            (Path(movie_dir) / Path(x).name.rsplit("_frame_")[0]).with_suffix(".mp4")
-        )
-    )
-    movie_dict = {i: pims.Video(i) for i in df["movie_path"].unique()}
-    df["annotation"] = df[["x_position", "y_position", "width", "height"]].apply(
-        lambda x: tuple([x[0], x[1], x[2], x[3]]), 1
-    )
-    df = df.drop(columns=["x_position", "y_position", "width", "height"])
-    for name, group in tqdm(
-        df.groupby(["movie_path", "frame_number", "species_id", "filename"])
-    ):
-        frame = movie_dict[name[0]][name[1]]
-        boxes = [tuple(i[4:])[0] for i in group.values]
-        for box in boxes:
-            # Calculating end-point of bounding box based on starting point and w, h
-            end_box = tuple([int(box[0] + box[2]), int(box[1] + box[3])])
-            # changed color and width to make it visible
-            cv2.rectangle(frame, (int(box[0]), int(box[1])), end_box, (255, 0, 0), 1)
-        out_dir = Path(out_path)
-        out_dir.mkdir(parents=True, exist_ok=True)
-        # Recursively add permissions to folders created
-        for root, dirs, files in out_dir.iterdir():
-            Path(root).chmod(0o777)
-        cv2.imwrite(out_dir / Path(name[3]).name, frame)
-
-
-def bb_iou(boxA, boxB):
+def _bb_iou(boxA, boxB):
     """
     The function takes two bounding boxes, computes the area of intersection, and divides it by the area
     of the union of the two boxes
@@ -122,7 +81,7 @@ def filter_bboxes(
     user_count = pd.Series(users).nunique()
     if user_count / total_users >= obj:
         # Get clusters of annotation boxes based on iou criterion
-        cluster_ids = DBSCAN(min_samples=1, metric=bb_iou, eps=eps).fit_predict(bboxes)
+        cluster_ids = DBSCAN(min_samples=1, metric=_bb_iou, eps=eps).fit_predict(bboxes)
         # Count the number of users within each cluster
         counter_dict = Counter(cluster_ids)
         # Accept a cluster assignment if at least 80% of users agree on annotation

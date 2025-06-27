@@ -31,13 +31,10 @@ logging.getLogger().setLevel(logging.INFO)
 def check_ffmpeg_availability():
     try:
         # Try to import the ffmpeg module from ffmpeg-python
-        result = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True)
-        print("FFmpeg Version:")
-        print(result.stdout.split("\n")[0])
+        import ffmpeg
 
         return True
-    except FileNotFoundError:
-        print("FFmpeg is not installed or not in PATH")
+    except ImportError:
         return False
 
 
@@ -87,14 +84,13 @@ def get_movie_path(f_path: str, project: Project, server_connection: dict = None
         return f_path
 
 
-def movies_in_movie_folder(project: Project, db_connection, server_connection: dict):
+def _movies_in_movie_folder(project: Project, server_connection: dict):
     """
     This function uses the project information and the database information, and returns
     a dataframe of the movies in the "movie_folder".
 
-    :param project: the project object
+    :param project: the project processor object
     :param server_connection: a dictionary with the connection to the server
-    :param db_connection: SQL connection object
     :return: A dataframe with the following columns (index, movie_id, fpath, exists, filename_ext)
 
     """
@@ -156,7 +152,7 @@ def retrieve_movie_info_from_server(
     """
 
     # Create a dataframe of the movies in the "movie_folder"
-    mov_folder_df = movies_in_movie_folder(project, db_connection, server_connection)
+    mov_folder_df = _movies_in_movie_folder(project, server_connection)
 
     from kso_utils.db_utils import get_df_from_db_table
 
@@ -228,42 +224,6 @@ def retrieve_movie_info_from_server(
     return available_movies_df, no_available_movies_df, no_info_movies_df
 
 
-def preview_movie(
-    movie_path: str,
-    movie_metadata: pd.DataFrame,
-):
-    """
-    It takes a movie filename and its associated metadata and returns a widget object that can be displayed in the notebook
-
-    :param movie_path: the filename of the movie you want to preview
-    :param movie_metadata: the metadata of the movie you want to preview
-    :return: Widget object
-    """
-
-    # Adjust the width of the video and metadata sections based on your preference
-    video_width = "60%"  # Adjust as needed
-    metadata_width = "40%"  # Adjust as needed
-
-    if "http" in movie_path:
-        video_widget = widgets.Video.from_url(movie_path, width=video_width)
-    else:
-        video_widget = widgets.Video.from_file(movie_path, width=video_width)
-
-    metadata_html = movie_metadata.T.to_html()
-
-    metadata_widget = widgets.HTML(
-        value=metadata_html,
-        layout=widgets.Layout(width=metadata_width, overflow="auto"),
-    )
-
-    # Create a horizontal box layout to display video and metadata side by side
-    display_widget = widgets.HBox([video_widget, metadata_widget])
-
-    display(display_widget)
-
-    return display_widget
-
-
 def get_info_selected_movies(
     selected_movies: list,
     footage_source: str,
@@ -287,7 +247,7 @@ def get_info_selected_movies(
         )
 
         # Retrieve the paths of the movies selected
-        selected_movie_path = [
+        selected_movies_paths = [
             get_movie_path(
                 project=project,
                 f_path=f_path,
@@ -310,12 +270,12 @@ def get_info_selected_movies(
         }
 
     elif footage_source == "New Footage":
-        selected_movie_path = selected_movies
+        selected_movies_paths = selected_movies
         selected_movies_ids = {}
         selected_movies_df = pd.DataFrame()
 
     return (
-        selected_movie_path,
+        selected_movies_paths,
         selected_movies,
         selected_movies_df,
         selected_movies_ids,
@@ -367,14 +327,14 @@ def extract_frames(
             key_movie_df = df[df["fpath"] == movie].reset_index()
 
             # Read the movie on cv2 and prepare to extract frames
-            write_movie_frames(key_movie_df, url)
+            _write_movie_frames(key_movie_df, url)
 
         logging.info("Frames extracted successfully")
 
     return df
 
 
-def write_movie_frames(key_movie_df: pd.DataFrame, url: str):
+def _write_movie_frames(key_movie_df: pd.DataFrame, url: str):
     """
     Function to get a frame from a movie
     :param key_movie_df: a df with the information of the movie
@@ -410,7 +370,7 @@ def get_movie_extensions():
     return tuple(["wmv", "mpg", "mov", "avi", "mp4", "MOV", "MP4"])
 
 
-def convert_video(
+def _convert_video(
     movie_path: str,
     movie_filename: str,
     fps_output: str,
@@ -495,7 +455,7 @@ def convert_video(
     return str(conv_fpath)
 
 
-def standarise_movie_format(
+def _standarise_movie_format(
     project: Project,
     server_connection: dict,
     movie_path: str,
@@ -606,7 +566,7 @@ def standarise_movie_format(
         # Specify the desired fps of the movie
         fps_output = "fps=" + str(round(fps))
 
-        conv_mov_path = convert_video(
+        conv_mov_path = _convert_video(
             movie_path=movie_path,
             movie_filename=movie_filename,
             fps_output=fps_output,
@@ -700,7 +660,7 @@ def check_movies_meta(
 
             # Convert movies to the right format, frame rate or codec and upload them to the project's server/storage
             [
-                standarise_movie_format(
+                _standarise_movie_format(
                     project=project,
                     server_connection=server_connection,
                     movie_path=get_movie_path(j, project, server_connection),
@@ -827,85 +787,3 @@ def check_movies_meta(
                 orig_csv="server_movies_csv",
                 updated_csv="local_movies_csv",
             )
-
-
-def concatenate_local_movies(csv_paths):
-    # Load the csv with movies information
-    df = pd.read_csv(csv_paths["local_movies_csv"])
-
-    # Select only the path of the folder
-    df["Path"] = df["fpath"].apply(lambda x: Path(x).parent)
-
-    # Function to merge directory path and multiple filenames into a list
-    def merge_paths(row):
-        directory_path = row["Path"]
-        filenames = row["go_pro_files"].split("; ")
-        merged_paths = [directory_path / filename.strip() for filename in filenames]
-        return merged_paths
-
-    # Combine the path of the folder with the go_profiles inside the folder
-    df["path_go_pros"] = df.apply(merge_paths, axis=1)
-
-    # Loop through each classification submitted by the users
-    for index, row in tqdm(df.iterrows(), total=df.shape[0]):
-        # Start text file and list to keep track of the videos to concatenate
-        textfile_name = "a_file.txt"
-        with open(textfile_name, "w") as textfile:
-            video_list = []
-
-            for movie_i in sorted(row["path_go_pros"]):
-                # Keep track of the videos to concatenate
-                textfile.write("file '" + str(movie_i) + "'" + "\n")
-                video_list.append(movie_i)
-
-        # Concatenate the files
-        if Path(row["fpath"]).exists():
-            logging.info(f"{row['fpath']} not concatenated because it already exists")
-        else:
-            logging.info(f"Concatenating {row['fpath']}")
-
-            # Concatenate the videos
-            subprocess.call(
-                [
-                    "ffmpeg",
-                    "-f",
-                    "concat",
-                    "-safe",
-                    "0",
-                    "-i",
-                    "a_file.txt",
-                    "-c",
-                    "copy",
-                    str(row["fpath"]),
-                ]
-            )
-
-        logging.info(f"{row['fpath']} concatenated successfully")
-
-        # Delete the text file
-        Path(textfile_name).unlink()
-
-
-def select_project_movies(
-    project: Project,
-    movies_df: pd.DataFrame,
-):
-    """
-    > This function filters a df of movies to select only those movies that are relevant to the project (e.g. good visibity)
-
-    :param project: the project object
-    :param movies_df: a df with the information about the filepaths and "existance" of the movies
-    """
-
-    # Select only movies that are a good deployment
-    if project.Project_name in ["Spyfish_Aotearoa"]:
-        # Check for missing values in IsBadDeployment column
-        if movies_df["IsBadDeployment"].isnull().any():
-            raise ValueError(
-                "The 'IsBadDeployment' column contains missing values. Please handle missing values before proceeding."
-            )
-
-        else:
-            movies_df = movies_df.loc[~movies_df.IsBadDeployment]
-
-    return movies_df

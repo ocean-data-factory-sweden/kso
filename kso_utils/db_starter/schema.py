@@ -5,8 +5,7 @@ siteName text NOT NULL,
 decimalLatitude varchar(255) NULL,
 decimalLongitude varchar(255) NULL,
 geodeticDatum varchar(255) NULL,
-countryCode varchar(255) NULL,
-UNIQUE (siteName)
+countryCode varchar(255) NULL
 );
 
 CREATE TABLE IF NOT EXISTS movies
@@ -21,8 +20,7 @@ sampling_end real NULL,
 author text NULL,
 siteName text NULL,
 fpath text NULL,
-UNIQUE (filename),
-FOREIGN KEY (siteName) REFERENCES sites (siteName)
+UNIQUE (filename) 
 );
 
 CREATE TABLE IF NOT EXISTS photos
@@ -54,10 +52,12 @@ FOREIGN KEY (movie_id) REFERENCES movies (id)
 CREATE TABLE IF NOT EXISTS species
 (
 id integer PRIMARY KEY,
-commonName text NOT NULL,
+commonName text  NULL,
+aphiaID int NOT NULL, 
 scientificName text NOT NULL,
-taxonRank text NOT NULL,
-UNIQUE (commonName)
+taxonRank text  NULL,
+Targeted text  NULL,
+DOC_TaxonID text NULL
 );
 
 CREATE TABLE IF NOT EXISTS agg_annotations_clip

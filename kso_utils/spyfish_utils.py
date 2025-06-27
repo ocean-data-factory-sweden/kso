@@ -11,7 +11,7 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)
 
 
-def get_spyfish_col_names(table_name: str):
+def get_col_names(table_name: str):
     """Return a dictionary with the project-specific column names of a csv of interest
     This function helps matching the schema format without modifying the column names of the original csv.
 
@@ -38,8 +38,20 @@ def get_spyfish_col_names(table_name: str):
             "RecordedBy": "author",
             "SiteID": "siteName",
             "LinkToVideoFile": "fpath",
-            "fileName": "filename",
         }
+
+    # elif table_name == "species":
+    #         # Save the column names of interest in a dict
+    #         col_names_dic = {
+    #             'id': 'id',
+    #             'DOC_TaxonID': "id"
+    #             'aphiaID': 'id',
+    #             'commonName': 'commonName',
+    #             'scientificName': 'scientificName',
+    #             'Targeted': 'taxonRank',
+    #             'kingdom': "kingdom",
+    
+            # }
 
     else:
         # Create empty data frame as there are no project-specific

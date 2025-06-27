@@ -38,7 +38,7 @@ def fix_text_encoding_folder(folder_name):
                 old_path.rename(new_path)
 
 
-def get_koster_col_names(table_name: str):
+def get_col_names(table_name: str):
     """Return a dictionary with the project-specific column names of a csv of interest
     This function helps matching the schema format without modifying the column names of the original csv.
 
@@ -61,7 +61,7 @@ def get_koster_col_names(table_name: str):
 
 
 # Function to process subjects uploaded automatically
-def auto_subjects(subjects_df: pd.DataFrame, auto_date: str):
+def _auto_subjects(subjects_df: pd.DataFrame, auto_date: str):
     """
     The function `auto_subjects` selects and extracts metadata from subjects that were automatically
     uploaded after a specified date.
@@ -79,7 +79,7 @@ def auto_subjects(subjects_df: pd.DataFrame, auto_date: str):
     # Select automatically uploaded frames
     auto_subjects_df = subjects_df[(subjects_df["created_at"] > auto_date)]
 
-    from kso_utils.zooniverse_utils import extract_metadata
+    from kso_upload_copy.notebooks.classify.hold.zooniverse_utils import extract_metadata
 
     # Extract metadata from automatically uploaded subjects
     auto_subjects_df, auto_subjects_meta = extract_metadata(auto_subjects_df)
@@ -91,7 +91,7 @@ def auto_subjects(subjects_df: pd.DataFrame, auto_date: str):
 
 
 # Function to process subjects uploaded manually
-def manual_subjects(subjects_df: pd.DataFrame, manual_date: str, auto_date: str):
+def _manual_subjects(subjects_df: pd.DataFrame, manual_date: str, auto_date: str):
     """
     The function extracts metadata from manually uploaded clips and processes it to combine with the
     subjects dataframe.
@@ -107,7 +107,7 @@ def manual_subjects(subjects_df: pd.DataFrame, manual_date: str, auto_date: str)
     :return: a pandas DataFrame containing information about clips that were uploaded manually, along
     with their metadata and processed information.
     """
-    from kso_utils.zooniverse_utils import extract_metadata
+    from kso_upload_copy.notebooks.classify.hold.zooniverse_utils import extract_metadata
 
     # Select clips uploaded manually
     man_clips_df = (
@@ -127,7 +127,7 @@ def manual_subjects(subjects_df: pd.DataFrame, manual_date: str, auto_date: str)
 
     if len(man_clips_meta) > 0:
         # Process the metadata of manually uploaded clips
-        man_clips_meta = process_manual_clips(man_clips_meta)
+        man_clips_meta = _process_manual_clips(man_clips_meta)
 
         # Combine metadata info with the subjects df
         man_clips_df = pd.concat([man_clips_df, man_clips_meta], axis=1)
@@ -136,7 +136,7 @@ def manual_subjects(subjects_df: pd.DataFrame, manual_date: str, auto_date: str)
 
 
 # Function to process the metadata of clips that were uploaded manually
-def process_manual_clips(meta_df: pd.DataFrame):
+def _process_manual_clips(meta_df: pd.DataFrame):
     """
     The function processes metadata of manual clips by extracting relevant information such as clip
     start and end times and the filename of the original movie.
@@ -179,7 +179,7 @@ def process_manual_clips(meta_df: pd.DataFrame):
     return meta_df
 
 
-def get_movies_id(df: pd.DataFrame, conn: sqlite3.Connection):
+def _get_movies_id(df: pd.DataFrame, conn: sqlite3.Connection):
     """
     This function retrieves movie IDs based on movie filenames from a database and merges them with a
     given DataFrame.
@@ -242,16 +242,16 @@ def process_koster_subjects(subjects: pd.DataFrame, conn: sqlite3.Connection):
     manual_date = "2019-11-17 00:00:00 UTC"
 
     # Select automatically uploaded subjects
-    auto_subjects_df = auto_subjects(subjects, auto_date=auto_date)
+    auto_subjects_df = _auto_subjects(subjects, auto_date=auto_date)
 
     # Select manually uploaded subjects
-    manual_subjects_df = manual_subjects(
+    manual_subjects_df = _manual_subjects(
         subjects, manual_date=manual_date, auto_date=auto_date
     )
 
     if len(manual_subjects_df) > 0:
         # Include movie_ids to the metadata
-        manual_subjects_df = get_movies_id(manual_subjects_df, conn=conn)
+        manual_subjects_df = _get_movies_id(manual_subjects_df, conn=conn)
 
         # Combine all uploaded subjects
         subjects = pd.merge(manual_subjects_df, auto_subjects_df, how="outer")
@@ -315,41 +315,3 @@ def process_clips_koster(annotations, row_class_id: str, rows_list: list):
                 rows_list.append(choice_i)
 
     return rows_list
-
-
-def process_koster_movies_csv(movies_df: pd.DataFrame):
-    """
-    It takes a dataframe of movies and returns a dataframe of movies with the following changes:
-
-    - The filename is standardized
-    - The filename is unswedified
-    - The filename is renamed to fpath
-    - The SamplingStart and SamplingEnd columns are renamed to sampling_start and sampling_end
-
-    :param movies_df: the dataframe containing the movies
-    :return: A dataframe with the columns:
-        - filename
-        - fpath
-        - sampling_start
-        - sampling_end
-    """
-    # Standarise the filename
-    movies_df["filename"] = movies_df["filename"].str.normalize("NFD")
-
-    # Ensure the filename has standard characters
-    movies_df["filename"] = movies_df["filename"].apply(lambda x: fix_text_encoding(x))
-
-    # TO DO Include server's path to the movie files
-    movies_df["fpath"] = (
-        movies_df["filename"].replace(".MP4", ".mp4").replace(".mov", ".mp4")
-    )
-
-    # Rename relevant fields
-    movies_df = movies_df.rename(
-        columns={
-            "SamplingStart": "sampling_start",
-            "SamplingEnd": "sampling_end",
-        }
-    )
-
-    return movies_df
