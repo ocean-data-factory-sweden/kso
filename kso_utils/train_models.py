@@ -27,9 +27,7 @@ def train_models(
     mlp.setup_paths()
 
     # Get the baseline model from the registry, specified by model_name
-    model_path = mlp.registry_utils.get_model(
-        mlp, model_name, model_download_dir, baseline=True
-    )
+    model_path = mlp.get_model(model_name, model_download_dir, baseline=True)
 
     mlp.train_yolo(
         exp_name=exp_name,

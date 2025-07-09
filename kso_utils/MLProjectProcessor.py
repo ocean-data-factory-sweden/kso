@@ -124,13 +124,6 @@ class MLProjectProcessor(ProjectProcessor):
     #############
     # t5
     #############
-    def choose_baseline_model(self, download_path: str):
-        """
-        It downloads the latest version of the baseline model from the model registry
-        :return: The path to the baseline model.
-        """
-        return self.registry_utils.choose_baseline_model(download_path)
-
     def choose_entity(self, alt_name: bool = False):
         if self.team_name is None:
             return kso_widgets.choose_entity()
@@ -213,10 +206,11 @@ class MLProjectProcessor(ProjectProcessor):
     #############
     # Function to choose a model to evaluate
 
-    def choose_model(self, custom_project: str = "", publish: bool = False):
+    def get_and_show_models_zenodo(self, custom_project: str = ""):
         """
-        It takes a project name that is defined in the class and returns a dropdown widget that displays the metrics of the model
-        selected
+        NOTE: to make it modular, this needs to be moved and renamed later!
+
+        It takes a project name that is defined in the class and returns a list with the metrics of the model
 
         :param project_name: The name of the project you want to load the model from
         :return: The model_widget is being returned.
@@ -224,20 +218,7 @@ class MLProjectProcessor(ProjectProcessor):
         model_dict = zenodo_utils.download_and_extract_models_from_zenodo(
             "pClzrdKwErArGWuPXMje0OtLEaq2gM8vHcAEeQN9CXyS2IjbuJsw05JLjVII"
         )
-        if publish:
-            # Create the dropdown widget
-            model_widget = widgets.Dropdown(
-                options=[(name, model) for name, model in model_dict.items()],
-                description="Select Zenodo model: ",
-                display="flex",
-                flex_flow="column",
-                align_items="stretch",
-                style={"description_width": "initial"},
-            )
-            # Display the dropdown widget
-            display(model_widget)
-            return model_widget
-        return self.registry_utils.choose_model(self, model_dict, custom_project)
+        return model_dict
 
     def eval_yolo(self, exp_name: str, conf_thres: float):
         # Find trained model weights
@@ -498,9 +479,16 @@ class MLProjectProcessor(ProjectProcessor):
         )
         self.registry_utils.close_run()
 
-    def get_model(self, model_name: str, download_path: str, custom_project: str = ""):
+    def get_model(
+        self,
+        model_name: str,
+        download_path: str,
+        custom_project: str = "",
+        baseline: bool = False,
+    ):
         """
-        It downloads the latest model checkpoint from the specified project and model name
+        It downloads the latest model checkpoint from the specified project and model name.
+        If the model_name contains .pt and :, it is a local model and its path is returned.
 
         :param model_name: The name of the model you want to download
         :type model_name: str
@@ -515,7 +503,7 @@ class MLProjectProcessor(ProjectProcessor):
             return str(Path(model_name).parent)
 
         return self.registry_utils.get_model(
-            self, model_name, download_path, custom_project
+            self, model_name, download_path, custom_project, baseline
         )
 
     def get_dataset(
