@@ -124,28 +124,12 @@ class MLProjectProcessor(ProjectProcessor):
     #############
     # t5
     #############
-    def choose_entity(self, alt_name: bool = False):
-        if self.team_name is None:
-            return kso_widgets.choose_entity()
-        else:
-            if not alt_name:
-                logging.info(
-                    f"Found team name: {self.team_name}. If you want"
-                    " to use a different team name for this experiment"
-                    " set the argument alt_name to True"
-                )
-            else:
-                return kso_widgets.choose_entity()
-
     def setup_paths(self):
         if not isinstance(self.output_path, str) and self.output_path is not None:
             self.output_path = self.output_path.selected
         self.data_path, self.hyp_path = yolo_utils.setup_paths(
             self.output_path, self.model_type
         )
-
-    def choose_train_params(self):
-        return kso_widgets.choose_train_params(self.model_type)
 
     def train_yolo(
         self,
