@@ -4,7 +4,6 @@ import sys
 import cv2
 import logging
 import ffmpeg
-import subprocess
 import urllib
 import unicodedata
 import pandas as pd
@@ -12,7 +11,6 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 from ultralytics.utils.downloads import is_url
-from IPython.display import display
 import ipywidgets as widgets
 
 # util imports

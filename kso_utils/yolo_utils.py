@@ -1,7 +1,6 @@
 # base imports
 import cv2 as cv2
 import numpy as np
-import re
 import pims
 import sqlite3
 import shutil

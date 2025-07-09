@@ -1,12 +1,8 @@
 # base imports
 import logging
-import pims
-import cv2
 from sklearn.cluster import DBSCAN
 from collections import Counter
 import pandas as pd
-from pathlib import Path
-from tqdm import tqdm
 import numpy as np
 from PIL import Image as PILImage, ImageDraw
 
