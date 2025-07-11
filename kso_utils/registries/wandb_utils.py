@@ -1,6 +1,7 @@
 import wandb
 import logging
 import ultralytics
+from pathlib import Path
 
 # Logging
 logging.basicConfig()
@@ -147,3 +148,45 @@ def get_dataset(self, model: str, team_name: str = "koster"):
     else:
         logging.error("Externally trained model. No data available.")
         return "", ""
+
+
+def set_config(**kwargs):
+    """
+    `set_config` takes in a confidence threshold, model name, and evaluation directory and returns a
+    configuration object.
+
+    :param conf_thres: This is the confidence threshold for the bounding boxes
+    :type conf_thres: float
+    :param model: The name of the model you want to use
+    :type model: str
+    :param eval_dir: The directory where the evaluation images are stored
+    :type eval_dir: str
+    :return: The config object is being returned.
+    """
+    config = wandb.config
+    for key, value in kwargs.items():
+        if key == "model_name" and "model_name" in config:
+            pass
+        else:
+            setattr(config, key, value)
+    return config
+
+
+def add_data(path: str, name: str, registry: str, run):
+    """
+    > The function `add_data` takes a path to a directory, a name for the directory, and a run
+    object, and adds the directory to the run as an artifact
+
+    :param path: the path to the directory you want to upload
+    :type path: str
+    :param name: The name of the artifact
+    :type name: str
+    :param run: The run object that you get from calling wandb.init()
+    """
+    my_data = wandb.Artifact(name, type="raw_data")
+    if Path(path).is_dir():
+        my_data.add_dir(path)
+        run.log_artifact(my_data)
+    else:
+        my_data.add_file(path)
+        run.log_artifact(my_data)

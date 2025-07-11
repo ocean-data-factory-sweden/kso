@@ -342,7 +342,7 @@ class MLProjectProcessor(ProjectProcessor):
                 logging.info(f"An unexpected error occurred: {e}")
                 species_mapping = {}
 
-            yolo_utils.set_config(
+            self.registry_utils.set_config(
                 conf=conf_thres,
                 model_name=model,
                 evaluation_directory=eval_dir,
@@ -355,7 +355,7 @@ class MLProjectProcessor(ProjectProcessor):
                 movie_csv_df=pd.read_csv(self.csv_paths["local_movies_csv"]),
                 out_format=out_format,
             )
-            yolo_utils.add_data(
+            self.registry_utils.add_data(
                 Path(eval_dir, "annotations.csv"),
                 "detection_output",
                 self.registry,
@@ -365,7 +365,7 @@ class MLProjectProcessor(ProjectProcessor):
             shutil.make_archive(
                 Path(eval_dir, "labels"), "zip", Path(eval_dir, "labels")
             )
-            yolo_utils.add_data(
+            self.registry_utils.add_data(
                 Path(eval_dir, "labels"),
                 "detection_output",
                 self.registry,
@@ -437,12 +437,11 @@ class MLProjectProcessor(ProjectProcessor):
         # Create a new run for tracking only if necessary
         self.registry_utils.start_run(self, "model-evaluations", "track")
 
-        if self.registry == "wandb":
-            yolo_utils.set_config(
-                conf=conf_thres,
-                model_name=artifact_dir,
-                evaluation_directory=self.eval_dir,
-            )
+        self.registry_utils.set_config(
+            conf=conf_thres,
+            model_name=artifact_dir,
+            evaluation_directory=self.eval_dir,
+        )
 
         # self.csv_report = yolo_utils.generate_csv_report(
         #    self.team_name, self.project_name, eval_dir, self.run, log=True
@@ -455,7 +454,7 @@ class MLProjectProcessor(ProjectProcessor):
             log=True,
             registry=self.registry,
         )
-        yolo_utils.add_data(
+        self.registry_utils.add_data(
             str(Path(latest_tracker).parent.absolute()),
             "tracker_output",
             self.registry,
