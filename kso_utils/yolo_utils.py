@@ -996,6 +996,7 @@ def generate_csv_report(
             )
             frame_no = None
 
+        out_col_list = None
         with open(label_file, "r") as infile:
             lines = infile.readlines()
             for line in lines:
@@ -1711,6 +1712,7 @@ def _get_species_mapping(model, project_name, team_name="koster", registry="wand
 
         full_path = f"{team_name}/{project_name}"
         runs = api.runs(full_path)  # Get all runs in the project
+        run = None
         for r in runs:
             # Choose the run corresponding to the model given as parameter
             if r.id == model.split("_")[1]:

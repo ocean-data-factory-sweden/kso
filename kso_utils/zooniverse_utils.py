@@ -148,6 +148,7 @@ def retrieve_zoo_info(
                 export_df = None
 
         except AttributeError:
+            url = None
             logging.info(
                 "No connection with Zooniverse, retrieving template info from google drive."
             )
@@ -671,6 +672,7 @@ def aggregate_classifications(
     """
 
     # Check if we have the right number of parameters for the type of subject
+    subject_parameters = None
     if subject_type == "clip":
         subject_parameters = 2
     elif subject_type == "frame":
@@ -1546,7 +1548,6 @@ def set_zoo_clip_metadata(
     project: Project,
     generated_clipsdf: pd.DataFrame,
     sitesdf: pd.DataFrame,
-    moviesdf: pd.DataFrame,
 ):
     """
     This function updates the dataframe of clips to be uploaded with
@@ -2118,6 +2119,7 @@ def set_zoo_frame_metadata(
         )
 
     # Set project-specific metadata
+    upload_to_zoo = None
     if project.Zooniverse_number == 9747:
         df = add_db_info_to_df(
             project, db_connection, csv_paths, df, "sites", "id, siteName"

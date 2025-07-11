@@ -114,14 +114,6 @@ class ProjectProcessor:
                     # Store the path of the CSV file
                     self.csv_paths[csv_key] = filename
 
-                    # Read the local CSV file into a pandas DataFrame
-                    df = pd.read_csv(filename)
-                    setattr(self, csv_key, df)
-
-                    # Temporary workaround for sites_csv (Pylint needs an explicit declaration)
-                    if csv_key == "local_sites_csv":
-                        self.local_sites_csv = df
-
     def _setup_db(self):
         """
         The function creates a database and populates it with the data from the local csv files.
@@ -416,11 +408,11 @@ class ProjectProcessor:
         """
         if subject_type == "clip":
             # Add declaration to avoid pylint error
+            sitesdf = pd.read_csv(self.csv_paths["local_sites_csv"])
             upload_df, sitename, created_on = zoo_utils.set_zoo_clip_metadata(
                 project=self.project,
                 generated_clipsdf=self.generated_clips,
-                sitesdf=self.local_sites_csv,
-                moviesdf=self.local_movies_csv,
+                sitesdf=sitesdf,
             )
             zoo_utils.upload_clips_to_zooniverse(
                 project=self.project,
@@ -574,7 +566,7 @@ class ProjectProcessor:
         display(frame_modification)
         display(button)
 
-    def _parallel_map(func, iterable, args=()):
+    def _parallel_map(self, func, iterable, args=()):
         """
         The function `_parallel_map` uses multiprocessing to apply a given function to each element of an
         iterable in parallel.

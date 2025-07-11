@@ -352,7 +352,7 @@ class MLProjectProcessor(ProjectProcessor):
                 evaluation_path=eval_dir,
                 log=True,
                 registry=self.registry,
-                movie_csv_df=self.local_movies_csv,
+                movie_csv_df=pd.read_csv(self.csv_paths["local_movies_csv"]),
                 out_format=out_format,
             )
             yolo_utils.add_data(
@@ -376,7 +376,7 @@ class MLProjectProcessor(ProjectProcessor):
                 evaluation_path=eval_dir,
                 log=True,
                 registry=self.registry,
-                movie_csv_df=self.local_movies_csv,
+                movie_csv_df=pd.read_csv(self.csv_paths["local_movies_csv"]),
                 out_format=out_format,
             )
         else:

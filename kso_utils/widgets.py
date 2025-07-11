@@ -307,12 +307,9 @@ def request_latest_zoo_info():
 
     def generate_export(retrieve_option):
         if retrieve_option == "No, just download the last available information":
-            generate = False
-
+            return False
         elif retrieve_option == "Yes":
-            generate = True
-
-        return generate
+            return True
 
     latest_info = interactive(
         generate_export,
@@ -1489,6 +1486,7 @@ def _view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
         raise Exception("Subject not found in provided annotations")
 
     # Get the HTML code to show the selected subject
+    html_code = None
     if subject_type == "clip":
         html_code = f"""
         <html>
