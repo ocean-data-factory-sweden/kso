@@ -154,8 +154,8 @@ class MLProjectProcessor(ProjectProcessor):
                 imgsz=img_size,
             )
         except Exception as e:
-            logging.info(f"Training failed due to: {e}")
             self.registry_utils.close_run()
+            raise AssertionError(f"Training failed due to: {e}")
 
     def enhance_yolo(
         self, in_path: str, project_path: str, conf_thres: float, img_size=[640, 640]
