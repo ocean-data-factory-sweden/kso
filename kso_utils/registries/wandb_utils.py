@@ -66,13 +66,17 @@ def show_available_models(self, custom_project: str = "", baseline: bool = False
     """
     full_path = _get_full_path(self, custom_project, baseline)
     api = wandb.Api()
-    collections = [
-        coll.name
-        for coll in api.artifact_type(
-            type_name="model", project=full_path
-        ).collections()
-    ]
-    return collections
+    model_collections = set()
+
+    # Go through each run in the project and check for logged model artifacts
+    for run in api.runs(full_path):
+        for artifact in run.logged_artifacts():
+            if artifact.type == "model":
+                # Only keep the base name, not version suffix
+                model_name = artifact.name.split(":")[0]
+                model_collections.add(model_name)
+
+    return sorted(model_collections)
 
 
 def get_model(
@@ -94,12 +98,17 @@ def get_model(
     wandb_model = f"{full_path}/{model_name}"
     try:
         api = wandb.Api()
-        artifacts = api.artifact_versions(type_name="model", name=wandb_model)
+        artifacts = api.artifact_collection(
+            type_name="model", name=wandb_model
+        ).artifacts()
         latest = artifacts[
             0
-        ]  # This is the latest model, since artifact_versions returns a sorted list
-        model_path = latest.file(download_path)
-        return str(model_path)
+        ]  # This is the latest model, since artifact_collections returns a sorted list
+        model_dir = latest.download(
+            root=download_path
+        )  # only gets downloaded if the file does not exist yet
+        model_filename = list(latest.manifest.entries.keys())[0]
+        return f"{model_dir}/{model_filename}"
     except Exception as e:
         # WandB is not specific with the errors they return when the model does not exist, for example:
         # 404 Client Error: Not Found for url: https://api.wandb.ai/graphql"
