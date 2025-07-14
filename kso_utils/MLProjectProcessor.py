@@ -51,6 +51,7 @@ class MLProjectProcessor(ProjectProcessor):
         # dynamically, even with a hard-coded wandb, so that adding more registries requires
         # no more refactoring
         self.registry_utils = import_module(f"kso_utils.registries.wandb_utils")
+        self.registry_utils.init()
 
         # Before t6_utils gets loaded in, the val.py file in yolov5_tracker repository needs to be removed
         # to prevent the batch_size error, see issue kso-object-detection #187

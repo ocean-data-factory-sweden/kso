@@ -2,6 +2,7 @@ import wandb
 import logging
 import ultralytics
 from pathlib import Path
+import os
 
 # Logging
 logging.basicConfig()
@@ -23,6 +24,14 @@ def init():
     For future development: If we want to support other model packages than YOLO, we might need to specify the start and
     end of a run (tracking) ourselves and not rely on this init() function anymore.
     """
+    api_key = os.environ.get("WANDB_API_KEY")
+    if not api_key and not wandb.api.api_key:
+        raise AssertionError(
+            "No WandB login provided. Set the WANDB_API_KEY in your environment, or if you are running locally, run wandb.login() and enter your credentials., This will be saved for future runs."
+        )
+    if api_key:
+        wandb.login(key=api_key)
+
     ultralytics.settings.update({"wandb": True})
 
 

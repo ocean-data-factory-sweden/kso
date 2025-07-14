@@ -174,3 +174,5 @@ jobs:
         run: |
           export PYTHONPATH=.
           pytest -vv .
+        env:
+          WANDB_API_KEY: '${{ secrets.WANDB_API_KEY }}'
