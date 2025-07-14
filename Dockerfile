@@ -82,8 +82,8 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh &
     rm Miniconda3-latest-Linux-x86_64.sh && \
     /opt/conda/bin/conda clean -afy
 
-# Create a conda environment with Python 3.8
-RUN /opt/conda/bin/conda create -n myenv python=3.8 -y && \
+# Create a conda environment with Python 3.12
+RUN /opt/conda/bin/conda create -n myenv python=3.12 -y && \
     /opt/conda/bin/conda clean -afy
 
 # Copy requirements and install packages
@@ -93,7 +93,8 @@ RUN /opt/conda/bin/conda run -n myenv pip install --no-cache-dir -r /usr/src/app
     /opt/conda/bin/conda run -n myenv conda install -y -c conda-forge libstdcxx-ng opencv 
 
 # Copy over custom autobackend file
-RUN cp /usr/src/app/kso/src/autobackend.py /opt/conda/envs/myenv/lib/python3.8/site-packages/ultralytics/nn/
+# RUN cp /usr/src/app/kso/src/autobackend.py /opt/conda/envs/myenv/lib/python3.8/site-packages/ultralytics/nn/
+## IS THIS NEEDED?
 
 # Clean up unnecessary packages
 RUN apt-get remove --autoremove -y wget git && apt-get clean && rm -rf /var/lib/apt/lists/*

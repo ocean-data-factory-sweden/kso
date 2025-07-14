@@ -151,7 +151,7 @@ jobs:
           source /opt/conda/etc/profile.d/conda.sh
           conda activate myenv
           echo "PATH=$(conda env list | grep 'myenv' | awk '{print $NF}')/bin:$PATH" >> $GITHUB_ENV
-          echo "PYTHONPATH=$(conda env list | grep 'myenv' | awk '{print $NF}')/lib/python3.8/site-packages:$PYTHONPATH" >> $GITHUB_ENV
+          echo "PYTHONPATH=$(conda env list | grep 'myenv' | awk '{print $NF}')/lib/python3.12/site-packages:$PYTHONPATH" >> $GITHUB_ENV
 
       - name: Install pylint, pytest, and nbqa
         shell: bash

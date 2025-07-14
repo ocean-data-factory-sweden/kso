@@ -11,10 +11,10 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: 'recursive'
-      - name: Initialize Python 3.8
+      - name: Initialize Python 3.12
         uses: actions/setup-python@v4
         with: 
-          python-version: '3.8'
+          python-version: '3.12'
       - name: Install jupytext and vulture
         run: |
           python -m pip install jupytext vulture
