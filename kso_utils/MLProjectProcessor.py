@@ -50,7 +50,7 @@ class MLProjectProcessor(ProjectProcessor):
         # a configuraiton option added to the project config. In the meanwhile do the import
         # dynamically, even with a hard-coded wandb, so that adding more registries requires
         # no more refactoring
-        self.registry_utils = import_module(f"kso_utils.registries.wandb_utils")
+        self.registry_utils = import_module(f"kso_utils.registries.wandb_registry")
         self.registry_utils.init()
 
         # Before t6_utils gets loaded in, the val.py file in yolov5_tracker repository needs to be removed
