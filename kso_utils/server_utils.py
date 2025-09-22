@@ -88,8 +88,9 @@ def download_init_csv(project: Project, init_keys: list, server_connection: dict
     db_initial_info = {}
 
     if project.server == ServerType.TEMPLATE:
-        if Path(project.csv_folder).is_dir() and any(
-            file.endswith(".csv") for file in os.listdir(project.csv_folder)
+        csv_folder_path = Path(project.csv_folder)
+        if csv_folder_path.is_dir() and any(
+            file.suffix == ".csv" for file in csv_folder_path.iterdir()
         ):
             logging.info(f"csv already exists in {project.csv_folder}")
         else:
