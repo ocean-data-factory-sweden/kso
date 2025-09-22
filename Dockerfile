@@ -22,7 +22,8 @@ RUN apt-get update && \
         libxau-dev \
         libxdmcp-dev \
         pkg-config \
-        yasm && \
+        yasm \
+        nasm && \
     apt-get clean
 
 # --- Build ffmpeg with CUDA support from source ---
