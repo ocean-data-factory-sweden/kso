@@ -26,7 +26,7 @@ RUN apt-get update && \
     apt-get clean
 
 # --- Build ffmpeg with CUDA support from source ---
-RUN git clone --depth 1 --branch n12.0.16.0 https://git.videolan.org/git/ffmpeg/nv-codec-headers.git && \
+RUN git clone --depth 1 --branch n12.0.16.0 https://github.com/FFmpeg/nv-codec-headers.git && \
     cd nv-codec-headers && \
     make install && \
     cd .. && \
