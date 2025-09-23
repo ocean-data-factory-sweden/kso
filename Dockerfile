@@ -106,12 +106,7 @@ RUN /opt/conda/bin/conda run -n myenv pip install --no-cache-dir -r /usr/src/app
 RUN apt-get remove --autoremove -y wget git && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables
-ENV WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
-    WANDB_CACHE_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
-    WANDB_DATA_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
-    DATA_DIR=/tmp \
-    ARTIFACT_DIR=/tmp \
-    PYTHONPATH=$PYTHONPATH:/usr/src/app/kso \
+ENV PYTHONPATH=$PYTHONPATH:/usr/src/app/kso \
     PATH=/opt/conda/bin:$PATH \
     LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/conda/envs/myenv/lib/
 
