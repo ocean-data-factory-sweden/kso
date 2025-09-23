@@ -83,15 +83,10 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh &
     rm Miniconda3-latest-Linux-x86_64.sh && \
     /opt/conda/bin/conda clean -afy
 
-# Configure conda-forge as the only channel
+# Create a conda environment with Python 3.12, using conda-forge
 # Since mid 2024, Anaconda, Inc. introduced ToS acceptance for the
 # default Anaconda channels, meaning that conda create requires
-# explicit acceptance. Therefore use conda-forge.
-RUN /opt/conda/bin/conda config --remove-key channels || true && \
-    /opt/conda/bin/conda config --add channels conda-forge && \
-    /opt/conda/bin/conda config --set channel_priority strict
-
-# Create a conda environment with Python 3.12
+# explicit acceptance. Therefore use conda-forge instead.
 RUN /opt/conda/bin/conda create -n myenv python=3.12 -y --override-channels -c conda-forge && \
     /opt/conda/bin/conda clean -afy
 
