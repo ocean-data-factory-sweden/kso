@@ -83,24 +83,27 @@ RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh &
     rm Miniconda3-latest-Linux-x86_64.sh && \
     /opt/conda/bin/conda clean -afy
 
+# Configure conda-forge as the only channel
+# Since mid 2024, Anaconda, Inc. introduced ToS acceptance for the
+# default Anaconda channels, meaning that conda create requires
+# explicit acceptance. Therefore use conda-forge.
+RUN /opt/conda/bin/conda config --remove-key channels || true && \
+    /opt/conda/bin/conda config --add channels conda-forge && \
+    /opt/conda/bin/conda config --set channel_priority strict
+
 # Create a conda environment with Python 3.12
-RUN /opt/conda/bin/conda create -n myenv python=3.12 -y && \
+RUN /opt/conda/bin/conda create -n myenv python=3.12 -y --override-channels -c conda-forge && \
     /opt/conda/bin/conda clean -afy
 
 # Copy requirements and install packages
+# use override-channels to ensure conda-forge
 COPY requirements.txt /usr/src/app/
 RUN /opt/conda/bin/conda run -n myenv pip install --no-cache-dir -r /usr/src/app/requirements.txt && \
-    /opt/conda/bin/conda run -n myenv pip uninstall -y opencv-python opencv-contrib-python && \  
-    /opt/conda/bin/conda run -n myenv conda install -y -c conda-forge libstdcxx-ng opencv 
-
-# Copy over custom autobackend file
-# RUN cp /usr/src/app/kso/src/autobackend.py /opt/conda/envs/myenv/lib/python3.8/site-packages/ultralytics/nn/
-## IS THIS NEEDED?
+    /opt/conda/bin/conda run -n myenv pip uninstall -y opencv-python opencv-contrib-python && \
+    /opt/conda/bin/conda run -n myenv conda install --override-channels -c conda-forge -y libstdcxx-ng opencv
 
 # Clean up unnecessary packages
 RUN apt-get remove --autoremove -y wget git && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-
 
 # Set environment variables
 ENV WANDB_DIR=/mimer/NOBACKUP/groups/snic2021-6-9/ \
