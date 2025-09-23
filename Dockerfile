@@ -2,7 +2,7 @@
 # We need ffmpeg on the system that works with the GPU.
 # Only having the python package is not enough. ---
 # To build from source we need the devel cuda image.
-FROM nvcr.io/nvidia/cuda:12.0.1-cudnn8-devel-ubuntu20.04 as builder
+FROM nvcr.io/nvidia/cuda:12.9.0-cudnn-devel-ubuntu24.04 as builder
 # So that we are not asked for user input during the build
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -24,7 +24,7 @@ RUN apt-get update && \
         pkg-config \
         yasm \
         nasm && \
-    apt-get clean
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- Build ffmpeg with CUDA support from source ---
 RUN git clone --depth 1 --branch n12.0.16.0 https://github.com/FFmpeg/nv-codec-headers.git && \
@@ -46,13 +46,14 @@ RUN git clone --depth 1 --branch n12.0.16.0 https://github.com/FFmpeg/nv-codec-h
         --extra-cflags=-I/usr/local/cuda/include \
         --extra-ldflags=-L/usr/local/cuda/lib64 && \
     make -j 8 && \
-    make install
+    make install && \
+    make clean
 
 # Start over from the docker image with cuda 12.0
 # since we only want the final result from the previous run and we copy that.
 # Now we can use the runtime cuda image, since we do not need to build anything
 # from scratch. This is better, since the runtime image is smaller
-FROM nvcr.io/nvidia/cuda:12.0.1-cudnn8-runtime-ubuntu20.04
+FROM nvcr.io/nvidia/cuda:12.9.0-cudnn-runtime-ubuntu24.04
 COPY --from=builder /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
 # So that we are not asked for user input during the build
 ARG DEBIAN_FRONTEND=noninteractive
@@ -65,49 +66,40 @@ COPY . ./kso
 # Update the package lists and install dependencies for OpenCV and others
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
+        python3.12 \
+        python3-pip \
+        python3.12-venv \
         libc6 \
         libmagic1 \
         libgl1 \
         libglib2.0-0 \
-        libx264-155 \
+        libsm6 \
+        libxrender1 \
+        libxext6 \
+        libgl1 \
+        libx264-164 \
         libxau6 \
         libxcb1 \
         libxdmcp6 \
         openssl && \
-    apt-get install --no-install-recommends -y wget git && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install Miniconda
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
-    bash Miniconda3-latest-Linux-x86_64.sh -b -p /opt/conda && \
-    rm Miniconda3-latest-Linux-x86_64.sh && \
-    /opt/conda/bin/conda clean -afy
-
-# Create a conda environment with Python 3.12, using conda-forge
-# Since mid 2024, Anaconda, Inc. introduced ToS acceptance for the
-# default Anaconda channels, meaning that conda create requires
-# explicit acceptance. Therefore use conda-forge instead.
-RUN /opt/conda/bin/conda create -n myenv python=3.12 -y --override-channels -c conda-forge && \
-    /opt/conda/bin/conda clean -afy
-
-# Copy requirements and install packages
-# use override-channels to ensure conda-forge
+# Create a virtual environment and install Python packages
 COPY requirements.txt /usr/src/app/
-RUN /opt/conda/bin/conda run -n myenv pip install --no-cache-dir -r /usr/src/app/requirements.txt && \
-    /opt/conda/bin/conda run -n myenv pip uninstall -y opencv-python opencv-contrib-python && \
-    /opt/conda/bin/conda run -n myenv conda install --override-channels -c conda-forge -y libstdcxx-ng opencv
-
-# Clean up unnecessary packages
-RUN apt-get remove --autoremove -y wget git && apt-get clean && rm -rf /var/lib/apt/lists/*
-
+RUN python3.12 -m venv /opt/venv && \
+    # Activate the venv in this RUN step
+    /bin/bash -c "source /opt/venv/bin/activate && \
+    pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r /usr/src/app/requirements.txt"
 # Set environment variables
-ENV PYTHONPATH=$PYTHONPATH:/usr/src/app/kso \
-    PATH=/opt/conda/bin:$PATH \
-    LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/conda/envs/myenv/lib/
+ENV PYTHONPATH=/opt/venv/lib/python3.12/site-packages:$PYTHONPATH:/usr/src/app/kso
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Set everything up to work with the jupyter notebooks
+# Set the user
 ARG NB_USER=jovyan
-ARG NB_UID=1000
+ARG NB_UID=1500
+# Random number higher than 1000,
+# since 1000 is already in use in the base image.
 ENV USER=${NB_USER} \
     NB_UID=${NB_UID} \
     HOME=/home/${NB_USER}
@@ -117,5 +109,5 @@ RUN adduser --disabled-password \
     ${NB_USER}
 USER ${NB_USER}
 
-# Make sure conda is activated in the entry point
-ENTRYPOINT ["/bin/bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate myenv && exec \"$@\"", "--"]
+# Make sure we use the environment as entry point
+ENTRYPOINT ["/bin/bash", "-c", "source /opt/venv/bin/activate && exec \"$@\"", "--"]
