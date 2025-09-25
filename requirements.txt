@@ -19,4 +19,10 @@ ultralytics==8.3.166
 wandb==0.21.0
 yolov5==7.0.14
 scikit-learn==1.7.2
-
+# Users running locally need to change the cuda version depending
+# on their local machine.
+# If the HPC cluser has cuda lower than 12.9, chnage the cuda version
+# here and in the base image in the docker container
+--extra-index-url https://download.pytorch.org/whl/cu129
+torch==2.8.0+cu129
+torchvision==0.23.0+cu129
