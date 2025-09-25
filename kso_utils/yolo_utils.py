@@ -495,8 +495,8 @@ def frame_aggregation(
             named_tuple = tuple([grouped_fields[1], filename])
         else:
             # Get movie_path and frame_number
-            rev_fields = grouped_fields.reverse()
-            named_tuple = tuple([rev_fields])
+            grouped_fields.reverse()
+            named_tuple = tuple([grouped_fields])
 
         if movie_bool:
             from kso_utils.koster_utils import fix_text_encoding
