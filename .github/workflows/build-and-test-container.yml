@@ -144,15 +144,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Initialize conda and activate environment
-        shell: bash  # Ensure the shell is bash
-        id: activate-conda
-        run: |
-          source /opt/conda/etc/profile.d/conda.sh
-          conda activate myenv
-          echo "PATH=$(conda env list | grep 'myenv' | awk '{print $NF}')/bin:$PATH" >> $GITHUB_ENV
-          echo "PYTHONPATH=$(conda env list | grep 'myenv' | awk '{print $NF}')/lib/python3.12/site-packages:$PYTHONPATH" >> $GITHUB_ENV
-
       - name: Install pylint, pytest, and nbqa
         shell: bash
         run: |
@@ -162,12 +153,12 @@ jobs:
       - name: Pylint kso_utils
         shell: bash
         run: |
-          pylint --disable=possibly-used-before-assignment,used-before-assignment,no-member,assignment-from-no-return kso_utils
+          pylint kso_utils
       - name: Pylint notebooks
         if: success() || failure()
         shell: bash
         run: |
-          nbqa pylint --disable=unexpected-keyword-arg,no-member,assignment-from-no-return,no-value-for-parameter notebooks
+          nbqa pylint notebooks
         # If one of the pylint steps fails, there are errors and we do not need to run the test below.
       - name: Pytest
         shell: bash
