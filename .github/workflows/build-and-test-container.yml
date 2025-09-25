@@ -144,12 +144,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install pylint, pytest, and nbqa
-        shell: bash
-        run: |
-          pip install pylint pytest nbqa
-          echo "/github/home/.local/bin" >> $GITHUB_PATH  # Add the local bin path to the GitHub path
-
       - name: Pylint kso_utils
         shell: bash
         run: |
