@@ -88,10 +88,16 @@ def download_init_csv(project: Project, init_keys: list, server_connection: dict
     db_initial_info = {}
 
     if project.server == ServerType.TEMPLATE:
-        gdrive_id = "1PZGRoSY_UpyLfMhRphMUMwDXw4yx1_Fn"
-        _download_gdrive(
-            gdrive_id=gdrive_id, folder_name=project.csv_folder, fix_encoding=False
-        )
+        csv_folder_path = Path(project.csv_folder)
+        if csv_folder_path.is_dir() and any(
+            file.suffix == ".csv" for file in csv_folder_path.iterdir()
+        ):
+            logging.info(f"csv already exists in {project.csv_folder}")
+        else:
+            gdrive_id = "1PZGRoSY_UpyLfMhRphMUMwDXw4yx1_Fn"
+            _download_gdrive(
+                gdrive_id=gdrive_id, folder_name=project.csv_folder, fix_encoding=False
+            )
 
     elif project.server in [ServerType.LOCAL, ServerType.SNIC]:
         logging.info("Running locally so no csv files were downloaded from the server.")
@@ -152,10 +158,12 @@ def get_ml_data(project: Project):
         if project.server == ServerType.TEMPLATE:
             gdrive_id = "1xknKGcMnHJXu8wFZTAwiKuR3xCATKco9"
             ml_folder = project.ml_folder
-
-            # Download template training files from Gdrive
-            _download_gdrive(gdrive_id, Path(ml_folder))
-            logging.info("Template data downloaded successfully")
+            if Path(ml_folder).is_dir():
+                logging.info("Template data already exists")
+            else:
+                # Download template training files from Gdrive
+                _download_gdrive(gdrive_id, Path(ml_folder))
+                logging.info("Template data downloaded successfully")
         else:
             logging.info("No download method implemented for this data")
     else:

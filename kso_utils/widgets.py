@@ -11,7 +11,6 @@ from io import BytesIO
 from base64 import b64encode
 
 # widget imports
-import ipysheet
 import folium
 import ipywidgets as widgets
 from ipyfilechooser import FileChooser
@@ -19,12 +18,11 @@ from IPython.display import HTML, display, clear_output, Image as IPImage
 from ipywidgets import interactive, Layout, Video
 from folium.plugins import MiniMap
 from pathlib import Path
-import asyncio
 from PIL import Image as PILImage
 
 # util imports
 from kso_utils.video_reader import VideoReader
-from kso_utils.project_utils import Project, get_projects_csv_file
+from kso_utils.project_utils import Project
 import kso_utils.movie_utils as movie_utils
 
 # Logging
@@ -66,33 +64,6 @@ def choose_species(db_connection, species_list=None):
 
     display(w)
     return w
-
-
-def choose_project():
-    """
-    This function generates a dropdown menu with project names listed based on a CSV file.
-
-    :param projects_csv: Path to the CSV file with a list of projects, defaults to "../kso_utils/db_starter/projects_list.csv"
-    :type projects_csv: str, optional
-    :return: A dropdown widget with the project names as options
-    :rtype: ipywidgets.Dropdown
-    """
-    projects_csv_path = get_projects_csv_file()
-    projects_df = pd.read_csv(projects_csv_path)
-
-    if "Project_name" not in projects_df.columns:
-        raise ValueError("The CSV file does not contain a 'Project_name' column.")
-
-    # Create the dropdown widget
-    choose_project_widget = widgets.Dropdown(
-        options=projects_df["Project_name"].unique(),
-        value=projects_df["Project_name"].iloc[0],
-        description="Project:",
-        disabled=False,
-    )
-
-    display(choose_project_widget)
-    return choose_project_widget
 
 
 def gpu_select():
@@ -192,7 +163,7 @@ def _select_movie(available_movies_df: pd.DataFrame):
     return select_movie_widget
 
 
-def choose_folder(start_path: str = ".", folder_type: str = ""):
+def _choose_folder(start_path: str = ".", folder_type: str = ""):
     """
     > This function enables users to select the folder of interest to retrieve or save files to/from.
 
@@ -303,7 +274,7 @@ def choose_footage(
             else:
                 print("No folder selected")
 
-        select_movie_widg = choose_folder(
+        select_movie_widg = _choose_folder(
             start_path=(
                 project.movie_folder
                 if project.movie_folder not in [None, "None"]
@@ -336,12 +307,9 @@ def request_latest_zoo_info():
 
     def generate_export(retrieve_option):
         if retrieve_option == "No, just download the last available information":
-            generate = False
-
+            return False
         elif retrieve_option == "Yes":
-            generate = True
-
-        return generate
+            return True
 
     latest_info = interactive(
         generate_export,
@@ -1249,136 +1217,6 @@ def compare_frames(df):
 ######################################
 # ###### Tut 5 widgets ###########
 # #####################################
-
-
-def choose_train_params(model_type: str):
-    """
-    It creates two sliders, one for batch size, one for epochs
-    :return: the values of the sliders.
-    """
-    v = widgets.FloatLogSlider(
-        value=1,
-        base=2,
-        min=0,  # max exponent of base
-        max=10,  # min exponent of base
-        step=1,  # exponent step
-        description="Batch size:",
-        readout=True,
-        readout_format="d",
-    )
-
-    z = widgets.IntSlider(
-        value=1,
-        min=0,
-        max=1000,
-        step=10,
-        description="Epochs:",
-        disabled=False,
-        continuous_update=False,
-        orientation="horizontal",
-        readout=True,
-        readout_format="d",
-    )
-
-    h = widgets.IntText(description="Height:", value=128)
-    w = widgets.IntText(description="Width:", value=128)
-    s = widgets.IntText(description="Image size:", value=128)
-
-    def on_value_change(change):
-        height = h.value
-        width = w.value
-        return [height, width]
-
-    h.observe(on_value_change, names="value")
-    w.observe(on_value_change, names="value")
-    s.observe(on_value_change, names="value")
-
-    if model_type == 1:
-        box = widgets.HBox([v, z, h, w])
-        display(box)
-        return v, z, h, w
-    elif model_type == 2:
-        box = widgets.HBox([v, z, s])
-        display(box)
-        return v, z, s, None
-    else:
-        logging.warning("Model in experimental stage.")
-        box = widgets.HBox([v, z])
-        display(box)
-        return v, z, None, None
-
-
-def choose_experiment_name():
-    """
-    It creates a text box that allows you to enter a name for your experiment
-    :return: The text box widget.
-    """
-    exp_name = widgets.Text(
-        value="exp_name",
-        placeholder="Choose an experiment name",
-        description="Experiment name:",
-        disabled=False,
-        display="flex",
-        flex_flow="column",
-        align_items="stretch",
-        style={"description_width": "initial"},
-    )
-    display(exp_name)
-    return exp_name
-
-
-def choose_entity():
-    """
-    It creates a text box that allows you to enter your username or teamname of WandB
-    :return: The text box widget.
-    """
-    entity = widgets.Text(
-        value="koster",
-        placeholder="Give your user or team name",
-        description="User or Team name:",
-        disabled=False,
-        display="flex",
-        flex_flow="column",
-        align_items="stretch",
-        style={"description_width": "initial"},
-    )
-    display(entity)
-    return entity
-
-
-def choose_conf():
-    w = widgets.FloatSlider(
-        value=0.5,
-        min=0,
-        max=1.0,
-        step=0.1,
-        description="Confidence threshold:",
-        disabled=False,
-        continuous_update=False,
-        orientation="horizontal",
-        readout=True,
-        readout_format=".1f",
-        display="flex",
-        flex_flow="column",
-        align_items="stretch",
-        style={"description_width": "initial"},
-    )
-    display(w)
-    return w
-
-
-def choose_text(name: str):
-    text_widget = widgets.Text(
-        description=f"Please enter a suitable {name} ",
-        display="flex",
-        flex_flow="column",
-        align_items="stretch",
-        style={"description_width": "initial"},
-    )
-    display(text_widget)
-    return text_widget
-
-
 class WidgetMaker(widgets.VBox):
     def __init__(self):
         """
@@ -1648,6 +1486,7 @@ def _view_subject(subject_id: int, class_df: pd.DataFrame, subject_type: str):
         raise Exception("Subject not found in provided annotations")
 
     # Get the HTML code to show the selected subject
+    html_code = None
     if subject_type == "clip":
         html_code = f"""
         <html>
@@ -1836,61 +1675,6 @@ def explore_classifications_per_subject(class_df: pd.DataFrame, subject_type: st
             display(a)
 
     subject_widget.observe(on_change, names="value")
-
-
-def choose_test_prop():
-    """
-    > The function `choose_test_prop()` creates a slider widget that allows the user to choose the
-    proportion of the data to be used for testing
-    :return: A widget object
-    """
-
-    w = widgets.FloatSlider(
-        value=0.2,
-        min=0.0,
-        max=1.0,
-        step=0.1,
-        description="Test proportion:",
-        disabled=False,
-        continuous_update=False,
-        orientation="horizontal",
-        readout=True,
-        readout_format=".1f",
-        display="flex",
-        flex_flow="column",
-        align_items="stretch",
-        style={"description_width": "initial"},
-    )
-
-    display(w)
-    return w
-
-
-def choose_eval_params():
-    """
-    It creates one slider for confidence threshold
-    :return: the value of the slider.
-    """
-
-    z1 = widgets.FloatSlider(
-        value=0.5,
-        min=0.0,
-        max=1.0,
-        step=0.1,
-        description="Confidence threshold:",
-        disabled=False,
-        continuous_update=False,
-        orientation="horizontal",
-        readout=True,
-        readout_format=".1f",
-        display="flex",
-        flex_flow="column",
-        align_items="stretch",
-        style={"description_width": "initial"},
-    )
-
-    display(z1)
-    return z1
 
 
 def select_viewer():

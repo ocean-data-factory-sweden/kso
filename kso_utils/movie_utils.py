@@ -4,7 +4,6 @@ import sys
 import cv2
 import logging
 import ffmpeg
-import subprocess
 import urllib
 import unicodedata
 import pandas as pd
@@ -12,7 +11,6 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 from ultralytics.utils.downloads import is_url
-from IPython.display import display
 import ipywidgets as widgets
 
 # util imports
@@ -239,6 +237,8 @@ def get_info_selected_movies(
     :param server_connection: a dictionary with the connection to the server
     :param df: the dataframe of available movies
     """
+    selected_movies_paths = None
+    selected_movies_ids = None
 
     if footage_source == "Existing Footage":
         # Create a df with the selected movies
@@ -533,6 +533,7 @@ def _standarise_movie_format(
         duration_mins = duration / 60
 
         # Check if the movie is accessible locally
+        size = None
         if Path(movie_path).exists():
             # Store the size of the movie
             size = Path(movie_path).stat().st_size
@@ -655,6 +656,7 @@ def check_movies_meta(
         return
 
     else:
+        check_fps = None
         if review_method.startswith("Advanced"):
             logging.info("Checking the format, frame rate and codec of the movies")
 

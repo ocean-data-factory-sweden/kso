@@ -1,7 +1,6 @@
 # base imports
 import cv2 as cv2
 import numpy as np
-import re
 import pims
 import sqlite3
 import shutil
@@ -15,7 +14,6 @@ import wandb
 import imagesize
 import base64
 import ffmpeg
-import mlflow
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 from jupyter_bbox_widget import BBoxWidget
@@ -497,8 +495,8 @@ def frame_aggregation(
             named_tuple = tuple([grouped_fields[1], filename])
         else:
             # Get movie_path and frame_number
-            rev_fields = grouped_fields.reverse()
-            named_tuple = tuple([rev_fields])
+            grouped_fields.reverse()
+            named_tuple = tuple([grouped_fields])
 
         if movie_bool:
             from kso_utils.koster_utils import fix_text_encoding
@@ -929,51 +927,6 @@ def setup_paths(output_folder: str, model_type: str):
         return None, None
 
 
-def set_config(**kwargs):
-    """
-    `set_config` takes in a confidence threshold, model name, and evaluation directory and returns a
-    configuration object.
-
-    :param conf_thres: This is the confidence threshold for the bounding boxes
-    :type conf_thres: float
-    :param model: The name of the model you want to use
-    :type model: str
-    :param eval_dir: The directory where the evaluation images are stored
-    :type eval_dir: str
-    :return: The config object is being returned.
-    """
-    config = wandb.config
-    for key, value in kwargs.items():
-        if key == "model_name" and "model_name" in config:
-            pass
-        else:
-            setattr(config, key, value)
-    return config
-
-
-def add_data(path: str, name: str, registry: str, run):
-    """
-    > The function `add_data` takes a path to a directory, a name for the directory, and a run
-    object, and adds the directory to the run as an artifact
-
-    :param path: the path to the directory you want to upload
-    :type path: str
-    :param name: The name of the artifact
-    :type name: str
-    :param run: The run object that you get from calling wandb.init()
-    """
-    if registry == "wandb":
-        my_data = wandb.Artifact(name, type="raw_data")
-        if Path(path).is_dir():
-            my_data.add_dir(path)
-            run.log_artifact(my_data)
-        else:
-            my_data.add_file(path)
-            run.log_artifact(my_data)
-    elif registry == "mlflow":
-        mlflow.log_artifact(path, artifact_path=name)
-
-
 def generate_csv_report(
     evaluation_path: str,
     movie_csv_df: pd.DataFrame,
@@ -1000,6 +953,7 @@ def generate_csv_report(
             )
             frame_no = None
 
+        out_col_list = None
         with open(label_file, "r") as infile:
             lines = infile.readlines()
             for line in lines:
@@ -1183,8 +1137,6 @@ def generate_counts(
             if registry == "wandb":
                 # wandb.init(resume="must", id=run.id)
                 wandb.log({"tracking_counts": wandb.Table(dataframe=final_df)})
-            elif registry == "mlflow":
-                pass
         return final_df
 
 
@@ -1717,6 +1669,7 @@ def _get_species_mapping(model, project_name, team_name="koster", registry="wand
 
         full_path = f"{team_name}/{project_name}"
         runs = api.runs(full_path)  # Get all runs in the project
+        run = None
         for r in runs:
             # Choose the run corresponding to the model given as parameter
             if r.id == model.split("_")[1]:
@@ -1737,41 +1690,6 @@ def _get_species_mapping(model, project_name, team_name="koster", registry="wand
                 # Handle the case where species mapping cannot be found in either location
                 logging.error("Error reading species mapping from config or file.")
                 species_mapping = {}
-    elif registry == "mlflow":
-        from mlflow import MlflowClient
-
-        experiment = mlflow.get_experiment_by_name(project_name)
-        client = MlflowClient()
-        pattern = r"runs:/([^/]+)/weights/best\.pt"
-        # Use re.search() to find the match
-        try:
-            run_id = re.search(pattern, model).group(1)
-        except:
-            logging.error("No valid run found.")
-        if experiment is not None:
-            # Get the path of the artifact with the labels and class_id
-            artifacts = client.list_artifacts(run_id, path="input_datasets")
-            run = mlflow.get_run(run_id)
-            artifact_uri = run.info.artifact_uri
-
-            yaml_fpaths = [
-                Path(artifact_uri, af.path)
-                for af in artifacts
-                if ".yaml" in af.path and "hyp.yaml" not in af.path
-            ]
-            if yaml_fpaths:
-                yaml_fpath = yaml_fpaths[0]
-                # Download the artifact using yaml_fpath
-                # Temporarily download the artifact with mapping labels
-                local_artifact = mlflow.artifacts.download_artifacts(str(yaml_fpath))
-
-                # Attempt to read species mapping from a YAML file specified in the configuration
-                data_dict = read_yaml_file(local_artifact)
-                species_mapping = data_dict["names"]
-                species_mapping = {str(i): sp for i, sp in enumerate(species_mapping)}
-            else:
-                # Handle the case where no artifacts meet the criteria
-                logging.error(f"No artifacts found in run{run.info.artifact_uri}.")
     else:
         logging.error("Registry invalid.")
         species_mapping = {}
@@ -1799,8 +1717,8 @@ def process_detections(
     :param db_connection: SQL connection object
     :param csv_paths: a dictionary with the paths of the csvs used to initiate the db
     :param annotations_csv_path: the path to the folder containing the annotations.csv file or the annotations.csv
-    :param selected_movies_id: the ids of the movies selected in earlier steps (note if the selection changes b, mlflow)
-    :param model_registry: the name of the model register (e.g wandb, mlflow)
+    :param selected_movies_id: the ids of the movies selected in earlier steps (note if the selection changes b)
+    :param model_registry: the name of the model register (e.g wandb)
     :param model: the name of the model in wandb used to obtain the detections
     :param project_name: name of the project in wandb
     :param team_name: name of the team in wandb.

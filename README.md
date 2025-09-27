@@ -57,7 +57,7 @@ docker pull ghcr.io/ocean-data-factory-sweden/kso:dev
 
 ### Conda Installation
 #### Requirements
-* [Python 3.8](https://www.python.org/)
+* [Python 3.12](https://www.python.org/)
 * [Anaconda](https://docs.anaconda.com/anaconda/install/index.html)
 * [GIT](https://git-scm.com/downloads)
 
@@ -80,7 +80,7 @@ cd kso
 
 3. Create an Anaconda environment with Python 3.8. Remember to change the name env.
 ```
-conda create -n <name env> python=3.8
+conda create -n <name env> python=3.12
 ```
 
 4. Enter the environment: 
@@ -95,11 +95,11 @@ conda activate <name env>
     <img src="https://github.com/ocean-data-factory-sweden/kso/blob/dev/assets/cuda_gpu_example_requirements.png?raw=true" alt="CUDA Requirements" width="450" height="150">
   </div>
   
-  5b. Add the recommended command to the KSO's gpu_requirements_user.txt file.
+  5b. Change the cuda version in the KSO's requirements.txt file after torch and torchvision. If you do not have a GPU, remove the cuda specification.
 
 6. Install all the requirements:
 ```
-pip install -r requirements.txt -r gpu_requirements_user.txt
+pip install -r requirements.txt
 ```
 
 ## Cloudina 

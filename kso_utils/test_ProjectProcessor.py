@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-import kso_utils.project as p
+from kso_utils.ProjectProcessor import ProjectProcessor
 import kso_utils.project_utils as project_utils
 
 template = project_utils.find_project("Template project")
@@ -18,7 +18,7 @@ def test_init_ProjectProcessor():
     ProjectProcessor class, we test them by running the initiation
     of the ProjectProcessor
     """
-    pp = p.ProjectProcessor(template)
+    pp = ProjectProcessor(template)
     template_csv_paths = {
         "local_movies_csv": str(Path("db_csv_info", "movies_example.csv")),
         "local_sites_csv": str(Path("db_csv_info", "sites_example.csv")),
@@ -28,7 +28,3 @@ def test_init_ProjectProcessor():
         pp.csv_paths == template_csv_paths
     ), f"The self.csv_paths are not set correctly in _load_meta. They should be {template_csv_paths}, but got {pp.csv_paths}."
     # Also pp.local_sites_csv is set and this is the sites df itself, but I don't know what to test for that.
-
-
-def test_init_MLProjectProcessor():
-    mlp = p.MLProjectProcessor(template)

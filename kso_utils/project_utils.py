@@ -44,7 +44,7 @@ def get_cdn_user():
     return cdn_user
 
 
-def get_projects_csv_file():
+def _get_projects_csv_file():
     cdn_user = get_cdn_user()
     if Path(cdn_user, "bucket").exists():
         # If this path exists, we are on cloudina and use the cloudina csv
@@ -78,7 +78,7 @@ def get_projects_csv_file():
 
 def find_project(project_name: str = ""):
     """Find project information using project csv path and project name"""
-    project_csv = get_projects_csv_file()
+    project_csv = _get_projects_csv_file()
     cdn_user = get_cdn_user()  # is used if on cloudina, otherwise not used
 
     with open(project_csv, mode="r", newline="", encoding="utf-8") as file:
