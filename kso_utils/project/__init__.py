@@ -163,7 +163,7 @@ def create_project(
     with yaml_path.open("w", encoding="utf-8") as fh:
         yaml.safe_dump(yaml_dict, fh, sort_keys=False, default_flow_style=False)
 
-    logging.info("Project YAML created at %s", yaml_path)
+    logging.info(f"Project YAML created at {yaml_path}")
     return yaml_path
 
 
@@ -204,7 +204,7 @@ def update_users(
     data["users"] = new_user_data
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML users data updated at %s", project_path)
+    logging.info(f"Project YAML users data updated at {project_path}")
     return project_path
 
 
@@ -230,7 +230,7 @@ def update_input_data(
     data["input_data"] = input_data
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML input_data updated at %s", project_path)
+    logging.info("Project YAML input_data updated at {project_path}")
     return project_path
 
 
@@ -253,7 +253,7 @@ def update_output_data(
     data["output_data"] = output_data
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML output_data updated at %s", project_path)
+    logging.info(f"Project YAML output_data updated at {project_path}")
     return project_path
 
 
@@ -280,7 +280,7 @@ def update_tracking(
     data["tracking"] = tracking
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML tracking updated at %s", project_path)
+    logging.info(f"Project YAML tracking updated at {project_path}")
     return project_path
 
 
@@ -305,7 +305,7 @@ def update_db_path(
     data["db_path"] = db_path
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML db_path updated at %s", project_path)
+    logging.info(f"Project YAML db_path updated at {project_path}")
     return project_path
 
 
@@ -331,7 +331,7 @@ def update_server(
     data["server"] = server
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML server updated at %s", project_path)
+    logging.info(f"Project YAML server updated at {project_path}")
     return project_path
 
 
@@ -356,7 +356,7 @@ def update_csv_folder(
     data["csv_folder"] = csv_folder
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML csv_folder updated at %s", project_path)
+    logging.info(f"Project YAML csv_folder updated at {project_path}")
     return project_path
 
 
@@ -381,7 +381,7 @@ def update_movie_folder(
     data["movie_folder"] = movie_folder
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML movie_folder updated at %s", project_path)
+    logging.info(f"Project YAML movie_folder updated at {project_path}")
     return project_path
 
 
@@ -406,7 +406,7 @@ def update_photo_folder(
     data["photo_folder"] = photo_folder
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML photo_folder updated at %s", project_path)
+    logging.info(f"Project YAML photo_folder updated at {project_path}")
     return project_path
 
 
@@ -431,7 +431,7 @@ def update_ml_folder(
     data["ml_folder"] = ml_folder
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML ml_folder updated at %s", project_path)
+    logging.info(f"Project YAML ml_folder updated at {project_path}")
     return project_path
 
 
@@ -456,7 +456,7 @@ def update_utils_path(
     data["utils_path"] = utils_path
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML utils_path updated at %s", project_path)
+    logging.info(f"Project YAML utils_path updated at {project_path}")
     return project_path
 
 
@@ -478,6 +478,6 @@ def read_project(path_project: str | Path):
     with open(project_path, "r", newline="", encoding="utf-8") as yaml_file:
         data = yaml.load(yaml_file, Loader=yaml.SafeLoader)
 
-    logging.info("Project YAML at %s", project_path)
+    logging.info(f"Project YAML at {project_path}")
 
     return data
