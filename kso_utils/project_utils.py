@@ -66,9 +66,10 @@ def _get_projects_yaml_file():
             # We are on cloudina
             github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/dev/kso_utils/db_starter/cdn_projects_list.csv?raw=true"
         else:
-            github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/dev/kso_utils/db_starter/projects_list.csv?raw=true"
+            github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/dev/kso_utils/db_starter/projects_list.yaml?raw=true"
         read_file = pd.read_csv(github_path)
-        read_file.to_csv(project_csv, index=None)
+        with open(project_yaml, "w", encoding="utf-8") as d:
+                yaml.safe_dump(read_file.to_dict(orient='records'), d, sort_keys=False, default_flow_style=False)
 
     if not Path(project_yaml).exists():
         raise FileNotFoundError(
