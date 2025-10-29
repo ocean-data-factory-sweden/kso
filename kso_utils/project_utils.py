@@ -5,7 +5,7 @@ from pathlib import Path
 import logging
 from dataclasses import dataclass
 import pandas as pd
-
+import yaml
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -44,7 +44,7 @@ def get_cdn_user():
     return cdn_user
 
 
-def _get_projects_csv_file():
+def _get_projects_yaml_file():
     cdn_user = get_cdn_user()
     if Path(cdn_user, "bucket").exists():
         # If this path exists, we are on cloudina and use the cloudina csv
@@ -54,12 +54,13 @@ def _get_projects_csv_file():
         # Get the directory of this utils file
         base_dir = Path(__file__).resolve().parent
         # Build path to the data file
-        project_csv = base_dir / "db_starter" / "projects_list.csv"
+        #project_csv = base_dir / "db_starter" / "projects_list.csv"
+        project_yaml = base_dir / "db_starter" / "projects_list.yaml"
 
     # Check if the csv exists, otherwise retrieve it from github
-    if not Path(project_csv).exists():
+    if not Path(project_yaml).exists():
         logging.info(
-            f"The csv {project_csv} did not exist yet, so it is retrieved from gitlab."
+            f"The yaml {project_yaml} did not exist yet, so it is retrieved from gitlab."
         )
         if Path(cdn_user, "bucket").exists():
             # We are on cloudina
@@ -69,20 +70,25 @@ def _get_projects_csv_file():
         read_file = pd.read_csv(github_path)
         read_file.to_csv(project_csv, index=None)
 
-    if not Path(project_csv).exists():
+    if not Path(project_yaml).exists():
         raise FileNotFoundError(
-            f"The CSV {project_csv} does not exist and could not be retrieved from Gitlab."
+            f"The yaml {project_yaml} does not exist and could not be retrieved from Gitlab."
         )
-    return project_csv
+    return project_yaml
 
 
 def find_project(project_name: str = ""):
     """Find project information using project csv path and project name"""
-    project_csv = _get_projects_csv_file()
+    # project_csv = _get_projects_csv_file()
+    project_yaml = _get_projects_yaml_file()
+
     cdn_user = get_cdn_user()  # is used if on cloudina, otherwise not used
 
-    with open(project_csv, mode="r", newline="", encoding="utf-8") as file:
-        reader = csv.DictReader(file)  # Reads rows as dictionaries
+    # with open(project_csv, mode="r", newline="", encoding="utf-8") as file:
+    with open(project_yaml, mode="r", newline="", encoding="utf-8") as file:
+
+        # reader = csv.DictReader(file)  # Reads rows as dictionaries
+        reader = yaml.load(file,Loader=yaml.SafeLoader)  # Reads rows as dictionaries
         for row in reader:
             if row["Project_name"] == project_name:
                 logging.info(f"{project_name} loaded successfully")
@@ -108,5 +114,5 @@ def find_project(project_name: str = ""):
                 return project
 
     raise AttributeError(
-        f"Project {project_name} is not found in CSV {project_csv}. Please select another project or add the information to the csv."
+        f"Project {project_name} is not found in yaml {project_yaml}. Please select another project or add the information to the yaml."
     )

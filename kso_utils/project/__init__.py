@@ -62,7 +62,7 @@ def _validate_tracking(tracking: Optional[Dict[str, Any]]) -> Optional[Dict[str,
 
 def create_project(
     Project_name: str,
-    project_path: str | Path = "kso_utils/project",
+    project_path: str | Path = Path(__file__).resolve().parent,
     *,
     input_data: Optional[Dict[str, Any]] = None,
     output_data: Optional[Dict[str, Any]] = None,
@@ -481,3 +481,4 @@ def read_project(path_project: str | Path):
     logging.info(f"Project YAML at {project_path}")
 
     return data
+
