@@ -481,4 +481,3 @@ def read_project(path_project: str | Path):
     logging.info(f"Project YAML at {project_path}")
 
     return data
-
