@@ -230,7 +230,7 @@ def update_input_data(
     data["input_data"] = input_data
     with open(project_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-    logging.info("Project YAML input_data updated at {project_path}")
+    logging.info(f"Project YAML input_data updated at {project_path}")
     return project_path
 
 
