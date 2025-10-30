@@ -18,6 +18,7 @@
   movie_folder: /mimer/NOBACKUP/groups/snic2021-6-9/project_movies/movies_Koster/
   photo_folder: ''
   ml_folder: ''
+  utils_path: 'kso_utils.koster_utils'
 - Project_name: Spyfish_Aotearoa
   Zooniverse_number: '14054'
   db_path: spyfish_aot.db
