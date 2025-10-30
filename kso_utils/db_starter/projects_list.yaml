@@ -5,7 +5,7 @@
   bucket: ''
   key: ''
   csv_folder: db_csv_info
-  movie_folder: ''
+  movie_folder: 'None'
   photo_folder: ''
   ml_folder: ml-template-data
 - Project_name: Koster_Seafloor_Obs

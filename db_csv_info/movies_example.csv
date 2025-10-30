@@ -1,0 +1,6 @@
+movie_id,filename,siteName,created_on,author,fps,duration,sampling_start,sampling_end,fpath
+1,movie_1.mp4,Site_1,13/08/2021,Author_name_1,25.0,10.12,0.0,10.12,https://www.wildlife.ai/wp-content/uploads/2022/06/movie_1.mp4
+2,movie_2.mp4,Site_1,13/08/2021,Author_name_2,29.97002997002997,10.043366666666667,0.0,10.043366666666667,https://www.wildlife.ai/wp-content/uploads/2022/06/movie_2.mp4
+3,movie_3.mp4,Site_1,13/08/2021,Author_name_3,29.97002997002997,10.01,0.0,10.01,https://www.wildlife.ai/wp-content/uploads/2022/06/movie_3.mp4
+4,movie_4.mp4,Site_1,18/08/2021,Author_name_4,25.0,10.08,0.0,10.08,https://www.wildlife.ai/wp-content/uploads/2022/06/movie_4.mp4
+5,movie_5.mp4,Site_2,18/08/2021,Author_name_1,29.97002997002997,10.01,0.0,10.01,https://www.wildlife.ai/wp-content/uploads/2022/06/movie_5.mp4

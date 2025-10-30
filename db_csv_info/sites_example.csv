@@ -1,0 +1,6 @@
+site_id,siteName,decimalLatitude,decimalLongitude,geodeticDatum,countryCode
+1,Site_1,-39.052281,174.023941,WGS84,NZ
+2,Site_2,-39.057633,174.018739,WGS84,NZ
+3,Site_3,-39.04892,174.0296,WGS84,NZ
+4,Site_4,-39.046859,174.014944,WGS84,NZ
+5,Site_5,-39.053019,174.015039,WGS84,NZ
