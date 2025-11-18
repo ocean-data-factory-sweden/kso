@@ -86,11 +86,12 @@ RUN apt-get update && \
 
 # Create a virtual environment and install Python packages
 COPY requirements.txt /usr/src/app/
+COPY requirements_cuda12.9.txt /usr/src/app/
 RUN python3.12 -m venv /opt/venv && \
     # Activate the venv in this RUN step
     /bin/bash -c "source /opt/venv/bin/activate && \
     pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r /usr/src/app/requirements.txt"
+    pip install --no-cache-dir -r /usr/src/app/requirements.txt -r /usr/src/app/requirements_cuda12.9.txt"
 # Set environment variables
 ENV PYTHONPATH=/opt/venv/lib/python3.12/site-packages:$PYTHONPATH:/usr/src/app/kso
 ENV PATH="/opt/venv/bin:$PATH"

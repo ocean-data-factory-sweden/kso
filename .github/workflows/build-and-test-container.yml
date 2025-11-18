@@ -26,6 +26,7 @@ jobs:
           files: |
             Dockerfile
             requirements.txt
+            requirements_cuda12.9.txt
 
   # Based on if the files have changed and whether we push or PR,
   # we decide on the tag of the image.
