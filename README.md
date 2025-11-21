@@ -162,6 +162,12 @@ We are always excited to collaborate and help other marine scientists. Please fe
 ## Troubleshooting
 
 If you experience issues importing panoptes_client in Windows, it is a known [issue with the libmagic package](https://github.com/zooniverse/panoptes-python-client/issues/264). [Pmason's suggestions in the Talk board of Zooniverse](https://www.zooniverse.org/talk/18/3283063) can be useful for troubleshooting it.
+The following code fixed the issue in a Windows machine:
+```bash
+pip uninstall panoptescli
+pip install panoptescli
+pip install python-magic-bin
+```
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
