@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 import pandas as pd
 import yaml
+
 # Logging
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
@@ -54,7 +55,7 @@ def _get_projects_yaml_file():
         # Get the directory of this utils file
         base_dir = Path(__file__).resolve().parent
         # Build path to the data file
-        #project_csv = base_dir / "db_starter" / "projects_list.csv"
+        # project_csv = base_dir / "db_starter" / "projects_list.csv"
         project_yaml = base_dir / "db_starter" / "projects_list.yaml"
 
     # Check if the csv exists, otherwise retrieve it from github
@@ -69,7 +70,12 @@ def _get_projects_yaml_file():
             github_path = "https://github.com/ocean-data-factory-sweden/kso_utils/blob/dev/kso_utils/db_starter/projects_list.yaml?raw=true"
         read_file = pd.read_csv(github_path)
         with open(project_yaml, "w", encoding="utf-8") as d:
-                yaml.safe_dump(read_file.to_dict(orient='records'), d, sort_keys=False, default_flow_style=False)
+            yaml.safe_dump(
+                read_file.to_dict(orient="records"),
+                d,
+                sort_keys=False,
+                default_flow_style=False,
+            )
 
     if not Path(project_yaml).exists():
         raise FileNotFoundError(
@@ -89,7 +95,7 @@ def find_project(project_name: str = ""):
     with open(project_yaml, mode="r", newline="", encoding="utf-8") as file:
 
         # reader = csv.DictReader(file)  # Reads rows as dictionaries
-        reader = yaml.load(file,Loader=yaml.SafeLoader)  # Reads rows as dictionaries
+        reader = yaml.load(file, Loader=yaml.SafeLoader)  # Reads rows as dictionaries
         for row in reader:
             if row["Project_name"] == project_name:
                 logging.info(f"{project_name} loaded successfully")
