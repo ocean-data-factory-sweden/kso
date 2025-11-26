@@ -75,10 +75,65 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Free disk space (specific to Ubuntu images)
+      - name: Check disk space
         run: |
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+          df -h
+
+      # In the github runner, /mnt is mounted to some other volume with plenty of free space.
+      # We move the docker directory to this volume to have enough space for building images.
+      # This is much faster than erasing files to free disk space
+      - name: Move docker directory
+        run: |
+          echo "---- Contents of /mnt -------------"
+          ls /mnt
+          echo "---- Info about /mnt --------------"
+          cat /mnt/DATALOSS_WARNING_README.txt
+          echo "-----------------------------------"
+          sudo bash << EOF
+          mv /var/lib/docker /mnt/
+          mkdir /var/lib/docker
+          mount --bind /mnt/docker /var/lib/docker
+          EOF
+
+      # We skip this erasing step to speed up the CI run.
+      # If /mnt disappears at some point from the runner, you can gain disk space by enabling this.
+      # See https://github.com/actions/runner-images/blob/0d358721aff04547ce591c7e1c444dc285fae993/images/ubuntu/Ubuntu2404-Readme.md
+      - name: Free disk space with rm (specific to Ubuntu images)
+        if: ${{ false }}
+        run: |
+          sudo bash << EOF
+          rm -rf "$ANDROID_SDK_ROOT"      # 12 GB
+          rm -rf "$AGENT_TOOLSDIRECTORY"  #  6 GB
+          rm -rf /usr/share/dotnet        #  4 GB
+          rm -rf "$CONDA"                 #  1 GB
+          EOF
+
+      # We skip this erasing step to speed up the CI run.
+      # If /mnt disappears at some point from the runner, you can gain disk space by enabling this.
+      # See https://github.com/actions/runner-images/blob/0d358721aff04547ce591c7e1c444dc285fae993/images/ubuntu/Ubuntu2404-Readme.md
+      - name: Free disk space with apt (specific to Ubuntu images)
+        if: ${{ false }}
+        run: |
+          sudo bash << EOF
+          # Remove browsers
+          apt-get remove --purge -y microsoft-edge-stable google-chrome-stable firefox
+          # Remove java
+          apt-get remove --purge -y '^temurin-*' '^openjdk-*'
+          # Remove unnecessary tools
+          apt-get remove --purge -y azure-cli '^google-cloud-*' powershell '^mysql-*' '^dotnet-.*'
+          # Remove compilers
+          apt-get remove --purge -y '^llvm-*' '^libllvm-*' '^gfortran-*' gcc-{9,10,11,12,13}
+          # Clean
+          apt-get autoremove -y
+          apt-get clean && rm -rf /var/lib/apt/lists/*
+          EOF
+          # List remaining large packages
+          dpkg-query -Wf '${Installed-Size}\t${Package}\n' | sort -n | tail -n 10
+
+      - name: Check disk space
+        run: |
+          df -h
+
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
