@@ -1,9 +1,0 @@
-Project_name: Test Project
-Project_path: /Users/ghaith/Desktop/kso/kso/kso2/projects/test_project
-Data:
-  path: /Users/ghaith/Desktop/kso/kso/kso2/projects/coco8.yaml
-model:
-  weights_path: /Users/ghaith/Desktop/yolov8n.pt
-  model_name: yolov8n.pt
-tracking: null
-metadata: null
