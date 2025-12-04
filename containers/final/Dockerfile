@@ -19,6 +19,3 @@ RUN adduser --disabled-password \
 USER ${NB_USER}
 
 WORKDIR /opt/kso
-
-# Make sure we use the environment as entry point
-ENTRYPOINT ["/bin/bash", "-c", "source /opt/venv/bin/activate && exec \"$@\"", "--"]

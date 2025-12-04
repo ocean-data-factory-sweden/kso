@@ -80,14 +80,14 @@ RUN apt-get update && \
 
 COPY --from=ffmpeg-build /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
 
-# Create a virtual environment and install Python packages
+# Install pip packages directly so that the user can create
+# their own venv with --system-site-packages to use the packages in the container
+ARG PIP_BREAK_SYSTEM_PACKAGES=1
+ARG PIP_ROOT_USER_ACTION=ignore
+ARG PIP_NO_CACHE_DIR=1
+
+# Install Python packages
 COPY requirements.txt /opt/kso/
 COPY requirements_cuda12.9.txt /opt/kso/
-RUN python3.12 -m venv /opt/venv && \
-    # Activate the venv in this RUN step
-    /bin/bash -c "source /opt/venv/bin/activate && \
-    pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r /opt/kso/requirements.txt -r /opt/kso/requirements_cuda12.9.txt"
-# Set environment variables
-ENV PYTHONPATH=/opt/venv/lib/python3.12/site-packages:$PYTHONPATH:/opt/kso
-ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install -r /opt/kso/requirements.txt -r /opt/kso/requirements_cuda12.9.txt
+RUN pip install papermill
