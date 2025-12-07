@@ -74,6 +74,7 @@ dependencies = [
     "ipykernel>=7.1.0",
     "isodate==0.7.2",
     "itsdangerous==2.2.0",
+    "jblack>=1.2",
     "jiter==0.11.1",
     "joblib==1.5.2",
     "jsonpatch==1.33",

@@ -1507,6 +1507,14 @@ wheels = [
 ]
 
 [[package]]
+name = "jblack"
+version = "1.2"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ff/57/1a11323759ea6a771e6dde211ded41972f1e805cc0eafd8d485521565d95/jblack-1.2-py3-none-any.whl", hash = "sha256:3aa68d6cc4abd1ff1b2c25083784bbd339b177203d830e4cab2547e7af3bd0b0", size = 4581 },
+]
+
+[[package]]
 name = "jedi"
 version = "0.19.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1815,6 +1823,7 @@ dependencies = [
     { name = "ipykernel" },
     { name = "isodate" },
     { name = "itsdangerous" },
+    { name = "jblack" },
     { name = "jiter" },
     { name = "joblib" },
     { name = "jsonpatch" },
@@ -2030,6 +2039,7 @@ requires-dist = [
     { name = "ipykernel", specifier = ">=7.1.0" },
     { name = "isodate", specifier = "==0.7.2" },
     { name = "itsdangerous", specifier = "==2.2.0" },
+    { name = "jblack", specifier = ">=1.2" },
     { name = "jiter", specifier = "==0.11.1" },
     { name = "joblib", specifier = "==1.5.2" },
     { name = "jsonpatch", specifier = "==1.33" },

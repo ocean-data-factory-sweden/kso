@@ -10,13 +10,18 @@ from pathlib import Path
 from dataclasses import dataclass
 import pprint
 from ultralytics import settings
-
+from PIL import Image
+import random
+import pandas as pd
+from collections import defaultdict
+import json
+import shutil
 
 @dataclass
 class Project:
     Project_name: str
     project_path: str | Path | None = None
-    ultralytics_data: Optional[Dict[str, Any]] = None
+    data_path: Optional[Dict[str, Any]] = None
     tracking: Optional[Dict[str, Any]] = None
     model_path: str = None
     model_name: str = None
@@ -59,7 +64,7 @@ def create_project(
         yaml_dict: Dict[str, Any] = {
             "Project_name": sanitized,
             "Project_path": str(project),
-            "ultralytics_data": {"path": str(ultralytics_data)},
+            "data_path": {"ultralytics_data_path": str(ultralytics_data)},
             "model": {"model_path": weights_path, "model_name": model_name},
             "tracking": tracking,
             "metadata": metadata,
@@ -83,7 +88,7 @@ def create_project(
     project = Project(
         Project_name=yaml_dict["Project_name"],
         project_path=yaml_dict["Project_path"],
-        ultralytics_data=yaml_dict["ultralytics_data"]["path"],
+        data_path=yaml_dict["data_path"]["ultralytics_data_path"],
         tracking=yaml_dict["tracking"],
         model_path=yaml_dict["model"]["model_path"],
         model_name=yaml_dict["model"]["model_name"],
@@ -99,27 +104,305 @@ def add_data(project_path: Project, data: str = None) -> Dict:
         raise ValueError("'Project_path' must be a project instance.")
     if data and not isinstance(data, str):
         raise ValueError("'Ultralytics data path' must be a non-empty string.")
-    if data:
-        data_path = Path(data).expanduser().resolve()
-
+    
     project_name = project_path.Project_name
     base_dir = Path.cwd().parent
     project = base_dir / "projects" / project_name
 
     yaml_path = project / f"{project_name}.project.yaml"
 
-    if not data:
+    if data:
+        data_path = Path(data).expanduser().resolve()
+    else:
         data_path = add_ultralytics_dataset_yaml(str(project / "coco8.yaml"))
 
     with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.SafeLoader)
 
-    data["ultralytics_data"]["path"] = str(data_path)
+    data["data_path"]["ultralytics_data_path"] = str(data_path)
     with open(yaml_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
 
     logging.info(f"Project YAML data path updated at {yaml_path}")
     return pprint.pp(data)
+
+def preprocess_biigle_csv(BIIGLE_CSV_PATH:str,IMAGES_ROOT:str,DATASET_DIR:str):
+    
+    BIIGLE_CSV_PATH = Path(BIIGLE_CSV_PATH).expanduser().resolve()           # e.g. "my_annotations.csv"
+    IMAGES_ROOT = Path(IMAGES_ROOT).expanduser().resolve()          # e.g. "my_images" (filenames must match CSV)
+    DATASET_DIR = Path(DATASET_DIR).expanduser().resolve()
+
+    TRAIN_RATIO = 0.7
+    VAL_RATIO   = 0.2
+    TEST_RATIO  = 0.1
+
+    AUGMENT_TRAIN  = True
+    AUGMENT_FACTOR = 0.5                  # 0.5 = +50% images, 1.0 = double
+    AUGMENT_OPS    = ["hflip", "vflip", "rot180"]
+
+    RANDOM_SEED = 42
+    VALID_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+
+    if not BIIGLE_CSV_PATH.exists():
+        raise FileNotFoundError(f"{BIIGLE_CSV_PATH} doent exist")
+    if not IMAGES_ROOT.exists():
+        raise FileNotFoundError(f"{IMAGES_ROOT} doent exist")
+    if not DATASET_DIR.exists():
+        raise FileNotFoundError(f"{DATASET_DIR} doent exist")
+
+    df = pd.read_csv(BIIGLE_CSV_PATH)
+    print(f"Loaded {len(df)} annotations from CSV")
+
+    # Validate columns
+    required = ["filename", "label_name", "shape_name", "points", "attributes"]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(f"CSV missing required columns: {missing}")
+
+    # Filter to Rectangle/Polygon (converted to bounding boxes)
+    supported = ["Rectangle", "Polygon"]
+    df = df[df["shape_name"].isin(supported)].reset_index(drop=True)
+    print(f"Supported annotations (Rectangle/Polygon): {len(df)}")
+
+    # Build class mapping
+    class_names = sorted(df["label_name"].unique())
+    df["class_id"] = df["label_name"].map({name: i for i, name in enumerate(class_names)})
+
+    print(f"\nDetected {len(class_names)} classes:")
+    for cid, name in enumerate(class_names):
+        print(f"  {cid}: {name} ({(df['class_id'] == cid).sum()} annotations)")
+
+    # Parse image dimensions
+    attrs = df["attributes"].apply(json.loads)
+    df["img_w"] = attrs.apply(lambda d: d.get("width"))
+    df["img_h"] = attrs.apply(lambda d: d.get("height"))
+    df = df.dropna(subset=["img_w", "img_h"]).reset_index(drop=True)
+
+    # Convert to YOLO format
+    def bbox_from_points(points_str):
+        pts = json.loads(points_str)
+        xs, ys = pts[0::2], pts[1::2]
+        return min(xs), min(ys), max(xs), max(ys)
+
+    df[["xmin", "ymin", "xmax", "ymax"]] = df["points"].apply(
+        lambda s: pd.Series(bbox_from_points(s)))
+
+    df["x_center"] = ((df["xmin"] + df["xmax"]) / 2) / df["img_w"]
+    df["y_center"] = ((df["ymin"] + df["ymax"]) / 2) / df["img_h"]
+    df["w_norm"]   = (df["xmax"] - df["xmin"]) / df["img_w"]
+    df["h_norm"]   = (df["ymax"] - df["ymin"]) / df["img_h"]
+
+    print(f"\nConverted {len(df)} annotations to YOLO format")
+
+
+    # Index source images
+    image_index = {p.name: p for p in IMAGES_ROOT.rglob("*") 
+                if p.is_file() and p.suffix.lower() in VALID_EXTS}
+
+    # Create splits
+    rng = random.Random(RANDOM_SEED)
+    img_to_labels = defaultdict(set)
+    for row in df.itertuples():
+        img_to_labels[row.filename].add(int(row.class_id))
+
+    images = list(img_to_labels.keys())
+    n_images = len(images)
+    n_train = int(round(TRAIN_RATIO * n_images))
+    n_val = int(round(VAL_RATIO * n_images))
+
+    split_for_image = {}
+    split_counts = {"train": 0, "val": 0, "test": 0}
+
+    def assign(img, split):
+        if img not in split_for_image:
+            split_for_image[img] = split
+            split_counts[split] += 1
+            return True
+        return split_for_image[img] == split
+
+    # Ensure class coverage
+    for cls in sorted(df["class_id"].unique()):
+        imgs = [img for img, labels in img_to_labels.items() if cls in labels]
+        rng.shuffle(imgs)
+        if imgs: assign(imgs[0], "train")
+        if len(imgs) >= 2:
+            for img in imgs[1:]:
+                if assign(img, "val"): break
+        if len(imgs) >= 3:
+            for img in imgs[2:]:
+                if assign(img, "test"): break
+
+    # Fill remaining
+    remaining = [img for img in images if img not in split_for_image]
+    rng.shuffle(remaining)
+    for img in remaining:
+        needs = {"train": n_train - split_counts["train"],
+                "val": n_val - split_counts["val"],
+                "test": (n_images - n_train - n_val) - split_counts["test"]}
+        max_need = max(needs.values())
+        if max_need <= 0:
+            assign(img, "train")
+        else:
+            assign(img, rng.choice([s for s, n in needs.items() if n == max_need]))
+
+    # Build dataset
+    SPLIT_MAP = {"train": "train", "val": "valid", "test": "test"}
+    for folder in SPLIT_MAP.values():
+        (DATASET_DIR / folder / "images").mkdir(parents=True, exist_ok=True)
+        (DATASET_DIR / folder / "labels").mkdir(parents=True, exist_ok=True)
+
+    grouped = {fn: g for fn, g in df.groupby("filename")}
+    stats = {f: {"images": 0, "annotations": 0} for f in SPLIT_MAP.values()}
+
+    for filename, split in split_for_image.items():
+        folder = SPLIT_MAP[split]
+        src_img = image_index.get(filename)
+        if src_img is None:
+            continue
+        
+        shutil.copy2(src_img, DATASET_DIR / folder / "images" / filename)
+        
+        label_lines = []
+        if filename in grouped:
+            for row in grouped[filename].itertuples():
+                label_lines.append(
+                    f"{int(row.class_id)} {row.x_center:.6f} {row.y_center:.6f} "
+                    f"{row.w_norm:.6f} {row.h_norm:.6f}")
+        
+        (DATASET_DIR / folder / "labels" / f"{Path(filename).stem}.txt").write_text(
+            "\n".join(label_lines))
+        
+        stats[folder]["images"] += 1
+        stats[folder]["annotations"] += len(label_lines)
+
+    print(f"Dataset created from {n_images} images:")
+    for folder, s in stats.items():
+        print(f"  {folder}: {s['images']} images, {s['annotations']} annotations")
+
+    if not AUGMENT_TRAIN or AUGMENT_FACTOR <= 0:
+        print("Augmentation disabled.")
+    else:
+        train_img_dir = DATASET_DIR / "train" / "images"
+        train_lbl_dir = DATASET_DIR / "train" / "labels"
+        
+        train_imgs = sorted(p for p in train_img_dir.iterdir() if p.suffix.lower() in VALID_EXTS)
+        n_original = len(train_imgs)
+        n_target = int(round(n_original * AUGMENT_FACTOR))
+        
+        if n_target == 0:
+            print("No augmentation needed.")
+        else:
+            rng = random.Random(RANDOM_SEED + 1)
+            selected = rng.sample(train_imgs, k=min(n_target, n_original))
+            
+            def transform_bbox(xc, yc, w, h, op):
+                if op == "hflip":   return 1 - xc, yc, w, h
+                if op == "vflip":   return xc, 1 - yc, w, h
+                if op == "rot180":  return 1 - xc, 1 - yc, w, h
+                raise ValueError(f"Unknown op: {op}")
+            
+            def apply_image_op(img, op):
+                if op == "hflip":   return img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                if op == "vflip":   return img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+                if op == "rot180":  return img.rotate(180, expand=True)
+                raise ValueError(f"Unknown op: {op}")
+            
+            created = 0
+            for img_path in selected:
+                label_path = train_lbl_dir / f"{img_path.stem}.txt"
+                if not label_path.exists():
+                    continue
+                
+                raw = label_path.read_text().strip()
+                if not raw:
+                    continue
+                
+                op = rng.choice(AUGMENT_OPS)
+                new_labels = []
+                for line in raw.splitlines():
+                    parts = line.split()
+                    if len(parts) < 5:
+                        continue
+                    cls = parts[0]
+                    xc, yc, w, h = map(float, parts[1:5])
+                    xc, yc, w, h = transform_bbox(xc, yc, w, h, op)
+                    xc, yc = max(0, min(1, xc)), max(0, min(1, yc))
+                    w, h = max(0, min(1, w)), max(0, min(1, h))
+                    new_labels.append(f"{cls} {xc:.6f} {yc:.6f} {w:.6f} {h:.6f}")
+                
+                if not new_labels:
+                    continue
+                
+                img = Image.open(img_path)
+                img_aug = apply_image_op(img, op)
+                
+                suffix = f"_aug_{op}"
+                img_aug.save(train_img_dir / f"{img_path.stem}{suffix}{img_path.suffix}")
+                (train_lbl_dir / f"{img_path.stem}{suffix}.txt").write_text("\n".join(new_labels))
+                created += 1
+            
+            print(f"Created {created} augmented images")
+            print(f"  Train set: {n_original} -> {n_original + created} images")
+
+    data_yaml_path = DATASET_DIR / "data.yaml"
+
+    data_cfg = {
+        "path": str(DATASET_DIR),
+        "train": "train/images",
+        "val": "valid/images",
+        "test": "test/images",
+        "nc": len(class_names),
+        "names": class_names,
+    }
+
+    with open(data_yaml_path, "w") as f:
+        yaml.safe_dump(data_cfg, f, sort_keys=False)
+    return data_yaml_path
+
+
+
+
+
+def add_Biigle_data(project_path:Project,
+                    BIIGLE_CSV_PATH:str,
+                    IMAGES_ROOT:str,
+                    DATASET_DIR:str=None):
+    
+    if not BIIGLE_CSV_PATH or not isinstance(BIIGLE_CSV_PATH,str):
+        raise ValueError(f"BIIGLE_CSV_PATH must be a non empty string")
+    if not IMAGES_ROOT or not isinstance(IMAGES_ROOT, str):
+        raise ValueError(f"IMAGES_ROOT must be a non empty string")
+    if DATASET_DIR and not isinstance(DATASET_DIR, str):
+        raise ValueError(f"DATASET_DIR must be a non empty string")
+    if DATASET_DIR:
+        DATASET_DIR_path=Path(DATASET_DIR).expanduser().resolve()
+        if not DATASET_DIR_path.exists():
+            raise FileNotFoundError(f"{DATASET_DIR_path} not found")
+    project_name = project_path.Project_name
+    base_dir = Path.cwd().parent
+    project = base_dir / "projects" / project_name
+    if not DATASET_DIR:
+        DATASET_DIR=project/"Dataset"
+        DATASET_DIR.mkdir(parents=True, exist_ok=True)
+    
+    biigle_yaml_path=preprocess_biigle_csv(BIIGLE_CSV_PATH=BIIGLE_CSV_PATH,
+                                           IMAGES_ROOT=IMAGES_ROOT,
+                                           DATASET_DIR=str(DATASET_DIR))
+    
+    yaml_path = project / f"{project_name}.project.yaml"
+
+    with open(yaml_path, "r", encoding="utf-8") as f:
+        data = yaml.load(f, Loader=yaml.SafeLoader)
+    #data["data_path"] = {"Biigle_path":str(biigle_yaml_path)}
+    data["data_path"].update({"Biigle_path":str(biigle_yaml_path)})
+
+    with open(yaml_path, "w", encoding="utf-8") as d:
+        yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
+    logging.info(f"Project YAML data path updated at {yaml_path}")
+    return pprint.pp(data)
+
+
+
 
 
 def add_model(project_path: Project, model: str = None, model_name: str = None) -> Dict:
