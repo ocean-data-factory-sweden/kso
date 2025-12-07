@@ -19,6 +19,7 @@ from collections import defaultdict
 import random
 from PIL import Image
 
+
 def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
 
     project_name = project_path.Project_name
@@ -34,7 +35,7 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
     with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.SafeLoader)
 
-    #data_path = data["ultralytics_data"]["path"]
+    # data_path = data["ultralytics_data"]["path"]
     data_path = data["data_path"]["Biigle_path"]
 
     if not isinstance(project_path, Project):
@@ -87,13 +88,6 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
     print(f"Lifecycle_stage: {experiment.lifecycle_stage}")
     print(f"Last Updated timestamp: {experiment.last_update_time}")
     return results
-
-
-
-
-
-
-
 
 
 def export_experiment(project_path: Project, notebook_formats=None, use_threads=False):
