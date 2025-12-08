@@ -18,6 +18,55 @@ import shutil
 from collections import defaultdict
 import random
 from PIL import Image
+from mlflow.pyfunc import PythonModel
+import numpy as np
+from ultralytics import settings
+
+
+class YOLOv11MLflowModel(PythonModel):
+    def __init__(self):
+        # Don't keep any state in the constructor
+        super().__init__()
+
+    def load_context(self, context):
+
+        model_path = context.artifacts["weights"]
+        self.model = YOLO(model_path)
+
+    def predict(self, context, image_input):
+        image = image_input.get("image")
+        if isinstance(image, list):
+            image = np.array(image, dtype=np.uint8)
+
+        # Run prediction
+        results = self.model.predict(image)
+
+        # Convert to JSON string
+        output = []
+        for result in results:
+            result_dict = {
+                "boxes": (
+                    result.boxes.xyxy.cpu().numpy().tolist()
+                    if result.boxes is not None
+                    else []
+                ),
+                "scores": (
+                    result.boxes.conf.cpu().numpy().tolist()
+                    if result.boxes is not None
+                    else []
+                ),
+                "classes": (
+                    result.boxes.cls.cpu().numpy().astype(int).tolist()
+                    if result.boxes is not None
+                    else []
+                ),
+                "names": result.names,
+                "shape": list(result.orig_shape),
+            }
+            output.append(result_dict)
+
+        # Return as JSON string
+        return output
 
 
 def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
@@ -35,8 +84,8 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
     with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.SafeLoader)
 
-    # data_path = data["ultralytics_data"]["path"]
-    data_path = data["data_path"]["Biigle_path"]
+    # data_path = data["data_path"]["Biigle_path"]
+    data_path = data["data_path"]["ultralytics_data_path"]
 
     if not isinstance(project_path, Project):
         raise ValueError("'model' must be a Project instance.")
@@ -49,7 +98,11 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
     artifact_root.mkdir(parents=True, exist_ok=True)
 
     mlflowdb_path = Path.cwd().parent / "projects" / "mlflow.db"
-    experiment_name = f"{project_name}_yolov8"
+    experiment_name = f"{project_name}_yolov11"
+
+    os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{mlflowdb_path}"
+    os.environ["MLFLOW_EXPERIMENT_NAME"] = experiment_name
+    os.environ["MLFLOW_ARTIFACT_URI"] = str(artifact_root)
 
     # Check if experiment exists
     mlflow.set_tracking_uri(f"sqlite:///{mlflowdb_path}")
@@ -66,10 +119,21 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
     mlflow.set_experiment(experiment_name)
 
     model = YOLO(model_source)
+
     with mlflow.start_run():
         results = model.train(data=data_path, epochs=epochs, imgsz=imgsz)
         mlflow.log_param("epochs", epochs)
         mlflow.log_metric("accuracy", 0.87)
+        print(f"results.save_dir {results.save_dir}")
+
+        best_weight_path = Path(results.save_dir) / "weights" / "best.pt"
+
+        mlflow.pyfunc.log_model(
+            name="model",
+            python_model=YOLOv11MLflowModel(),
+            artifacts={"weights": str(best_weight_path)},
+        )
+
     mlflow.end_run()
 
     data["Mlflow"] = {
