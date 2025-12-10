@@ -24,12 +24,7 @@ rm -rf ${MIOPEN_USER_DB_PATH}
 mkdir -p ${MIOPEN_USER_DB_PATH}
 
 KSO_PATH=$(readlink -f ../../)
-
-if [ -z "${PYTHONPATH}" ]; then
-    export PYTHONPATH=$KSO_PATH
-else
-    export PYTHONPATH=$KSO_PATH:$PYTHONPATH
-fi
+export PYTHONPATH=$KSO_PATH${PYTHONPATH:+:$PYTHONPATH}
 
 notebook=$KSO_PATH/notebooks/analyse/Train_models.ipynb
 dpath="outputs/$SLURM_JOB_ID"
