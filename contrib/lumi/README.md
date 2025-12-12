@@ -4,8 +4,9 @@ Note! Replace the `project_...` with the correct project code in the instruction
 
 ## First steps
 
-- Login to LUMI using SSH or via Login node shell in https://www.lumi.csc.fi/
-  and clone the KSO repository to your personal working directory
+- Login to LUMI using SSH or via Login node shell in https://www.lumi.csc.fi/ and run the following commands in that shell.
+
+- Clone the KSO repository to your personal working directory:
 
       git clone https://github.com/ocean-data-factory-sweden/kso.git /scratch/project_.../$USER/kso
 
@@ -13,6 +14,12 @@ Note! Replace the `project_...` with the correct project code in the instruction
 
       cd /scratch/project_.../$USER/kso
       git checkout BRANCH_NAME
+
+- **This step is not needed in DTO-BioFlow project, an image is pulled already!**
+  Pull container image (change the image version 'dev-rocm6.4-ubuntu24.04' if needed):
+
+      cd /scratch/project_.../$USER
+      singularity pull --disable-cache docker://ghcr.io/ocean-data-factory-sweden/kso:dev-rocm6.4-ubuntu24.04
 
 ## Batch job execution
 
@@ -22,9 +29,9 @@ Note! Replace the `project_...` with the correct project code in the instruction
 
       cd /scratch/project_.../$USER/kso/contrib/lumi
 
-- Submit a job running a notebook non-interactively (modify the script as needed)
+- Submit a job running a notebook non-interactively (modify the script as needed), set `CONTAINER` to point to the path to the container image sif file
 
-      sbatch -A project_... scripts/submit.lumi.sh "/projappl/project_.../containers/kso-lumi_0.3.0.sif"
+      sbatch -A project_... scripts/submit.lumi.sh CONTAINER
 
 - The output will go to directory `/scratch/project_.../$USER/kso/contrib/lumi/outputs/JOBID/`, where `JOBID` is the unique id of the submitted job
 
@@ -42,9 +49,10 @@ Note! Replace the `project_...` with the correct project code in the instruction
   - Working directory: /scratch/$PROJECT
   - Under 'Advanced'
     - Custom Python type: Script
-    - Script or path to script: Copy-paste the following lines:
+    - Script or path to script: Copy-paste and edit the following lines:
 
-          CONTAINER="/projappl/$PROJECT/containers/kso-lumi_0.3.0.sif"
+          CONTAINER="..."  # Put the correct path to container here!
+          # The following lines need no changes
           export SINGULARITY_BIND="/pfs,/scratch,/projappl,/project,/flash,/appl"
           export python="singularity exec $CONTAINER python3"
           export PYTHONUSERBASE="/scratch/$PROJECT/$USER/venv"
@@ -53,9 +61,3 @@ Note! Replace the `project_...` with the correct project code in the instruction
 - Wait for the Jupyter session to be queued and launched
 - Click 'Connect to Jupyter' once the button appears
 - Navigate in Jupyter to the notebooks under **your working directory** (the directory named as your LUMI username)
-
-## Steps for general users
-
-The steps above work in general after the following changes:
-
-- Initial preparation step: pull/transfer the singularity container image (the sif file) to LUMI as explained in the corresponding step [in these instructions](container/README.md).
