@@ -1,4 +1,4 @@
-ARG BASE_IMAGE
+ARG BASE_IMAGE=ghcr.io/ocean-data-factory-sweden/kso-base:latest
 FROM ${BASE_IMAGE}
 
 # Copy KSO
