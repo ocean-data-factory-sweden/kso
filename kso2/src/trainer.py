@@ -7,11 +7,13 @@ from dataclasses import asdict
 import os
 import sys
 from ultralytics import YOLO
-from project import Project, create_project
-import mlflow
 from project import Project
-from mlflow_export_import.bulk.export_experiments import export_experiments
-from mlflow_export_import.bulk.import_experiments import import_experiments
+
+# import mlflow
+from project import Project
+
+# from mlflow_export_import.bulk.export_experiments import export_experiments
+# from mlflow_export_import.bulk.import_experiments import import_experiments
 import json
 import pandas as pd
 import shutil
@@ -21,6 +23,7 @@ from PIL import Image
 from mlflow.pyfunc import PythonModel
 import numpy as np
 from ultralytics import settings
+import mlflow
 
 
 class YOLOv11MLflowModel(PythonModel):
@@ -72,8 +75,6 @@ class YOLOv11MLflowModel(PythonModel):
 def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
 
     project_name = project_path.Project_name
-    # project = create_project(project_path=project_name)
-    # artifact_root=Path.cwd().parent/"projects"/project_name
 
     base_dir = Path.cwd().parent
     project = base_dir / "projects" / project_name
@@ -98,7 +99,7 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
     artifact_root.mkdir(parents=True, exist_ok=True)
 
     mlflowdb_path = Path.cwd().parent / "projects" / "mlflow.db"
-    experiment_name = f"{project_name}_yolov11"
+    experiment_name = project_name
 
     os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{mlflowdb_path}"
     os.environ["MLFLOW_EXPERIMENT_NAME"] = experiment_name
@@ -138,7 +139,7 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
 
     data["Mlflow"] = {
         "path": str(mlflowdb_path),
-        "experiment_name": f"yolov8_with_ep={epochs}",
+        "experiment_name": project_name,
         "mlflow.db": str(mlflowdb_path),
     }
 
@@ -155,9 +156,11 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
 
 
 def export_experiment(project_path: Project, notebook_formats=None, use_threads=False):
+    from mlflow_export_import.bulk.export_experiments import export_experiments
+    from mlflow_export_import.bulk.import_experiments import import_experiments
 
     project_name = project_path.Project_name
-    experiment_name = f"{project_name}_yolov8"
+    experiment_name = project_name
     # 1) Tracking URI points to your local mlruns folder
     mlflow.set_tracking_uri("http://localhost:8080")
     # Check if experiment exists

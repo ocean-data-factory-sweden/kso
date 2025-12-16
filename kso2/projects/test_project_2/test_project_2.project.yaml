@@ -1,0 +1,14 @@
+Project_name: test_project_2
+Project_path: /Users/ghaith/Desktop/kso/kso/kso2/projects/test_project_2
+data_path:
+  ultralytics_data_path: /Users/ghaith/Desktop/kso/kso/kso2/projects/test_project_2/coco8.yaml
+  Biigle_path: /Users/ghaith/Desktop/kso/kso/kso2/projects/test_project_2/Dataset/data.yaml
+model:
+  model_path: /Users/ghaith/Desktop/kso/kso/kso2/projects/test_project_2/yolov8n.pt
+  model_name: null
+tracking: null
+metadata: null
+Mlflow:
+  path: /Users/ghaith/Desktop/kso/kso/kso2/projects/mlflow.db
+  experiment_name: test_project_2
+  mlflow.db: /Users/ghaith/Desktop/kso/kso/kso2/projects/mlflow.db
