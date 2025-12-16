@@ -25,11 +25,11 @@ RUN apt-get update && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- Build ffmpeg with CUDA support from source ---
-RUN git clone --depth 1 --branch n12.0.16.0 https://github.com/FFmpeg/nv-codec-headers.git && \
+RUN git clone -b n12.0.16.1 --depth 1 https://github.com/FFmpeg/nv-codec-headers.git && \
     cd nv-codec-headers && \
     make install && \
     cd .. && \
-    git clone https://git.ffmpeg.org/ffmpeg.git --depth 1 ffmpeg/ && \
+    git clone -b n8.0.1 --depth 1 https://git.ffmpeg.org/ffmpeg.git && \
     cd ffmpeg && \
     ./configure \
         --enable-nonfree \
