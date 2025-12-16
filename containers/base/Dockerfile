@@ -6,7 +6,6 @@ FROM nvcr.io/nvidia/cuda:12.9.0-cudnn-devel-ubuntu24.04 AS ffmpeg-build
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
-    apt-get upgrade -y && \
     apt-get install --no-install-recommends -y \
         automake \
         autoconf \
