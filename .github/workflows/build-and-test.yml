@@ -4,6 +4,8 @@ on:
     branches:
       - main
       - dev
+    tags:
+      - "v*.*.*"
   pull_request:
     branches:
       - main
@@ -35,19 +37,32 @@ jobs:
           # Check whether workflow was triggered by PR
           is_pr=${{ github.event_name == 'pull_request' }}
 
+          # Check whether workflow was triggered by a push of a tag
+          is_tag=${{ github.ref_type == 'tag' }}
+
+          # Add 'latest" tag for versioned git tags
+          is_latest=$is_tag
+
           # Platforms
           platforms=(cpu cuda rocm)
 
           # Names of the images
-          base_image_name=ghcr.io/${{ github.repository }}-base       # ghcr.io/ocean-data-factory-sweden/kso-base
-          final_image_name=ghcr.io/${{ github.repository }}           # ghcr.io/ocean-data-factory-sweden/kso
+          cache_tag_prefix=buildcache
+          cache_tag_2=false
+          base_image_name=ghcr.io/${{ github.repository }}-base         # ghcr.io/ocean-data-factory-sweden/kso-base
+          final_image_name=ghcr.io/${{ github.repository }}             # ghcr.io/ocean-data-factory-sweden/kso
           if $is_pr; then
-            build_tag=pr-${{ github.event.pull_request.number }}      # pr-480
-            pr_base_tag=${{ github.event.pull_request.base.ref }}     # dev
+            build_tag=pr-${{ github.event.pull_request.number }}        # pr-480
+            pr_base_tag=${{ github.event.pull_request.base.ref }}       # dev
+            cache_tag=$cache_tag_prefix-$build_tag                      # buildcache-pr-480
+            cache_tag_2=$cache_tag_prefix-$pr_base_tag                  # buildcache-dev
+          elif $is_tag; then
+            build_tag=${{ github.ref_name }}; build_tag=${build_tag#v}  # 1.2.3-beta
+            cache_tag=$cache_tag_prefix-dev                             # buildcache-dev
           else
-            build_tag=${{ github.ref_name }}                          # dev
+            build_tag=${{ github.ref_name }}                            # dev
+            cache_tag=$cache_tag_prefix-$build_tag                      # buildcache-dev
           fi
-          cache_tag=buildcache                                        # buildcache
 
           # Check changed files since previous successful workflow run for PRs
           if $is_pr; then
@@ -171,12 +186,22 @@ jobs:
             final_image="$final_image_name:$build_tag-$platform_tag"
             build_final_image=true
 
+            # Tags for the build
+            base_image_tags="$base_image"
+            final_image_tags="$final_image"
+
+            # Add "latest" tag for cpu image
+            if [[ "$is_latest" == "true" && "$platform" == "cpu" ]]; then
+              base_image_tags="$base_image_tags"$'\n'"$base_image_name:latest"
+              final_image_tags="$final_image_tags"$'\n'"$final_image_name:latest"
+            fi
+
             # Build caches
-            base_image_cache_to="type=registry,ref=$base_image_name:$cache_tag-$build_tag-$platform_tag,mode=max"
-            base_image_cache_from="type=registry,ref=$base_image_name:$cache_tag-$build_tag-$platform_tag"
-            if $is_pr; then
+            base_image_cache_to="type=registry,ref=$base_image_name:$cache_tag-$platform_tag,mode=max"
+            base_image_cache_from="type=registry,ref=$base_image_name:$cache_tag-$platform_tag"
+            if [[ $cache_tag_2 != "false" ]]; then
               # Add cache of base branch for PRs
-              base_image_cache_from="$base_image_cache_from"$'\n'"type=registry,ref=$base_image_name:$cache_tag-$pr_base_tag-$platform_tag"
+              base_image_cache_from="$base_image_cache_from"$'\n'"type=registry,ref=$base_image_name:$cache_tag_2-$platform_tag"
             fi
 
             # Update platform lists
@@ -196,12 +221,14 @@ jobs:
               rocm_version \
               build_base_image \
               base_image \
+              base_image_tags \
               ffmpeg_base_image \
               base_image_base \
               base_image_cache_to \
               base_image_cache_from \
               build_final_image \
               final_image \
+              final_image_tags \
               python_requirements \
             ; do
               jq_inline --arg p $platform --arg k "$k" --arg v "${!k}" '.[$p][$k]=$v' plan.json
@@ -265,7 +292,7 @@ jobs:
           provenance: false   # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
           sbom: false         # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
           push: true
-          tags: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
+          tags: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image_tags'] }}
           cache-to: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image_cache_to'] }}
           cache-from: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image_cache_from'] }}
           build-args: |
@@ -362,7 +389,7 @@ jobs:
           provenance: false   # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
           sbom: false         # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
           push: true
-          tags: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['final_image'] }}
+          tags: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['final_image_tags'] }}
           build-args: |
             BASE_IMAGE=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
             CUDA=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['cuda'] }}
