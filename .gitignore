@@ -34,6 +34,11 @@ data/*
 
 results*.txt
 
+mlruns
+artifacts
+mlflow.db
+projects
+
 # Datasets -------------------------------------------------------------------------------------------------------------
 coco/
 coco128/
