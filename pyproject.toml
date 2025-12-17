@@ -1,0 +1,38 @@
+[project]
+name = "kso2"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12.9"
+dependencies = [
+    "av==15.0.0",
+    "boto3==1.39.4",
+    "ffmpeg-python==0.2.0",
+    "folium==0.20.0",
+    "ftfy==6.3.1",
+    "gdown==5.2.0",
+    "imagesize==1.4.1",
+    "ipyfilechooser==0.6.0",
+    "ipywidgets==8.1.7",
+    "jupyter-bbox-widget==0.6.0",
+    "natsort==8.4.0",
+    "notebook==7.4.4",
+    "numpy==2.2.6",
+    "pandas==2.3.1",
+    "panoptes-client==1.7.1",
+    "pims==0.7",
+    "scikit-learn==1.7.2",
+    "torch==2.8.0",
+    "torchvision==0.23.0",
+    "tqdm==4.67.1",
+    "ultralytics==8.3.166",
+    "wandb==0.21.0",
+    "yolov5==7.0.14",
+]
+
+[dependency-groups]
+dev = [
+    "nbqa==1.9.1",
+    "pylint==3.3.8",
+    "pytest==8.4.2",
+]
