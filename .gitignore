@@ -34,6 +34,11 @@ data/*
 
 results*.txt
 
+# Project and MLflow files
+projects
+mlruns
+mlflow.db
+
 # Datasets -------------------------------------------------------------------------------------------------------------
 coco/
 coco128/
@@ -244,3 +249,4 @@ com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
+
