@@ -74,6 +74,7 @@ dependencies = [
     "interegular==0.3.3",
     "isodate==0.7.2",
     "itsdangerous==2.2.0",
+    "ipykernel",
     "jiter==0.11.1",
     "joblib==1.5.2",
     "jsonpatch==1.33",
@@ -217,3 +218,15 @@ dependencies = [
     "zipp==3.23.0",
     "zstandard==0.25.0",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"kso2" = ["*.sh"]
+
+

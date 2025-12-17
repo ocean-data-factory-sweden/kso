@@ -7,10 +7,10 @@ from dataclasses import asdict
 import os
 import sys
 from ultralytics import YOLO
-from project import Project
+from .project import Project
 
 # import mlflow
-from project import Project
+from .project import Project
 
 # from mlflow_export_import.bulk.export_experiments import export_experiments
 # from mlflow_export_import.bulk.import_experiments import import_experiments
