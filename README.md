@@ -18,30 +18,21 @@ The Koster Seafloor Observatory is an open-source, citizen science and machine l
 
 ### KSO overview
 The KSO system has been developed to:
-* move and process underwater footage and its associated data (e.g. location, date, sampling device).
-* make this data available to citizen scientists in Zooniverse to annotate the data.
+* move and process underwater footage and its associated data (e.g. location, date, sampling device). (TBD)
+* make this data available to citizen scientists in Zooniverse to annotate the data. (TBD)
 * train and evaluate machine learning models (customise [Yolov5][YoloV5] or [Yolov8][YoloV8] models).
   
 ![koster_info_diag][high-level-overview]
 
 The system is built around a series of easy-to-use [Jupyter Notebooks][Jupyter_site]. Each notebook allows users to perform a specific task of the system (e.g. upload footage to the citizen science platform or analyse the classified data).
 
-Users can run these notebooks via Google Colab (by clicking on the Colab links in the table below), locally or on a high-performance computing (HPC) environment.
+Users can run these notebooks locally or on a high-performance computing (HPC) environment.
 
 ### Notebooks
 
-Our notebooks are modular and grouped into four main task categories; Set up, Classify, Analyse and Publish. 
-
-| Task                                             | Notebook                                              | Description                                                                                 | Try it!  | 
-| ------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------|
-| Set up                                            | Check_metadata                     | Check format and contents of footage and sites, media and species csv files                 | [![Open In Colab][colablogo]][colab_tut_1] [![binder][binderlogo]][binder_tut] | 
-| Classify                                            | Upload_subjects_to_Zooniverse                    | Prepare original footage and upload short clips to Zooniverse, extract frames of interest from the original footage and upload them to Zooniverse                               | [![Open In Colab][colablogo]][colab_tut_3] [![binder][binderlogo]][binder_tut] |
-| Classify                                            | Process_classifications             | Pull and process up-to-date classifications from Zooniverse             | [![Open In Colab][colablogo]][colab_tut_8] [![binder][binderlogo]][binder_tut] |
-| Analyse                                            | Train_models                                | Prepare the training and test data, set model parameters and train models                   | [![Open In Colab][colablogo]][colab_tut_5] [![binder][binderlogo]][binder_tut] | 
-| Analyse                                            | Evaluate_models                            | Use ecologically relevant metrics to test the models                                        | [![Open In Colab][colablogo]][colab_tut_6] [![binder][binderlogo]][binder_tut]   |
-| Publish                                            | Publish_models                             | Publish the model to a public repository                                                   | [![Open In Colab][colablogo]][colab_tut_7] [![binder][binderlogo]][binder_tut]  | 
-| Publish                                            | Publish_observations                      | Automatically classify new footage and export observations to GBIF                                                          | [![Open In Colab][colablogo]][colab_tut_9] [![binder][binderlogo]][binder_tut] |
-
+| Notebook | Description |
+| :--- | :--- |
+| **[demo_setup.ipynb](notebooks/demo_setup.ipynb)** | A complete demonstration of the KSO workflow: creating a project, adding data/models, training, and serving with MLflow. |
 
 ## Local Installation
 
@@ -55,68 +46,44 @@ Bash
 docker pull ghcr.io/ocean-data-factory-sweden/kso:dev
 ```
 
-### Conda Installation
+### Installation
 #### Requirements
-* [Python 3.12](https://www.python.org/)
-* [Anaconda](https://docs.anaconda.com/anaconda/install/index.html)
-* [GIT](https://git-scm.com/downloads)
-
-#### Download this repository
-Clone this repository using
-```python
-git clone https://github.com/ocean-data-factory-sweden/kso.git
-``` 
+* [Python >=3.12](https://www.python.org/)
+* [uv](https://github.com/astral-sh/uv) (Recommended) or pip
 
 #### Prepare your system
-Depending on your system (Windows/Linux/MacOS), you might need to install some extra tools. If this is the case, you will get a message about what you need to install in the next steps. 
-For example, [Microsoft Build Tools C++][Microsoft_C++] with a version higher than 14.0 is required for Windows systems.
 
-#### Set up the environment with Conda
-1. Open the Anaconda Prompt
-2. Navigate to the folder where you have cloned the repository or unzipped the manually downloaded repository. Then go into the kso folder.
-```
-cd kso
-```
+You can install the KSO system locally using either `uv` (recommended for speed and reliability) or standard `pip`.
 
-3. Create an Anaconda environment with Python 3.8. Remember to change the name env.
-```
-conda create -n <name env> python=3.12
-```
+##### Option 1: Using uv (Recommended)
 
-4. Enter the environment: 
-```
-conda activate <name env>
-```
+1. Install `uv` if you haven't already:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
 
-5. Specify your GPU details.
+2. Sync the environment (this creates a virtual environment and installs dependencies):
+   ```bash
+   uv sync
+   ```
 
-  5a. Find out the [pytorch][pytorch] installation you need. Navigate to the system options (example below) and select your device/platform details.
-  <div style="text-align: center;">
-    <img src="https://github.com/ocean-data-factory-sweden/kso/blob/dev/assets/cuda_gpu_example_requirements.png?raw=true" alt="CUDA Requirements" width="450" height="150">
-  </div>
-  
-  5b. Change the cuda version in the KSO's requirements.txt file after torch and torchvision. If you do not have a GPU, remove the cuda specification.
+3. Activate the environment:
+   ```bash
+   source .venv/bin/activate
+   ```
 
-6. Install all the requirements:
-```
-pip install -r requirements.txt
-```
+##### Option 2: Using pip
 
-## Cloudina 
-Cloudina is a hosted version of KSO (powered by JupyterHub) on NAISS Science Cloud. It allows users to scale and automate larger workflows using a powerful processing backend. This is currently an invitation-only service. To access the platform, please contact jurie.germishuys[at]combine.se.
+1. Create a virtual environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
 
-The current portals are accessible as:
-1. Console (object storage) - [storage][cdn_bucket]
-2. Album (JupyterHub) - [notebooks][cdn_album]
-3. Vendor (MLFlow) - [mlflow][cdn_vendor]
-
-
-## Starting a new project
-To start a new project you will need to:
-1. Create initial information for the database: Input the information about the underwater footage files, sites and species of interest. You can use a [template of the csv files](https://drive.google.com/file/d/1PZGRoSY_UpyLfMhRphMUMwDXw4yx1_Fn/view?usp=sharing) and move the directory to the "db_starter" folder.
-2. Link your footage to the database: You will need files of underwater footage to run this system. You can [download some samples](https://drive.google.com/drive/folders/1t2ce8euh3SEU2I8uhiZN1Tu-76ZDqB6w?usp=sharing) and move them to `db_starter`. You can also store your own files and specify their directory in the notebooks.
-
-Please remember the format of the underwater media is standardised (typically .mp4 or .jpg) and the associated metadata captured in three CSV files (“movies”, “sites” and “species”) should follow the [Darwin Core standards (DwC)](https://dwc.tdwg.org/simple/). 
+2. Install the package in editable mode:
+   ```bash
+   pip install -e .
+   ```
 
 ## Developer instructions
 If you would like to expand and improve the KSO capabilities, please follow the instructions above to set the project up on your local computer.
