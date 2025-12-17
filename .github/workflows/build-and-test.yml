@@ -1,0 +1,395 @@
+name: Build and Test
+on:
+  push:
+    branches:
+      - main
+      - dev
+    tags:
+      - "v*.*.*"
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+jobs:
+  plan:
+    name: Plan build
+    runs-on: ubuntu-latest
+    outputs:
+      build_base_platforms: ${{ steps.diff.outputs.build_base_platforms }}
+      build_final_platforms: ${{ steps.diff.outputs.build_final_platforms }}
+      test_platforms: ${{ steps.diff.outputs.test_platforms }}
+      plan: ${{ steps.diff.outputs.plan }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Plan build
+        id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Check whether workflow was triggered by PR
+          is_pr=${{ github.event_name == 'pull_request' }}
+
+          # Check whether workflow was triggered by a push of a tag
+          is_tag=${{ github.ref_type == 'tag' }}
+
+          # Add 'latest" tag for versioned git tags
+          is_latest=$is_tag
+
+          # Platforms
+          platforms=(cpu cuda rocm)
+
+          # Names of the images
+          cache_tag_prefix=buildcache
+          cache_tag_2=false
+          base_image_name=ghcr.io/${{ github.repository }}-base         # ghcr.io/ocean-data-factory-sweden/kso-base
+          final_image_name=ghcr.io/${{ github.repository }}             # ghcr.io/ocean-data-factory-sweden/kso
+          if $is_pr; then
+            build_tag=pr-${{ github.event.pull_request.number }}        # pr-480
+            pr_base_tag=${{ github.event.pull_request.base.ref }}       # dev
+            cache_tag=$cache_tag_prefix-$build_tag                      # buildcache-pr-480
+            cache_tag_2=$cache_tag_prefix-$pr_base_tag                  # buildcache-dev
+          elif $is_tag; then
+            build_tag=${{ github.ref_name }}; build_tag=${build_tag#v}  # 1.2.3-beta
+            cache_tag=$cache_tag_prefix-dev                             # buildcache-dev
+          else
+            build_tag=${{ github.ref_name }}                            # dev
+            cache_tag=$cache_tag_prefix-$build_tag                      # buildcache-dev
+          fi
+
+          # Check changed files since previous successful workflow run for PRs
+          if $is_pr; then
+            # Default reference sha to PR base sha
+            ref_sha=${{ github.event.pull_request.base.sha }}
+            echo -e "Base commit: $ref_sha"
+
+            # This would be the commit sha before this push
+            # ref_sha="${{ github.event.before }}"
+
+            # Find commit shas of the successful workflow runs
+            shas=$(gh api repos/${{ github.repository }}/actions/runs --paginate \
+              --jq "[.workflow_runs[] | select(.pull_requests[]?.number == ${{ github.event.pull_request.number }} and .name == \"Build and Test\" and .conclusion == \"success\") | .head_sha] | .[]")
+
+            # Find the most recent sha that exists and set that as reference sha
+            # (all of them might not exist if the branch has been rebased)
+            for sha in $shas; do
+              if git cat-file -e "$sha"^{commit} 2>/dev/null; then
+                ref_sha=$sha
+                echo -e "Found commit with previous successful build: $ref_sha"
+                break
+              fi
+            done
+
+            # Current commit sha
+            head_sha=${{ github.event.after }}
+
+            # Compare
+            echo -e "Diffing from $ref_sha to $head_sha"
+            git diff --name-only "$ref_sha" "$head_sha" > changed.txt
+
+            echo -e "\nChanged files:"
+            cat changed.txt
+          fi
+
+          # Helper function for editing file inline with jq
+          jq_inline() {
+            local tmp=$(mktemp)
+            jq "$@" > "$tmp"
+            mv "$tmp" "${@: -1}"
+          }
+
+          # Initialize output jsons
+          echo '[]' > build_base_platforms.json
+          echo '[]' > build_final_platforms.json
+          echo '[]' > test_platforms.json
+          echo '{}' > plan.json
+
+          # Loop over platforms
+          ubuntu_version=24.04
+          for platform in "${platforms[@]}"; do
+
+            case "$platform" in
+              cpu)
+                cuda_version=false
+                rocm_version=false
+                test=true
+                platform_tag=ubuntu$ubuntu_version
+                ffmpeg_base_image=docker.io/ubuntu:$ubuntu_version
+                base_image_base=docker.io/ubuntu:$ubuntu_version
+                python_requirements=requirements_cpu.txt
+                ;;
+
+              cuda)
+                cuda_version=12.9
+                cuda_patch_version=1
+                rocm_version=false
+                test=false
+                platform_tag=cuda$cuda_version-ubuntu$ubuntu_version
+                ffmpeg_base_image=nvcr.io/nvidia/cuda:$cuda_version.$cuda_patch_version-cudnn-devel-ubuntu$ubuntu_version
+                base_image_base=nvcr.io/nvidia/cuda:$cuda_version.$cuda_patch_version-cudnn-runtime-ubuntu$ubuntu_version
+                python_requirements=requirements_cuda${cuda_version}.txt
+                ;;
+
+              rocm)
+                cuda_version=false
+                rocm_version=6.4
+                rocm_patch_version=4
+                test=false
+                platform_tag=rocm$rocm_version-ubuntu$ubuntu_version
+                ffmpeg_base_image=docker.io/rocm/dev-ubuntu-$ubuntu_version:$rocm_version.$rocm_patch_version
+                base_image_base=docker.io/rocm/dev-ubuntu-$ubuntu_version:$rocm_version.$rocm_patch_version
+                python_requirements=requirements_rocm${rocm_version}.txt
+                ;;
+            esac
+
+            # Check whether the base image needs to be built
+            base_image="$base_image_name:$build_tag-$platform_tag"
+            if $is_pr; then
+              # Build base image only if needed for PR
+              build_base_image=false
+              # Build if this ci workflow has changed
+              if grep -qF '.github/workflows/build-and-test.yml' changed.txt; then
+                build_base_image=true
+              fi
+              # Build if container recipe has changed
+              if grep -qE '^containers/base/' changed.txt; then
+                build_base_image=true
+              fi
+              # Build if python packages have changed
+              if grep -qF 'requirements.txt' changed.txt; then
+                build_base_image=true
+              fi
+              if grep -qF "$python_requirements" changed.txt; then
+                build_base_image=true
+              fi
+
+              # Find existing image to be used if not building base image
+              if ! $build_base_image; then
+                if ! docker manifest inspect "$base_image" > /dev/null 2>&1; then
+                  # No existing image found; need to build a new image
+                  build_base_image=true
+                fi
+              fi
+            else
+              # Build base image always for dev and main
+              build_base_image=true
+            fi
+
+            # Build final image always
+            final_image="$final_image_name:$build_tag-$platform_tag"
+            build_final_image=true
+
+            # Tags for the build
+            base_image_tags="$base_image"
+            final_image_tags="$final_image"
+
+            # Add "latest" tag for cpu image
+            if [[ "$is_latest" == "true" && "$platform" == "cpu" ]]; then
+              base_image_tags="$base_image_tags"$'\n'"$base_image_name:latest"
+              final_image_tags="$final_image_tags"$'\n'"$final_image_name:latest"
+            fi
+
+            # Build caches
+            base_image_cache_to="type=registry,ref=$base_image_name:$cache_tag-$platform_tag,mode=max"
+            base_image_cache_from="type=registry,ref=$base_image_name:$cache_tag-$platform_tag"
+            if [[ $cache_tag_2 != "false" ]]; then
+              # Add cache of base branch for PRs
+              base_image_cache_from="$base_image_cache_from"$'\n'"type=registry,ref=$base_image_name:$cache_tag_2-$platform_tag"
+            fi
+
+            # Update platform lists
+            if $build_base_image; then
+              jq_inline --arg p $platform '.+[$p]' build_base_platforms.json
+            fi
+            if $build_final_image; then
+              jq_inline --arg p $platform '.+[$p]' build_final_platforms.json
+            fi
+            if $test; then
+              jq_inline --arg p $platform '.+[$p]' test_platforms.json
+            fi
+
+            # Update plan
+            for k in \
+              cuda_version \
+              rocm_version \
+              build_base_image \
+              base_image \
+              base_image_tags \
+              ffmpeg_base_image \
+              base_image_base \
+              base_image_cache_to \
+              base_image_cache_from \
+              build_final_image \
+              final_image \
+              final_image_tags \
+              python_requirements \
+            ; do
+              jq_inline --arg p $platform --arg k "$k" --arg v "${!k}" '.[$p][$k]=$v' plan.json
+            done
+
+          done
+
+          # Print plans
+          echo -e "\nBuild base image for these platforms:"
+          cat build_base_platforms.json
+          echo -e "\nBuild final image for these platforms:"
+          cat build_final_platforms.json
+          echo -e "\nRun tests for these platforms:"
+          cat test_platforms.json
+          echo -e "\nPlan:"
+          cat plan.json
+
+          # Emit json strings as a step output
+          echo "build_base_platforms=$(jq -c . build_base_platforms.json)" >> "$GITHUB_OUTPUT"
+          echo "build_final_platforms=$(jq -c . build_final_platforms.json)" >> "$GITHUB_OUTPUT"
+          echo "test_platforms=$(jq -c . test_platforms.json)" >> "$GITHUB_OUTPUT"
+          echo "plan=$(jq -c . plan.json)" >> "$GITHUB_OUTPUT"
+
+  build-and-push-base:
+    name: Build and push base image
+    needs: [plan]
+    if: ${{ needs.plan.outputs.build_base_platforms != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.plan.outputs.build_base_platforms) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Increase docker space
+        uses: ./.github/actions/increase-docker-space
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: '${{ github.actor }}'
+          password: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push base image
+        uses: docker/build-push-action@v6
+        if: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['build_base_image'] == 'true' }}
+        with:
+          file: containers/base/Dockerfile
+          platforms: linux/amd64
+          provenance: false   # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
+          sbom: false         # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
+          push: true
+          tags: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image_tags'] }}
+          cache-to: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image_cache_to'] }}
+          cache-from: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image_cache_from'] }}
+          build-args: |
+            BASE_IMAGE=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image_base'] }}
+            FFMPEG_BASE_IMAGE=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['ffmpeg_base_image'] }}
+            CUDA_VERSION=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['cuda_version'] }}
+            ROCM_VERSION=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['rocm_version'] }}
+            PYTHON_REQUIREMENTS=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['python_requirements'] }}
+
+  lint:
+    name: Lint
+    needs: [plan, build-and-push-base]
+    if: ${{ always() && !failure() && !cancelled() && needs.plan.outputs.test_platforms != '[]' }}
+    strategy:
+      matrix:
+        platform: ${{ fromJSON(needs.plan.outputs.test_platforms) }}
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Pylint kso_utils
+        shell: bash
+        run: |
+          pylint kso_utils
+
+      - name: Pylint notebooks
+        if: success() || failure()
+        shell: bash
+        run: |
+          nbqa pylint notebooks
+
+  test:
+    name: Test
+    needs: [plan, build-and-push-base]
+    if: ${{ always() && !failure() && !cancelled() && needs.plan.outputs.test_platforms != '[]' }}
+    strategy:
+      matrix:
+        platform: ${{ fromJSON(needs.plan.outputs.test_platforms) }}
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Pytest
+        shell: bash
+        run: |
+          pytest -vv .
+        env:
+          WANDB_API_KEY: '${{ secrets.WANDB_API_KEY }}'
+
+  build-and-push-final:
+    name: Build and push final image
+    needs: [plan, build-and-push-base, lint, test]
+    if: ${{ always() && !failure() && !cancelled() && needs.plan.outputs.build_final_platforms != '[]' }}
+    strategy:
+      matrix:
+        platform: ${{ fromJSON(needs.plan.outputs.build_final_platforms) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Increase docker space
+        uses: ./.github/actions/increase-docker-space
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: '${{ github.actor }}'
+          password: '${{ secrets.GITHUB_TOKEN }}'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push final image
+        uses: docker/build-push-action@v6
+        if: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['build_final_image'] == 'true' }}
+        with:
+          file: containers/final/Dockerfile
+          platforms: linux/amd64
+          provenance: false   # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
+          sbom: false         # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
+          push: true
+          tags: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['final_image_tags'] }}
+          build-args: |
+            BASE_IMAGE=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
+            CUDA=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['cuda'] }}
