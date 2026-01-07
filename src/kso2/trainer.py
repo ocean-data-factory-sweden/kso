@@ -1,19 +1,20 @@
 from __future__ import annotations
 from pathlib import Path
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List, Union
 import yaml
 from dataclasses import asdict
 import os
 import sys
 from ultralytics import YOLO
+import re
 from .project import Project
+import psutil
 
-# import mlflow
-from .project import Project
+from mlflow_export_import.bulk.export_experiments import export_experiments
+from mlflow_export_import.bulk.import_experiments import import_experiments
 
-# from mlflow_export_import.bulk.export_experiments import export_experiments
-# from mlflow_export_import.bulk.import_experiments import import_experiments
+
 import json
 import pandas as pd
 import shutil
@@ -25,6 +26,13 @@ import numpy as np
 from ultralytics import settings
 import mlflow
 
+# Logging
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 
 class YOLOv11MLflowModel(PythonModel):
     def __init__(self):
@@ -32,12 +40,20 @@ class YOLOv11MLflowModel(PythonModel):
         super().__init__()
 
     def load_context(self, context):
-
+        # Get the model path from artifacts
         model_path = context.artifacts["weights"]
+
+        logger.info(f"Loading YOLO weights from: {model_path}")
+        logger.info(f"Context: {context}")
+
         self.model = YOLO(model_path)
 
-    def predict(self, context, image_input):
-        image = image_input.get("image")
+    def predict(
+        self,
+        model_input: List[Union[pd.DataFrame, np.ndarray, List[Any], Dict[str, Any]]],
+    ):
+        # Import libraries when needed to avoid serialization issues
+        image = model_input.get("image")
         if isinstance(image, list):
             image = np.array(image, dtype=np.uint8)
 
@@ -67,7 +83,7 @@ class YOLOv11MLflowModel(PythonModel):
                 "shape": list(result.orig_shape),
             }
             output.append(result_dict)
-
+        logger.info(output)
         # Return as JSON string
         return output
 
@@ -76,9 +92,10 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
 
     project_name = project_path.Project_name
 
-    base_dir = Path.cwd().parent
+    base_dir = Path(__file__).resolve().parents[2]
     project = base_dir / "projects" / project_name
     yaml_path = project / f"{project_name}.project.yaml"
+
     if not yaml_path.exists():
         raise FileExistsError(f"{yaml_path} does not exist.")
 
@@ -95,10 +112,12 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
     if not model_source or not isinstance(model_source, str):
         raise ValueError("'model' must be a non-empty string.")
 
-    artifact_root = Path.cwd().parent / "projects" / project_name / "mlruns"
+    artifact_root = (
+        Path(__file__).resolve().parents[2] / "projects" / project_name / "mlruns"
+    )
     artifact_root.mkdir(parents=True, exist_ok=True)
 
-    mlflowdb_path = Path.cwd().parent / "projects" / "mlflow.db"
+    mlflowdb_path = Path(__file__).resolve().parents[2] / "projects" / "mlflow.db"
     experiment_name = project_name
 
     os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{mlflowdb_path}"
@@ -121,11 +140,14 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
 
     model = YOLO(model_source)
 
+    def dict_mapper(yolo_result):
+
+        return re.sub(r"[(B)]", "", yolo_result)
+
     with mlflow.start_run():
         results = model.train(data=data_path, epochs=epochs, imgsz=imgsz)
         mlflow.log_param("epochs", epochs)
-        mlflow.log_metric("accuracy", 0.87)
-        print(f"results.save_dir {results.save_dir}")
+        mlflow.log_metrics({dict_mapper(k): v for k, v in results.results_dict.items()})
 
         best_weight_path = Path(results.save_dir) / "weights" / "best.pt"
 
@@ -155,25 +177,26 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
     return results
 
 
-def export_experiment(project_path: Project, notebook_formats=None, use_threads=False):
-    from mlflow_export_import.bulk.export_experiments import export_experiments
-    from mlflow_export_import.bulk.import_experiments import import_experiments
+def export_experiment(
+    project_path: Project, port=8080, notebook_formats=None, use_threads=False
+):
 
     project_name = project_path.Project_name
     experiment_name = project_name
     # 1) Tracking URI points to your local mlruns folder
-    mlflow.set_tracking_uri("http://localhost:8080")
+    mlflow.set_tracking_uri(f"http://localhost:{port}")
     # Check if experiment exists
     experiment = mlflow.get_experiment_by_name(experiment_name)
-    print(experiment)
-    artifact_root = Path.cwd().parent / "projects" / project_name / "output"
+    artifact_root = (
+        Path(__file__).resolve().parents[2] / "projects" / project_name / "output"
+    )
     artifact_root.mkdir(parents=True, exist_ok=True)
 
     client = mlflow.MlflowClient()
 
     # 2) Export experiment(s)
     export_experiments(
-        client=client,
+        mlflow_client=client,
         experiments=[experiment.experiment_id],
         output_dir=str(artifact_root),
         notebook_formats=None,
@@ -181,10 +204,18 @@ def export_experiment(project_path: Project, notebook_formats=None, use_threads=
     )
 
 
-# def import_experiment(input_dir:str, experiment_rename_file:str):
+def import_experiment(project_path: Project, input_dir: str, port: int = 8080):
 
-#     import_experiments(
-#     input_dir = input_dir,
-#     experiment_renames = experiment_rename_file
-# )
-#     pass
+    project_name = project_path.Project_name
+    experiment_name = project_name
+    # 1) Tracking URI points to your local mlruns folder
+    mlflow.set_tracking_uri(f"http://localhost:{port}")
+
+    client = mlflow.MlflowClient()
+
+    import_experiments(
+        mlflow_client=client,
+        input_dir=input_dir,
+        use_src_user_id=False,
+        use_threads=False,
+    )

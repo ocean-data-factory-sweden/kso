@@ -89,9 +89,10 @@ def split_frames(data_path: str, perc_test: float):
     images_path = dataset_path / "images"
 
     # Create and/or truncate train.txt and test.txt
-    with open(dataset_path / "train.txt", "w") as file_train, open(
-        dataset_path / "valid.txt", "w"
-    ) as file_valid:
+    with (
+        open(dataset_path / "train.txt", "w") as file_train,
+        open(dataset_path / "valid.txt", "w") as file_valid,
+    ):
         # Populate train.txt and test.txt
         counter = 1
         total_images = len(list(images_path.glob("*.jpg")))

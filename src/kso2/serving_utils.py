@@ -1,8 +1,7 @@
 import subprocess
 import mlflow
 import mlflow.models
-import config
-
+import random
 import os
 import argparse
 import logging
@@ -53,7 +52,7 @@ def find_mlflow_processes():
         try:
             cmdline = proc.info["cmdline"]
             if cmdline and any("mlflow" in cmd for cmd in cmdline):
-                # 检查是否是MLflow server进程
+                # Check if it is the MLflow server process
                 if "server" in cmdline:
                     mlflow_processes.append(proc)
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
@@ -61,7 +60,7 @@ def find_mlflow_processes():
     return mlflow_processes
 
 
-def stop_mlflow_server(port=5000, force=False):
+def stop_mlflow_server(port=8080, force=False):
     """
     Stop MLflow server
 
@@ -186,9 +185,10 @@ def start_mlflow_server(host="127.0.0.1", port=8080, auto_open=True):
         return False
 
     # check if mlflow.db exists.
-    dir_path = Path.cwd().parent
+    dir_path = Path(__file__).resolve().parents[2]
     mlflowdb_path = dir_path / "projects" / "mlflow.db"
-    artifact_path = dir_path / "artifact"
+    artifact_path = dir_path / "projects" / "artifact"
+    artifact_path.mkdir(parents=True, exist_ok=True)
 
     if not mlflowdb_path.exists():
         logger.warning("The MLflowdb was not found.")
@@ -196,11 +196,12 @@ def start_mlflow_server(host="127.0.0.1", port=8080, auto_open=True):
     # Start the MLflow server
     logger.info(f"MLflow server, address {host}:{port}...")
 
-    dir = Path.cwd().parent
-    log_dir = dir / "projects" / "mlflow.log"
+    dir = Path(__file__).resolve().parents[2]
+
+    log_dir = dir / "projects" / "mlflow_logs"
 
     log_dir.mkdir(exist_ok=True)
-    stdout_log = open(log_dir / "mlflow_stdout.log", "a")
+    log_file = log_dir / "mlflow_stdout.log"
 
     try:
         process = subprocess.Popen(
@@ -216,8 +217,8 @@ def start_mlflow_server(host="127.0.0.1", port=8080, auto_open=True):
                 "--port",
                 str(port),
             ],
-            stdout=stdout_log,
-            stderr=stdout_log,
+            stdout=open(log_file, "a"),
+            stderr=subprocess.STDOUT,
         )
 
         # Wait for server to start
@@ -243,3 +244,12 @@ def start_mlflow_server(host="127.0.0.1", port=8080, auto_open=True):
     except Exception as e:
         logger.error(f"MLflow server failed to start: {str(e)}")
         return False
+
+
+def get_free_port_in_range(start=8080, end=9000) -> int:
+    for _ in range(100):  # limit attempts
+        port = random.randint(start, end)
+        result = check_port_available(port)
+        if result:
+            return port
+    print("no free port was found")
