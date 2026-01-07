@@ -147,6 +147,9 @@ celerybeat-schedule
 # dotenv
 .env
 
+#vscode folder
+.vscode
+
 # virtualenv
 .venv*
 venv*/
