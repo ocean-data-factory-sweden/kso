@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Sequence, Tuple, Any,Optional
+from typing import Dict, Iterable, List, Mapping, Sequence, Tuple, Any, Optional
 
 import yaml
 import os
@@ -144,7 +144,9 @@ def add_data(project_path: Project, data: str = None):
     return pprint.pp(data)
 
 
-def preprocess_biigle_csv(BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: str) -> Path:
+def preprocess_biigle_csv(
+    BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: str
+) -> Path:
     """
     Create a YOLO dataset from a BIIGLE CSV (nested helper functions inside).
     Returns:
@@ -194,7 +196,9 @@ def preprocess_biigle_csv(BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: s
         if missing:
             raise ValueError(f"CSV missing required columns: {missing}")
 
-    def _filter_supported_shapes(df: pd.DataFrame, supported: Sequence[str]) -> pd.DataFrame:
+    def _filter_supported_shapes(
+        df: pd.DataFrame, supported: Sequence[str]
+    ) -> pd.DataFrame:
         df = df[df["shape_name"].isin(supported)].reset_index(drop=True)
         print(f"Supported annotations (Rectangle/Polygon): {len(df)}")
         return df
@@ -208,7 +212,9 @@ def preprocess_biigle_csv(BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: s
 
     def _build_class_mapping(df: pd.DataFrame) -> Tuple[List[str], pd.DataFrame]:
         class_names = sorted(df["label_name"].unique())
-        df["class_id"] = df["label_name"].map({name: i for i, name in enumerate(class_names)})
+        df["class_id"] = df["label_name"].map(
+            {name: i for i, name in enumerate(class_names)}
+        )
         print(f"\nDetected {len(class_names)} classes:")
         for cid, name in enumerate(class_names):
             print(f"  {cid}: {name} ({(df['class_id'] == cid).sum()} annotations)")
@@ -217,7 +223,9 @@ def preprocess_biigle_csv(BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: s
     def _bbox_from_points(points_str: str) -> Tuple[float, float, float, float]:
         pts = json.loads(points_str)
         if not isinstance(pts, (list, tuple)) or len(pts) < 4 or len(pts) % 2 != 0:
-            raise ValueError(f"Invalid 'points' payload (must be flat [x1,y1,...]): {points_str}")
+            raise ValueError(
+                f"Invalid 'points' payload (must be flat [x1,y1,...]): {points_str}"
+            )
         xs = pts[0::2]
         ys = pts[1::2]
         return min(xs), min(ys), max(xs), max(ys)
@@ -300,7 +308,9 @@ def preprocess_biigle_csv(BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: s
             else:
                 assign(img, rng.choice([s for s, n in needs.items() if n == max_need]))
 
-        print(f"[split] Images: {n_images} | train={split_counts['train']} val={split_counts['val']} test={split_counts['test']}")
+        print(
+            f"[split] Images: {n_images} | train={split_counts['train']} val={split_counts['val']} test={split_counts['test']}"
+        )
         return split_for_image
 
     def _ensure_split_dirs(dataset_dir: Path) -> None:
@@ -348,7 +358,9 @@ def preprocess_biigle_csv(BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: s
             print(f"  {folder}: {s['images']} images, {s['annotations']} annotations")
         return stats
 
-    def _transform_bbox(xc: float, yc: float, w: float, h: float, op: str) -> Tuple[float, float, float, float]:
+    def _transform_bbox(
+        xc: float, yc: float, w: float, h: float, op: str
+    ) -> Tuple[float, float, float, float]:
         if op == "hflip":
             return 1 - xc, yc, w, h
         if op == "vflip":
@@ -382,7 +394,9 @@ def preprocess_biigle_csv(BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: s
         valid_exts_lower = {e.lower() for e in valid_exts}
 
         train_imgs = sorted(
-            p for p in train_img_dir.iterdir() if p.is_file() and p.suffix.lower() in valid_exts_lower
+            p
+            for p in train_img_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in valid_exts_lower
         )
         n_original = len(train_imgs)
         n_target = int(round(n_original * augment_factor))
@@ -429,7 +443,9 @@ def preprocess_biigle_csv(BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: s
             img_aug = _apply_image_op(img, op)
             suffix = f"_aug_{op}"
             img_aug.save(train_img_dir / f"{img_path.stem}{suffix}{img_path.suffix}")
-            (train_lbl_dir / f"{img_path.stem}{suffix}.txt").write_text("\n".join(new_labels))
+            (train_lbl_dir / f"{img_path.stem}{suffix}.txt").write_text(
+                "\n".join(new_labels)
+            )
             created += 1
 
         print(f"Created {created} augmented images")
@@ -464,7 +480,9 @@ def preprocess_biigle_csv(BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: s
 
     df = _convert_annotations_to_yolo(df)
     image_index = _index_images(images_root, VALID_EXTS)
-    split_for_image = _split_dataset(df, TRAIN_RATIO, VAL_RATIO, TEST_RATIO, RANDOM_SEED)
+    split_for_image = _split_dataset(
+        df, TRAIN_RATIO, VAL_RATIO, TEST_RATIO, RANDOM_SEED
+    )
 
     _write_split_files(df, split_for_image, image_index, dataset_dir)
 
