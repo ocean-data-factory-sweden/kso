@@ -313,7 +313,7 @@ jobs:
     container:
       image: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
     env:
-      PYTHONPATH: ${{ github.workspace }}
+      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src
     steps:
       - uses: actions/checkout@v6
 
@@ -339,7 +339,7 @@ jobs:
     container:
       image: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
     env:
-      PYTHONPATH: ${{ github.workspace }}
+      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src
     steps:
       - uses: actions/checkout@v6
 
