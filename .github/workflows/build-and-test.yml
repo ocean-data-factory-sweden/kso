@@ -313,9 +313,14 @@ jobs:
     container:
       image: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
     env:
-      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install package
+        shell: bash
+        run: |
+          pip install --no-deps -e .
 
       - name: Pylint kso_utils
         shell: bash
@@ -339,9 +344,14 @@ jobs:
     container:
       image: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
     env:
-      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install package
+        shell: bash
+        run: |
+          pip install --no-deps -e .
 
       - name: Pytest
         shell: bash
