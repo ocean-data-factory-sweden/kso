@@ -27,7 +27,7 @@ class Project:
     model_path: str = None
     model_name: str = None
     metadata: str = None
-    Mlflow: Optional[Dict[str, Any]] = None
+    # Mlflow: Optional[Dict[str, Any]] = None
 
 
 def create_project(
@@ -69,13 +69,14 @@ def create_project(
             "Project_path": str(project),
             "data_path": {"ultralytics_data_path": str(ultralytics_data)},
             "model": {"model_path": weights_path, "model_name": model_name},
-            "tracking": tracking,
-            "metadata": metadata,
-            "Mlflow": {
-                "path": None,
-                "experiment_name": None,
-                "mlflow.db": str(mlflow_path),
+            "tracking": {
+                "Mlflow": {
+                    "path": None,
+                    "experiment_name": None,
+                    "mlflow.db": str(mlflow_path),
+                },
             },
+            "metadata": metadata,
         }
 
         with yaml_path.open("w", encoding="utf-8") as fh:
@@ -101,20 +102,20 @@ def create_project(
     return project
 
 
-def add_data(project_path: Project, data: str = None):
+def add_data(project: Project, data: str = None):
 
-    if not project_path or not isinstance(project_path, Project):
+    if not project or not isinstance(project, Project):
         raise ValueError("'Project_path' must be a project instance.")
     if data and not isinstance(data, str):
         raise ValueError("'Ultralytics data path' must be a non-empty string.")
 
-    project_name = project_path.Project_name
+    project_name = project.Project_name
 
     # Get the directory of this file
     base_dir = Path(__file__).resolve().parents[2]
 
-    project = base_dir / "projects" / project_name
-    yaml_path = project / f"{project_name}.project.yaml"
+    project_path = base_dir / "projects" / project_name
+    yaml_path = project_path / f"{project_name}.project.yaml"
 
     if not yaml_path.exists():
         raise FileNotFoundError(f"{yaml_path} not found.")
@@ -125,10 +126,12 @@ def add_data(project_path: Project, data: str = None):
         if candidate.is_absolute():
             data_path = candidate.resolve()
         else:
-            data_path = (project / candidate).resolve()
+            data_path = (project_path / candidate).resolve()
 
     else:
-        generated_yolo_data = add_ultralytics_dataset_yaml(str(project / "coco8.yaml"))
+        generated_yolo_data = add_ultralytics_dataset_yaml(
+            str(project_path / "coco8.yaml")
+        )
         data_path = Path(generated_yolo_data).expanduser().resolve()
     if not data_path.exists():
         raise FileNotFoundError(f"Dataset file not found: {data_path}")
@@ -501,7 +504,7 @@ def preprocess_biigle_csv(
 
 
 def add_Biigle_data(
-    project_path: Project,
+    project: Project,
     BIIGLE_CSV_PATH: str,
     IMAGES_ROOT: str,
     DATASET_DIR: str = None,
@@ -517,11 +520,11 @@ def add_Biigle_data(
         DATASET_DIR_path = Path(DATASET_DIR).expanduser().resolve()
         if not DATASET_DIR_path.exists():
             raise FileNotFoundError(f"{DATASET_DIR_path} not found")
-    project_name = project_path.Project_name
+    project_name = project.Project_name
     base_dir = Path(__file__).resolve().parents[2]
-    project = base_dir / "projects" / project_name
+    project_path = base_dir / "projects" / project_name
     if not DATASET_DIR:
-        DATASET_DIR = project / "Dataset"
+        DATASET_DIR = project_path / "Dataset"
         DATASET_DIR.mkdir(parents=True, exist_ok=True)
 
     biigle_yaml_path = preprocess_biigle_csv(
@@ -530,7 +533,7 @@ def add_Biigle_data(
         DATASET_DIR=str(DATASET_DIR),
     )
 
-    yaml_path = project / f"{project_name}.project.yaml"
+    yaml_path = project_path / f"{project_name}.project.yaml"
 
     with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.SafeLoader)
@@ -543,26 +546,26 @@ def add_Biigle_data(
     return pprint.pp(data)
 
 
-def add_model(project_path: Project, model: str = None, model_name: str = None):
+def add_model(project: Project, model: str = None, model_name: str = None):
     """
     Update the project's YAML with a model path and/or model name.
 
     Rules for `model`:
     - Absolute path ending with '.pt': accepted if it exists.
     """
-    if not project_path or not isinstance(project_path, Project):
+    if not project or not isinstance(project, Project):
         raise ValueError("'Project_path' must be a Project instance.")
     if not isinstance(model, str):
         raise ValueError("'model' must be non-empty string")
     if not isinstance(model_name, str):
         raise ValueError("'model_name' must be a non-empty string")
 
-    project_name = project_path.Project_name
+    project_name = project.Project_name
     # Get the directory of this file
     base_dir = Path(__file__).resolve().parents[2]
 
-    project = base_dir / "projects" / project_name
-    yaml_path = project / f"{project_name}.project.yaml"
+    project_path = base_dir / "projects" / project_name
+    yaml_path = project_path / f"{project_name}.project.yaml"
     if not yaml_path.exists():
         raise FileExistsError(f"{yaml_path} does not exist.")
 
@@ -574,7 +577,7 @@ def add_model(project_path: Project, model: str = None, model_name: str = None):
         if candidate.is_absolute():
             model_path = candidate
         else:
-            model_path = (project / candidate).resolve()
+            model_path = (project_path / candidate).resolve()
 
         data.setdefault("model", {})["model_path"] = str(model_path)
 

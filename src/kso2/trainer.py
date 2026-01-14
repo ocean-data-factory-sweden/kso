@@ -88,13 +88,22 @@ class YOLOv11MLflowModel(PythonModel):
         return output
 
 
-def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
+def set_group_writable_umask(mask=0o002):
+    old_umask = os.umask(mask)
+    logging.info(f"Changed umask from {oct(old_umask)} to {oct(mask)}")
 
-    project_name = project_path.Project_name
+
+def training_model(
+    project: Project, epochs: int = 100, imgsz: int = 640, change_umask=False
+):
+    if change_umask:
+        set_group_writable_umask()
+
+    project_name = project.Project_name
 
     base_dir = Path(__file__).resolve().parents[2]
-    project = base_dir / "projects" / project_name
-    yaml_path = project / f"{project_name}.project.yaml"
+    project_path = base_dir / "projects" / project_name
+    yaml_path = project_path / f"{project_name}.project.yaml"
 
     if not yaml_path.exists():
         raise FileExistsError(f"{yaml_path} does not exist.")
@@ -102,13 +111,13 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
     with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.SafeLoader)
 
-    # data_path = data["data_path"]["Biigle_path"]
-    data_path = data["data_path"]["ultralytics_data_path"]
+    data_path = data["data_path"]["Biigle_path"]
+    # data_path = data["data_path"]["ultralytics_data_path"]
 
-    if not isinstance(project_path, Project):
+    if not isinstance(project, Project):
         raise ValueError("'model' must be a Project instance.")
 
-    model_source = data["model"]["model_path"] or project_path.model_name
+    model_source = data["model"]["model_path"] or project.model_name
     if not model_source or not isinstance(model_source, str):
         raise ValueError("'model' must be a non-empty string.")
 
@@ -122,7 +131,7 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
 
     os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{mlflowdb_path}"
     os.environ["MLFLOW_EXPERIMENT_NAME"] = experiment_name
-    os.environ["MLFLOW_ARTIFACT_URI"] = str(artifact_root)
+    os.environ["MLFLOW_ARTIFACT_URI"] = artifact_root.as_uri()
 
     # Check if experiment exists
     mlflow.set_tracking_uri(f"sqlite:///{mlflowdb_path}")
@@ -131,7 +140,7 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
     if experiment is None:
         # create the experiment with a project location
         experiment_id = mlflow.create_experiment(
-            name=experiment_name, artifact_location=f"file://{artifact_root}"
+            name=experiment_name, artifact_location=artifact_root.as_uri()
         )
     else:
         experiment_id = experiment.experiment_id
@@ -178,10 +187,10 @@ def training_model(project_path: Project, epochs: int = 100, imgsz: int = 640):
 
 
 def export_experiment(
-    project_path: Project, port=8080, notebook_formats=None, use_threads=False
+    project: Project, port=8080, notebook_formats=None, use_threads=False
 ):
 
-    project_name = project_path.Project_name
+    project_name = project.Project_name
     experiment_name = project_name
     # 1) Tracking URI points to your local mlruns folder
     mlflow.set_tracking_uri(f"http://localhost:{port}")
@@ -204,9 +213,9 @@ def export_experiment(
     )
 
 
-def import_experiment(project_path: Project, input_dir: str, port: int = 8080):
+def import_experiment(project: Project, input_dir: str, port: int = 8080):
 
-    project_name = project_path.Project_name
+    project_name = project.Project_name
     experiment_name = project_name
     # 1) Tracking URI points to your local mlruns folder
     mlflow.set_tracking_uri(f"http://localhost:{port}")
