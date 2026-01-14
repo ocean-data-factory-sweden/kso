@@ -25,7 +25,7 @@ dependencies = [
     "ipywidgets==8.1.7",
     "jupyter-bbox-widget==0.6.0",
     "mlflow>=3.7.0",
-    "mlflow-export-import>=1.2.0",
+    "mlflow-export-import @ git+https://github.com/mlflow/mlflow-export-import.git",
     "natsort==8.4.0",
     "notebook==7.4.4",
     "numpy==2.2.6",
