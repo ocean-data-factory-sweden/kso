@@ -192,7 +192,7 @@ If this code or its trained models contribute to your research, please cite:
 
 - **Website**: [https://subsim.se](https://subsim.se)
 - **Issues**: [GitHub Issues][issues-url]
-- **Contact**: matthias.obst@marine.gu.se
+- **Contact**: matthias.obst[at]marine.gu.se
 
 We are always excited to collaborate with marine scientists. Feel free to reach out with questions or ideas!
 
