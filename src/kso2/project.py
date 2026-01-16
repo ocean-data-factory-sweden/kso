@@ -33,6 +33,7 @@ class Project:
 def create_project(
     Project_name: str,
     ultralytics_data: Optional[Dict[str, Any]] = None,
+    Biigle_path: Optional[Dict[str, Any]] = None,
     tracking: Optional[Dict[str, Any]] = None,
     weights_path: str = None,
     model_name: str = None,
@@ -67,7 +68,10 @@ def create_project(
         yaml_dict: Dict[str, Any] = {
             "Project_name": sanitized,
             "Project_path": str(project),
-            "data_path": {"ultralytics_data_path": str(ultralytics_data)},
+            "data_path": {
+                "ultralytics_data_path": ultralytics_data,
+                "Biigle_path": Biigle_path,
+            },
             "model": {"model_path": weights_path, "model_name": model_name},
             "tracking": {
                 "Mlflow": {
@@ -92,7 +96,42 @@ def create_project(
     project = Project(
         Project_name=yaml_dict["Project_name"],
         project_path=yaml_dict["Project_path"],
-        data_path=yaml_dict["data_path"]["ultralytics_data_path"],
+        data_path=yaml_dict["data_path"],
+        tracking=yaml_dict["tracking"],
+        model_path=yaml_dict["model"]["model_path"],
+        model_name=yaml_dict["model"]["model_name"],
+        metadata=yaml_dict["metadata"],
+    )
+    pprint.pp(yaml_dict)
+    return project
+
+
+def load_project(Project_name: str):
+    """load an existing project"""
+    if not Project_name or not isinstance(Project_name, str):
+        raise ValueError("'Project_name' must be a non-empty string.")
+
+    sanitized = "".join(c.lower() if c.isalnum() else "_" for c in Project_name).strip(
+        "_"
+    )
+    # Get the directory of this file
+    base_dir = Path(__file__).resolve().parents[2]
+
+    project_path = base_dir / "projects"
+    yaml_path = project_path / sanitized / f"{sanitized}.project.yaml"
+    if yaml_path.exists():
+        with open(yaml_path, mode="r", newline="", encoding="utf-8") as file:
+            yaml_dict = yaml.load(file, Loader=yaml.SafeLoader)
+
+        logging.info(f"{Project_name} loaded successfully")
+    else:
+        raise FileNotFoundError(f"project {Project_name} was not found")
+
+    # Convert yaml into a project instance
+    project = Project(
+        Project_name=yaml_dict["Project_name"],
+        project_path=yaml_dict["Project_path"],
+        data_path=yaml_dict["data_path"],
         tracking=yaml_dict["tracking"],
         model_path=yaml_dict["model"]["model_path"],
         model_name=yaml_dict["model"]["model_name"],

@@ -1,11 +1,18 @@
-from .project import Project, create_project, add_model, add_data, add_Biigle_data
+from .project import (
+    Project,
+    create_project,
+    add_model,
+    add_data,
+    add_Biigle_data,
+    load_project,
+)
 from .trainer import (
-    YOLOv11MLflowModel,
     training_model,
     export_experiment,
     import_experiment,
 )
 from .serving_utils import start_mlflow_server, stop_mlflow_server
+from .data_augmentation import run_augmentation
 
 __all__ = [
     "Project",
@@ -13,10 +20,11 @@ __all__ = [
     "add_model",
     "add_data",
     "add_Biigle_data",
-    "YOLOv11MLflowModel",
     "training_model",
     "export_experiment",
     "import_experiment",
     "start_mlflow_server",
     "stop_mlflow_server",
+    "run_augmentation",
+    "load_project",
 ]
