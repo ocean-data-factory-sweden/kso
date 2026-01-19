@@ -52,11 +52,30 @@ def create_project(
 
     project_path = base_dir / "projects"
     yaml_path = project_path / sanitized / f"{sanitized}.project.yaml"
+
+    """index the last model added if none is provided"""
+    index = -1
+
     if yaml_path.exists():
         with open(yaml_path, mode="r", newline="", encoding="utf-8") as file:
             yaml_dict = yaml.load(file, Loader=yaml.SafeLoader)
 
         logging.info(f"{Project_name} loaded successfully")
+        weights_paths = [m["model_path"] for m in yaml_dict["models"]]
+        model_names = [m["model_name"] for m in yaml_dict["models"]]
+
+        if model_name or weights_path:
+            if model_name in model_names:
+                index = model_names.index(model_name)
+            elif weights_path in weights_paths:
+                index = weights_paths.index(weights_path)
+            else:
+                yaml_dict["models"].append(
+                    {"model_path": weights_path, "model_name": model_name}
+                )
+            with yaml_path.open("w", encoding="utf-8") as fh:
+                yaml.safe_dump(yaml_dict, fh, sort_keys=False, default_flow_style=False)
+
     else:
 
         project = project_path / sanitized
@@ -72,7 +91,7 @@ def create_project(
                 "ultralytics_data_path": ultralytics_data,
                 "Biigle_path": Biigle_path,
             },
-            "model": {"model_path": weights_path, "model_name": model_name},
+            "models": [{"model_path": weights_path, "model_name": model_name}],
             "tracking": {
                 "Mlflow": {
                     "path": None,
@@ -85,6 +104,7 @@ def create_project(
 
         with yaml_path.open("w", encoding="utf-8") as fh:
             yaml.safe_dump(yaml_dict, fh, sort_keys=False, default_flow_style=False)
+
     runs_dir = str(project_path / sanitized / "runs")
     datasets_dir = str(project_path / sanitized)
     # print(runs_dir,datasets_dir)
@@ -98,18 +118,24 @@ def create_project(
         project_path=yaml_dict["Project_path"],
         data_path=yaml_dict["data_path"],
         tracking=yaml_dict["tracking"],
-        model_path=yaml_dict["model"]["model_path"],
-        model_name=yaml_dict["model"]["model_name"],
+        model_path=yaml_dict["models"][index]["model_path"],
+        model_name=yaml_dict["models"][index]["model_name"],
         metadata=yaml_dict["metadata"],
     )
     pprint.pp(yaml_dict)
     return project
 
 
-def load_project(Project_name: str):
+def load_project(
+    Project_name: str, model_name: str | None = None, model_path: str | None = None
+):
     """load an existing project"""
     if not Project_name or not isinstance(Project_name, str):
         raise ValueError("'Project_name' must be a non-empty string.")
+    if model_name and not isinstance(model_name, str):
+        raise ValueError("'model_name' must be a non-empty string.")
+    if model_path and not isinstance(model_path, str):
+        raise ValueError("'model_path' must be a non-empty string.")
 
     sanitized = "".join(c.lower() if c.isalnum() else "_" for c in Project_name).strip(
         "_"
@@ -123,6 +149,17 @@ def load_project(Project_name: str):
         with open(yaml_path, mode="r", newline="", encoding="utf-8") as file:
             yaml_dict = yaml.load(file, Loader=yaml.SafeLoader)
 
+        """index the last model added if none is provided"""
+        index = -1
+
+        if model_name or model_path:
+            model_paths = [m["model_path"] for m in yaml_dict["models"]]
+            model_names = [m["model_name"] for m in yaml_dict["models"]]
+            if model_name in model_names:
+                index = model_names.index(model_name)
+            elif model_path in model_paths:
+                index = model_paths.index(model_path)
+
         logging.info(f"{Project_name} loaded successfully")
     else:
         raise FileNotFoundError(f"project {Project_name} was not found")
@@ -133,8 +170,8 @@ def load_project(Project_name: str):
         project_path=yaml_dict["Project_path"],
         data_path=yaml_dict["data_path"],
         tracking=yaml_dict["tracking"],
-        model_path=yaml_dict["model"]["model_path"],
-        model_name=yaml_dict["model"]["model_name"],
+        model_path=yaml_dict["models"][index]["model_path"],
+        model_name=yaml_dict["models"][index]["model_name"],
         metadata=yaml_dict["metadata"],
     )
     pprint.pp(yaml_dict)
