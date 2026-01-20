@@ -60,7 +60,6 @@ def run_augmentation(
             "data_type should be a non-empty string 'Biigle_path' or 'ultralytics_data_path'"
         )
     data_yaml_path = project.data_path.get(data_type)
-
     data_yaml_path = Path(data_yaml_path).expanduser().resolve()
     cfg = yaml.safe_load(data_yaml_path.read_text())
 

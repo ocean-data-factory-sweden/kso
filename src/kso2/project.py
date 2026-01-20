@@ -178,12 +178,12 @@ def load_project(
     return project
 
 
-def add_data(project: Project, data: str = None):
+def add_data(project: Project, data_path: str = None):
 
     if not project or not isinstance(project, Project):
         raise ValueError("'Project_path' must be a project instance.")
-    if data and not isinstance(data, str):
-        raise ValueError("'Ultralytics data path' must be a non-empty string.")
+    if data_path and not isinstance(data_path, str):
+        raise ValueError("'data_path' must be a non-empty string.")
 
     project_name = project.Project_name
 
@@ -196,9 +196,9 @@ def add_data(project: Project, data: str = None):
     if not yaml_path.exists():
         raise FileNotFoundError(f"{yaml_path} not found.")
 
-    if data:
+    if data_path:
 
-        candidate = Path(data).expanduser()
+        candidate = Path(data_path).expanduser()
         if candidate.is_absolute():
             data_path = candidate.resolve()
         else:
@@ -216,6 +216,8 @@ def add_data(project: Project, data: str = None):
         data = yaml.load(f, Loader=yaml.SafeLoader)
 
     data["data_path"]["ultralytics_data_path"] = str(data_path)
+
+    project.data_path["ultralytics_data_path"] = str(data_path)
     with open(yaml_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
 
@@ -618,11 +620,14 @@ def add_Biigle_data(
 
     with open(yaml_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
+
+    project.data_path["Biigle_path"] = str(biigle_yaml_path)
+
     logging.info(f"Project YAML data path updated at {yaml_path}")
     return pprint.pp(data)
 
 
-def add_model(project: Project, model: str = None, model_name: str = None):
+def add_model(project: Project, model_path: str = None, model_name: str = None):
     """
     Update the project's YAML with a model path and/or model name.
 
@@ -631,7 +636,7 @@ def add_model(project: Project, model: str = None, model_name: str = None):
     """
     if not project or not isinstance(project, Project):
         raise ValueError("'Project_path' must be a Project instance.")
-    if not isinstance(model, str):
+    if not isinstance(model_path, str):
         raise ValueError("'model' must be non-empty string")
     if not isinstance(model_name, str):
         raise ValueError("'model_name' must be a non-empty string")
@@ -648,27 +653,34 @@ def add_model(project: Project, model: str = None, model_name: str = None):
     with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.SafeLoader)
 
-    if model and model.endswith(".pt"):
-        candidate = Path(model).expanduser()
+    if model_path and model_path.endswith(".pt"):
+        candidate = Path(model_path).expanduser()
         if candidate.is_absolute():
-            model_path = candidate
+            model_trail = candidate
         else:
-            model_path = (project_path / candidate).resolve()
+            model_trail = (project_path / candidate).resolve()
 
-        data.setdefault("model", {})["model_path"] = str(model_path)
+        """CHECK IF THE MODEL ALREADY ADDED"""
+        index = -1
 
-    elif model and not model.endswith(".pt"):
-        raise ValueError("Entry name must end with '.pt'")
+        model_paths = [m["model_path"] for m in data["models"]]
+        if str(model_trail) in model_paths:
+            index = model_paths.index(str(model_trail))
+            logging.info(f"model {str(model_trail)} already exists")
+        else:
+            data["models"].append(
+                {"model_name": model_name, "model_path": str(model_trail)}
+            )
 
-    if model and model_name:
-        data["model"]["model_name"] = model_name
-
-    else:
-        if not data["model"]["model_path"]:
-            raise ValueError("'model' was not provided.")
+    elif model_path and not model_path.endswith(".pt"):
+        raise ValueError("model is not valid, must end with '.pt'")
 
     with open(yaml_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
+
+    """update project instance with provided model or last added model"""
+    project.model_path = data["models"][index]["model_path"]
+    project.model_name = data["models"][index]["model_name"]
 
     logging.info(f"Project YAML model name updated at {yaml_path}")
 
