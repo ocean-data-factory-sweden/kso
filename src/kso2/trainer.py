@@ -100,6 +100,10 @@ def training_model(
         set_group_writable_umask()
 
     project_name = project.Project_name
+    model_name = project.model_name
+
+    if not model_name:
+        model_name = f"{Path(project.model_path).stem}"
 
     base_dir = Path(__file__).resolve().parents[2]
     project_path = base_dir / "projects" / project_name
@@ -111,13 +115,13 @@ def training_model(
     with open(yaml_path, "r", encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.SafeLoader)
 
-    data_path = data["data_path"]["Biigle_path"]
-    # data_path = data["data_path"]["ultralytics_data_path"]
+    # data_path = project.data_path["Biigle_path"]
+    data_path = project.data_path["ultralytics_data_path"]
 
     if not isinstance(project, Project):
         raise ValueError("'model' must be a Project instance.")
 
-    model_source = data["model"]["model_path"] or project.model_name
+    model_source = project.model_path
     if not model_source or not isinstance(model_source, str):
         raise ValueError("'model' must be a non-empty string.")
 
@@ -128,13 +132,13 @@ def training_model(
 
     mlflowdb_path = Path(__file__).resolve().parents[2] / "projects" / "mlflow.db"
     experiment_name = project_name
-
-    os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{mlflowdb_path}"
+    settings.update({"mlflow": True})
+    os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{str(mlflowdb_path)}"
     os.environ["MLFLOW_EXPERIMENT_NAME"] = experiment_name
     os.environ["MLFLOW_ARTIFACT_URI"] = artifact_root.as_uri()
 
     # Check if experiment exists
-    mlflow.set_tracking_uri(f"sqlite:///{mlflowdb_path}")
+    mlflow.set_tracking_uri(f"sqlite:///{str(mlflowdb_path)}")
     experiment = mlflow.get_experiment_by_name(experiment_name)
 
     if experiment is None:
@@ -158,12 +162,15 @@ def training_model(
         mlflow.log_param("epochs", epochs)
         mlflow.log_metrics({dict_mapper(k): v for k, v in results.results_dict.items()})
 
+        mlflow.log_artifacts(results.save_dir, artifact_path="yolo")
+
         best_weight_path = Path(results.save_dir) / "weights" / "best.pt"
 
         mlflow.pyfunc.log_model(
-            name="model",
+            artifact_path="model",
             python_model=YOLOv11MLflowModel(),
             artifacts={"weights": str(best_weight_path)},
+            registered_model_name=model_name,
         )
 
     mlflow.end_run()
