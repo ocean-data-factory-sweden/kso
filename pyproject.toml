@@ -30,6 +30,7 @@ dependencies = [
     "natsort==8.4.0",
     "notebook==7.4.4",
     "numpy==2.2.6",
+    "opencv-python>=4.11.0.86",
     "pandas==2.3.1",
     "panoptes-client==1.7.1",
     "pims==0.7",

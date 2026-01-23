@@ -26,6 +26,10 @@ import numpy as np
 from ultralytics import settings
 import mlflow
 
+import requests
+import cv2
+
+
 # Logging
 
 logging.basicConfig(
@@ -50,7 +54,7 @@ class YOLOv11MLflowModel(PythonModel):
 
     def predict(
         self,
-        model_input: List[Union[pd.DataFrame, np.ndarray, List[Any], Dict[str, Any]]],
+        model_input,
     ):
         # Import libraries when needed to avoid serialization issues
         image = model_input.get("image")
@@ -235,3 +239,25 @@ def import_experiment(project: Project, input_dir: str, port: int = 8080):
         use_src_user_id=False,
         use_threads=False,
     )
+
+
+def mlflow_serving(
+    image_path: str, url: str = "http://127.0.0.1:5000/invocations"
+) -> Dict:
+    # Load a real image
+    img = cv2.imread(image_path)
+    img = cv2.resize(img, (640, 640))
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    # Prepare payload
+    # MLflow "inputs" format
+    payload = {"inputs": {"image": img_rgb.tolist()}}
+
+    # Post to server
+    response = requests.post(url, json=payload)
+
+    if response.status_code == 200:
+        print(response.json())
+    else:
+        print(f"Error: {response.status_code}")
+        print(response.text)
