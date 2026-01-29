@@ -26,9 +26,6 @@ import numpy as np
 from ultralytics import settings
 import mlflow
 
-import requests
-import cv2
-
 
 # Logging
 
@@ -58,8 +55,15 @@ class YOLOv11MLflowModel(PythonModel):
     ):
         # Import libraries when needed to avoid serialization issues
         image = model_input.get("image")
-        if isinstance(image, list):
-            image = np.array(image, dtype=np.uint8)
+
+        if isinstance(image, list) and all(isinstance(p, str) for p in image):
+            for p in image:
+                if not Path(p).exists():
+                    raise ValueError(f"Path does not exist: {p}")
+
+        elif isinstance(image, str):
+            if not Path(image).exists():
+                raise FileNotFoundError(f"the provided file {image} was not found")
 
         # Run prediction
         results = self.model.predict(image)
@@ -73,6 +77,7 @@ class YOLOv11MLflowModel(PythonModel):
                     if result.boxes is not None
                     else []
                 ),
+                "plot": (result.plot() if result.plot() is not None else []),
                 "scores": (
                     result.boxes.conf.cpu().numpy().tolist()
                     if result.boxes is not None
@@ -241,23 +246,15 @@ def import_experiment(project: Project, input_dir: str, port: int = 8080):
     )
 
 
-def mlflow_serving(
-    image_path: str, url: str = "http://127.0.0.1:5000/invocations"
-) -> Dict:
-    # Load a real image
-    img = cv2.imread(image_path)
-    img = cv2.resize(img, (640, 640))
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+def loading_model(model_name: str, version: int):
+    mlflowdb_path = Path(__file__).resolve().parents[2] / "projects" / "mlflow.db"
+    os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{str(mlflowdb_path)}"
+    model_uri = f"models:/{model_name}/{version}"
+    print(model_uri)
+    model = mlflow.pyfunc.load_model(model_uri)
+    return model
 
-    # Prepare payload
-    # MLflow "inputs" format
-    payload = {"inputs": {"image": img_rgb.tolist()}}
 
-    # Post to server
-    response = requests.post(url, json=payload)
-
-    if response.status_code == 200:
-        print(response.json())
-    else:
-        print(f"Error: {response.status_code}")
-        print(response.text)
+def model_inference(model, data_path):
+    result = model.predict({"image": data_path})
+    return result

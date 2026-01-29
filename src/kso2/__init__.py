@@ -10,10 +10,20 @@ from .trainer import (
     training_model,
     export_experiment,
     import_experiment,
-    mlflow_serving,
+    loading_model,
+    model_inference,
 )
-from .serving_utils import start_mlflow_server, stop_mlflow_server
-from .data_augmentation import run_augmentation
+from .serving_utils import (
+    start_mlflow_server,
+    stop_mlflow_server,
+    mlflow_serving,
+    deploy_mlflow_registered_model,
+    plot_bboxes,
+    save_predictions,
+)
+from .data_augmentation import (
+    run_augmentation,
+)
 
 __all__ = [
     "Project",
@@ -29,4 +39,9 @@ __all__ = [
     "run_augmentation",
     "load_project",
     "mlflow_serving",
+    "deploy_mlflow_registered_model",
+    "plot_bboxes",
+    "loading_model",
+    "model_inference",
+    "save_predictions",
 ]

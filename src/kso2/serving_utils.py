@@ -10,6 +10,11 @@ import time
 import signal
 import psutil
 from pathlib import Path
+import cv2
+from typing import Any, Dict, Optional, List, Union
+import requests
+import numpy as np
+from .project import Project
 
 
 logging.basicConfig(
@@ -253,3 +258,158 @@ def get_free_port_in_range(start=8080, end=9000) -> int:
         if result:
             return port
     print("no free port was found")
+
+
+def mlflow_serving(
+    image_path: str, url: str = "http://127.0.0.1:5001/invocations"
+) -> Dict:
+    # Load a real image
+    img = cv2.imread(image_path)
+    img = cv2.resize(img, (640, 640))
+
+    # Prepare payload
+    # MLflow "inputs" format
+    payload = {"inputs": {"image": img.tolist()}}
+
+    # Post to server
+    response = requests.post(url, json=payload)
+
+    if response.status_code == 200:
+
+        print(response.json())
+        return response.json()
+    else:
+        print(f"Error: {response.status_code}")
+        print(response.text)
+
+
+def deploy_mlflow_registered_model(
+    model_name: str, version: str, port=5000, auto_open=True
+):
+    """
+    deploy your model locally and returns base URL.
+
+    Uses:
+      mlflow models serve -m models:/<name>/<stage_or_version> -h <host> -p <port> --no-conda
+    """
+
+    # Check if the port is already in use.
+    if not check_port_available(port):
+        logger.error(f"Port {port} is already in use!")
+        logger.info(f"You can run the following command to stop the existing service:")
+        return False
+
+    # # check if mlflow.db exists.
+    # dir_path = Path(__file__).resolve().parents[2]
+    # mlruns_path = dir_path / "projects"
+
+    # if not mlflowdb_path.exists():
+    #     logger.warning("The MLflowdb was not found.")
+
+    # # Start the MLflow server
+    # logger.info(f"MLflow server, address :{port}...")
+
+    # dir = Path(__file__).resolve().parents[2]
+
+    # log_dir = dir / "projects" / "mlflow_logs"
+
+    # log_dir.mkdir(exist_ok=True)
+    # log_file = log_dir / "mlflow_stdout.log"
+
+    os.environ["MLFLOW_TRACKING_URI"] = (
+        "sqlite:////Users/ghaith/Desktop/kso/kso/projects/mlflow.db"
+    )
+    os.environ["MLFLOW_ARTIFACT_URI"] = (
+        "file:///Users/ghaith/Desktop/kso/kso/projects/test_project_1/mlruns"
+    )
+    try:
+        process = subprocess.Popen(
+            [
+                "mlflow",
+                "models",
+                "serve",
+                "-m",
+                f"models:/{model_name}/{version}",
+                "-p",
+                f"{port}",
+                "--no-conda",
+            ],
+            # stdout=open(log_file, "a"),
+            # stderr=subprocess.STDOUT,
+            cwd="/Users/ghaith/Desktop/kso/kso/projects/test_project_1",
+        )
+
+        # Wait for server to start
+        time.sleep(2)
+
+        # Check if the process is still running
+        if process.poll() is not None:
+            logger.error("MLflow server failed to start")
+            return False
+
+        # ui_url = f"http://{host}:{port}"
+        # logger.info(f"The MLflow server is running. Please visit: {ui_url}")
+
+        # # Automatically open browser
+        # if auto_open:
+        #     webbrowser.open(ui_url)
+        #     logger.info("The browser has opened automatically.")
+
+        # # Wait for user interruption
+        # print("\nexecute stop_mlflow_server function to stop the MLflow server...")
+
+        return True
+    except Exception as e:
+        logger.error(f"MLflow server failed to start: {str(e)}")
+        return False
+
+
+def plot_bboxes(results, image_path: str):
+    img = cv2.imread(image_path)
+    img = cv2.resize(img, (640, 640))
+
+    pred = results["predictions"][0]
+    names = pred["names"]
+    scores = pred["scores"]
+    classes = pred["classes"]
+    boxes = np.array(pred["boxes"], dtype=int)
+
+    for score, cls, bbox in zip(scores, classes, boxes):
+        x1, y1, x2, y2 = bbox
+        label = f"{names[str(cls)]}: {score:.2f}"
+
+        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+        cv2.putText(
+            img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2
+        )
+
+    return img
+
+
+def save_predictions(project: Project, predictions: List, save_dir: str = None) -> Path:
+    """
+    save the predictions created by the model inference
+    """
+
+    if save_dir:
+        save_dir = Path(save_dir).expanduser()
+    else:
+        project_name = project.Project_name
+        base_dir = Path(__file__).resolve().parents[2]
+        save_dir = base_dir / "projects" / project_name
+
+    if not save_dir.exists():
+        raise FileNotFoundError(f"{save_dir} was not found")
+
+    idx = 0
+    while True:
+        suffix = "" if idx == 0 else f"_{idx}"
+        new_dir = save_dir / f"inference_results{suffix}"
+        if not new_dir.exists():
+            new_dir.mkdir(parents=True)
+            break
+        idx += 1
+
+    for i, pred in enumerate(predictions):
+        cv2.imwrite(f"{new_dir}/annotated_{i}.jpg", pred["plot"])
+    logging.info(f"Saving inference results to: {new_dir}")
