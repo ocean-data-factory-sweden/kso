@@ -21,10 +21,11 @@ import shutil
 from collections import defaultdict
 import random
 from PIL import Image
-from mlflow.pyfunc import PythonModel
+from mlflow.pyfunc import PythonModel, PyFuncModel
 import numpy as np
 from ultralytics import settings
 import mlflow
+import torch.nn as nn
 
 
 # Logging
@@ -48,6 +49,10 @@ class YOLOv11MLflowModel(PythonModel):
         logger.info(f"Context: {context}")
 
         self.model = YOLO(model_path)
+
+    def nn_model(self):
+        """get the pytorch model from mlflow.pyfunc"""
+        return self.model.model
 
     def predict(
         self,
@@ -182,7 +187,13 @@ def training_model(
             registered_model_name=model_name,
         )
 
-    mlflow.end_run()
+    #     mlflow.pytorch.log_model(
+    #         artifact_path="model",
+    #         pytorch_model=model.model,
+    #         registered_model_name=model_name,
+    #     )
+
+    # mlflow.end_run()
 
     data["Mlflow"] = {
         "path": str(mlflowdb_path),
@@ -247,14 +258,29 @@ def import_experiment(project: Project, input_dir: str, port: int = 8080):
 
 
 def loading_model(model_name: str, version: int):
+    """load pyfuncModel from registred Mlflow models and versions"""
     mlflowdb_path = Path(__file__).resolve().parents[2] / "projects" / "mlflow.db"
     os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{str(mlflowdb_path)}"
     model_uri = f"models:/{model_name}/{version}"
-    print(model_uri)
     model = mlflow.pyfunc.load_model(model_uri)
     return model
 
 
-def model_inference(model, data_path):
+def model_inference(model: PyFuncModel, data_path: str):
+    if not isinstance(model, PyFuncModel):
+        raise TypeError(f"model {model} must be an mlflow pyfunc model.")
+    if not isinstance(data_path, str):
+        raise TypeError(f"data path {data_path} must be a non-empty string.")
     result = model.predict({"image": data_path})
     return result
+
+
+def internal_model(model: PyFuncModel):
+    """load the internal pytorch model of type torch.nn.Module"""
+    if not isinstance(model, PyFuncModel):
+        raise TypeError(f"model {model} must be a mlflow pyfuncModel")
+    internal_model = model._model_impl.python_model
+    pytorch_model = internal_model.nn_model()
+    if not isinstance(pytorch_model, nn.Module):
+        raise TypeError(f"model {pytorch_model} is not a pytorch model")
+    return pytorch_model

@@ -12,6 +12,7 @@ from .trainer import (
     import_experiment,
     loading_model,
     model_inference,
+    internal_model,
 )
 from .serving_utils import (
     start_mlflow_server,
@@ -23,6 +24,12 @@ from .serving_utils import (
 )
 from .data_augmentation import (
     run_augmentation,
+)
+
+from .Inference_latency import (
+    model_latency_inference,
+    inference_memory,
+    memory_estimator,
 )
 
 __all__ = [
@@ -44,4 +51,8 @@ __all__ = [
     "loading_model",
     "model_inference",
     "save_predictions",
+    "model_latency_inference",
+    "internal_model",
+    "inference_memory",
+    "memory_estimator",
 ]
