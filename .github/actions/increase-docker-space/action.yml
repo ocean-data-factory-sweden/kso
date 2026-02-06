@@ -41,6 +41,8 @@ runs:
         mount --bind /mnt/docker /var/lib/docker
         EOF
 
+    # This fix was last tested in November 2025.
+    # If enabled later again, the list of removed paths might need to be updated.
     # We skip this erasing step to speed up the CI run.
     # If /mnt disappears at some point from the runner, you can gain disk space by enabling this.
     # See https://github.com/actions/runner-images/blob/0d358721aff04547ce591c7e1c444dc285fae993/images/ubuntu/Ubuntu2404-Readme.md
@@ -55,6 +57,8 @@ runs:
         rm -rf "$CONDA"                 #  1 GB
         EOF
 
+    # This fix was last tested in November 2025.
+    # If enabled later again, the list of removed packages might need to be updated.
     # We skip this erasing step to speed up the CI run.
     # If /mnt disappears at some point from the runner, you can gain disk space by enabling this.
     # See https://github.com/actions/runner-images/blob/0d358721aff04547ce591c7e1c444dc285fae993/images/ubuntu/Ubuntu2404-Readme.md
