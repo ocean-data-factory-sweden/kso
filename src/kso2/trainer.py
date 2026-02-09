@@ -36,7 +36,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class YOLOv11MLflowModel(PythonModel):
+class YOLOUltralyticsMLflowModel(PythonModel):
     def __init__(self):
         # Don't keep any state in the constructor
         super().__init__()
@@ -107,7 +107,7 @@ def set_group_writable_umask(mask=0o002):
     logging.info(f"Changed umask from {oct(old_umask)} to {oct(mask)}")
 
 
-def training_model(
+def train_model(
     project: Project, epochs: int = 100, imgsz: int = 640, change_umask=False
 ):
     if not isinstance(project, Project):
@@ -116,12 +116,12 @@ def training_model(
     if change_umask:
         set_group_writable_umask()
 
-    project_name = project.Project_name
+    project_name = project.project_name
     model_name = project.model_name
     project_path = project.project_path
     Config_file_path = project.Config_file_path
     traking = project.tracking
-    mlflowdb_path = traking["Mlflow"].get("mlflow.db")
+    mlflowdb_path = traking["mlflow"].get("mlflow.db")
     yaml_path = Path(Config_file_path).expanduser()
     print(f"mlflowdb_path:{mlflowdb_path}")
 
@@ -132,9 +132,11 @@ def training_model(
         raise FileExistsError(f"{yaml_path} does not exist.")
 
     data = yaml_data_retrieve(yaml_path=yaml_path)
-    data_path = data["data_path"].get("Biigle_path") or data["data_path"].get(
+    data_path = data["data_path"].get("biigle_path") or data["data_path"].get(
         "ultralytics_data_path"
     )
+    print(f"data:{data}")
+    print(f"data_path:{data_path}")
     if not data_path:
         raise ValueError("No valid data path found in project configuration.")
 
@@ -182,7 +184,7 @@ def training_model(
 
         mlflow.pyfunc.log_model(
             artifact_path="model",
-            python_model=YOLOv11MLflowModel(),
+            python_model=YOLOUltralyticsMLflowModel(),
             artifacts={"weights": str(best_weight_path)},
             registered_model_name=model_name,
         )
@@ -195,7 +197,7 @@ def training_model(
 
     # mlflow.end_run()
 
-    data["Mlflow"] = {
+    data["mlflow"] = {
         "path": str(mlflowdb_path),
         "experiment_name": project_name,
         "mlflow.db": str(mlflowdb_path),
@@ -218,7 +220,7 @@ def export_experiment(
     project: Project, port=8080, notebook_formats=None, use_threads=False
 ):
 
-    project_name = project.Project_name
+    project_name = project.project_name
     experiment_name = project_name
     # 1) Tracking URI points to your local mlruns folder
     mlflow.set_tracking_uri(f"http://localhost:{port}")
@@ -243,7 +245,7 @@ def export_experiment(
 
 def import_experiment(project: Project, input_dir: str, port: int = 8080):
 
-    project_name = project.Project_name
+    project_name = project.project_name
     experiment_name = project_name
     # 1) Tracking URI points to your local mlruns folder
     mlflow.set_tracking_uri(f"http://localhost:{port}")

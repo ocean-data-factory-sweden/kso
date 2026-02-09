@@ -20,7 +20,7 @@ import shutil
 
 @dataclass
 class Project:
-    Project_name: str
+    project_name: str
     project_path: str | Path | None = None
     Config_file_path: str | Path | None = None
     data_path: Optional[Dict[str, Any]] = None
@@ -30,12 +30,17 @@ class Project:
     metadata: str = None
     # Mlflow: Optional[Dict[str, Any]] = None
 
+def sanitized_name(project_name:str):
+    sanitized = "".join(c.lower() if c.isalnum() else "_" for c in project_name).strip(
+        "_"
+    )
+    return sanitized
 
 def create_project(
-    Project_name: str,
-    Project_path: str | Path = None,
+    project_name: str,
+    project_path: str | Path = None,
     ultralytics_data: Optional[Dict[str, Any]] = None,
-    Biigle_path: Optional[Dict[str, Any]] = None,
+    biigle_path: Optional[Dict[str, Any]] = None,
     tracking: Optional[Dict[str, Any]] = None,
     weights_path: str = None,
     model_name: str = None,
@@ -43,60 +48,42 @@ def create_project(
 ) -> Project:
     """Create a YAML file describing a KSO project."""
     # user mistakes.
-    if not Project_name or not isinstance(Project_name, str):
-        raise ValueError("'Project_name' must be a non-empty string.")
+    if not project_name or not isinstance(project_name, str):
+        raise ValueError(f"{project_name} must be a non-empty string.")
 
-    sanitized = "".join(c.lower() if c.isalnum() else "_" for c in Project_name).strip(
-        "_"
-    )
+    sanitized=sanitized_name(project_name)
 
-    if Project_path:
-        Project_path = Path(Project_path).expanduser()
+    if project_path:
+        project_path = Path(project_path).expanduser()
+        project=project_path / sanitized
     else:
         base_dir = Path(__file__).resolve().parents[2]
-        Project_path = base_dir / "projects"
-    yaml_path = Project_path / sanitized / f"{sanitized}.project.yaml"
-
+        project_path = base_dir / "projects"
+        project=project_path / sanitized
+    
     """index the last model added if none is provided"""
     index = -1
 
-    if yaml_path.exists():
-        yaml_dict = yaml_data_retrieve(yaml_path)
-        weights_paths = [m["model_path"] for m in yaml_dict["models"]]
-        model_names = [m["model_name"] for m in yaml_dict["models"]]
-
-        if model_name or weights_path:
-            if model_name in model_names:
-                index = model_names.index(model_name)
-            elif weights_path in weights_paths:
-                index = weights_paths.index(weights_path)
-            else:
-                yaml_dict["models"].append(
-                    {"model_path": weights_path, "model_name": model_name}
-                )
-            # with yaml_path.open("w", encoding="utf-8") as fh:
-            #     yaml.safe_dump(yaml_dict, fh, sort_keys=False, default_flow_style=False)
-            yaml_dict = yaml_data_dump(yaml_path, yaml_dict)
+    if project.exists():
+       raise FileExistsError(f"the project {str(project)} already exist.")
 
     else:
-
-        project = Project_path / sanitized
         project.mkdir(parents=True, exist_ok=True)
 
         yaml_path = project / f"{sanitized}.project.yaml"
         mlflow_path = project / "mlflow.db"
         # Assemble the YAML structure.
         yaml_dict: Dict[str, Any] = {
-            "Project_name": sanitized,
-            "Project_path": str(project),
+            "project_name": sanitized,
+            "project_path": str(project),
             "Config_file_path": str(yaml_path),
             "data_path": {
                 "ultralytics_data_path": ultralytics_data,
-                "Biigle_path": Biigle_path,
+                "biigle_path": biigle_path,
             },
             "models": [{"model_path": weights_path, "model_name": model_name}],
             "tracking": {
-                "Mlflow": {
+                "mlflow": {
                     "path": None,
                     "experiment_name": None,
                     "mlflow.db": str(mlflow_path),
@@ -107,16 +94,16 @@ def create_project(
 
         yaml_dict = yaml_data_dump(yaml_path, yaml_dict)
 
-    runs_dir = str(Project_path / sanitized / "runs")
-    datasets_dir = str(Project_path / sanitized)
+    runs_dir = str(project_path / sanitized / "runs")
+    datasets_dir = str(project_path / sanitized)
     # Update multiple settings
     settings.update({"datasets_dir": datasets_dir, "runs_dir": runs_dir})
 
-    logging.info(f"Project YAML created at {str(Project_path)}")
+    logging.info(f"Project YAML created at {str(project_path)}")
     # Convert yaml into a project instance
     project = Project(
-        Project_name=yaml_dict["Project_name"],
-        project_path=yaml_dict["Project_path"],
+        project_name=yaml_dict["project_name"],
+        project_path=yaml_dict["project_path"],
         Config_file_path=yaml_dict["Config_file_path"],
         data_path=yaml_dict["data_path"],
         tracking=yaml_dict["tracking"],
@@ -129,21 +116,20 @@ def create_project(
 
 
 def load_project(
-    # Project_name : str,
-    Project_path: str | Path,
+    project_path: str | Path,
     model_name: str = None,
     model_path: str = None,
 ):
     """load an existing project"""
 
-    if not Project_path or not isinstance(Project_path, (str, Path)):
-        raise ValueError(f"{Project_path} must be non-empty string or Path")
+    if not project_path or not isinstance(project_path, (str, Path)):
+        raise ValueError(f"{project_path} must be non-empty string or Path")
     if model_name and not isinstance(model_name, str):
         raise ValueError("'model_name' must be a non-empty string.")
     if model_path and not isinstance(model_path, str):
         raise ValueError("'model_path' must be a non-empty string.")
 
-    yaml_path = Path(Project_path).expanduser()
+    yaml_path = Path(project_path).expanduser()
     if yaml_path.exists():
         yaml_dict = yaml_data_retrieve(yaml_path=yaml_path)
 
@@ -158,14 +144,14 @@ def load_project(
             elif model_path in model_paths:
                 index = model_paths.index(model_path)
 
-        logging.info(f"{Project_path} loaded successfully")
+        logging.info(f"{project_path} loaded successfully")
     else:
         raise FileNotFoundError(f"project {yaml_path} was not found")
 
     # Convert yaml into a project instance
     project = Project(
-        Project_name=yaml_dict["Project_name"],
-        project_path=yaml_dict["Project_path"],
+        project_name=yaml_dict["project_name"],
+        project_path=yaml_dict["project_path"],
         Config_file_path=yaml_dict["Config_file_path"],
         data_path=yaml_dict["data_path"],
         tracking=yaml_dict["tracking"],
@@ -215,35 +201,39 @@ def yaml_data_dump(yaml_path: str | Path, data: str = None):
 
 
 def preprocess_biigle_csv(
-    BIIGLE_CSV_PATH: str, IMAGES_ROOT: str, DATASET_DIR: str
+    biigle_csv_path: str,
+    images_root: str,
+    dataset_dir: str,
+    train_ratio:float = 0.7,
+    val_ratio:float = 0.2,
+    test_ratio:float = 0.1,
+    augment_factor:float = 0.5,
+    random_seed = 42,
+    augment_train = True
 ) -> Path:
     """
-    Create a YOLO dataset from a BIIGLE CSV (nested helper functions inside).
+    Create a YOLO dataset from a biigle CSV file.
     Returns:
         Path to the written data.yaml.
     """
     # ----------------------------
     # Inline config (unchanged defaults)
     # ----------------------------
-    TRAIN_RATIO = 0.7
-    VAL_RATIO = 0.2
-    TEST_RATIO = 0.1
+    
+    
 
-    AUGMENT_TRAIN = True
-    AUGMENT_FACTOR = 0.5  # 0.5 = +50% images, 1.0 = double
     AUGMENT_OPS = ["hflip", "vflip", "rot180"]
 
-    RANDOM_SEED = 42
-    VALID_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+    valid_exts = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
     REQUIRED_COLS = ["filename", "label_name", "shape_name", "points", "attributes"]
     SUPPORTED_SHAPES = ["Rectangle", "Polygon"]
 
     # ----------------------------
     # Normalize paths
     # ----------------------------
-    csv_path = Path(BIIGLE_CSV_PATH).expanduser().resolve()
-    images_root = Path(IMAGES_ROOT).expanduser().resolve()
-    dataset_dir = Path(DATASET_DIR).expanduser().resolve()
+    csv_path = Path(biigle_csv_path).expanduser().resolve()
+    images_root = Path(images_root).expanduser().resolve()
+    dataset_dir = Path(dataset_dir).expanduser().resolve()
 
     # ----------------------------
     # Nested helpers (private)
@@ -534,7 +524,6 @@ def preprocess_biigle_csv(
         }
         with open(data_yaml_path, "w") as f:
             yaml.safe_dump(data_cfg, f, sort_keys=False)
-        print(f"Wrote {data_yaml_path}")
         return data_yaml_path
 
     # ----------------------------
@@ -549,20 +538,20 @@ def preprocess_biigle_csv(
     class_names, df = _build_class_mapping(df)
 
     df = _convert_annotations_to_yolo(df)
-    image_index = _index_images(images_root, VALID_EXTS)
+    image_index = _index_images(images_root, valid_exts)
     split_for_image = _split_dataset(
-        df, TRAIN_RATIO, VAL_RATIO, TEST_RATIO, RANDOM_SEED
+        df, train_ratio, val_ratio, test_ratio, random_seed
     )
 
     _write_split_files(df, split_for_image, image_index, dataset_dir)
 
-    if AUGMENT_TRAIN:
+    if augment_train:
         _augment_training_set(
             dataset_dir=dataset_dir,
-            valid_exts=VALID_EXTS,
+            valid_exts=valid_exts,
             augment_ops=AUGMENT_OPS,
-            augment_factor=AUGMENT_FACTOR,
-            seed=RANDOM_SEED,
+            augment_factor=augment_factor,
+            seed=random_seed,
         )
     else:
         print("Augmentation disabled.")
@@ -574,8 +563,8 @@ def add_data(
     project: Project,
     data_type: str,
     data_path: str = None,
-    IMAGES_ROOT: str = None,
-    DATASET_DIR: str = None,
+    images_root: str = None,
+    dataset_dir: str | None= None,
 ):
 
     if not project or not isinstance(project, Project):
@@ -614,28 +603,28 @@ def add_data(
         project.data_path["ultralytics_data_path"] = str(data_path)
 
     elif data_type == "Biigle_dataset":
-        if not IMAGES_ROOT or not isinstance(IMAGES_ROOT, str):
-            raise ValueError(f"IMAGES_ROOT must be a non empty string")
-        if DATASET_DIR and not isinstance(DATASET_DIR, str):
-            raise ValueError(f"DATASET_DIR must be a non empty string")
-        if DATASET_DIR:
-            DATASET_DIR_path = Path(DATASET_DIR).expanduser().resolve()
+        if not images_root or not isinstance(images_root, str):
+            raise ValueError(f"images_root must be a non empty string")
+        if dataset_dir and not isinstance(dataset_dir, str):
+            raise ValueError(f"dataset_dir must be a non empty string")
+        if dataset_dir:
+            DATASET_DIR_path = Path(dataset_dir).expanduser().resolve()
             if not DATASET_DIR_path.exists():
                 raise FileNotFoundError(f"{DATASET_DIR_path} not found")
         project_path = Path(project_path).expanduser()
-        if not DATASET_DIR:
-            DATASET_DIR = project_path / "Dataset"
-            DATASET_DIR.mkdir(parents=True, exist_ok=True)
+        if not dataset_dir:
+            dataset_dir = project_path / "Dataset"
+            dataset_dir.mkdir(parents=True, exist_ok=True)
 
         biigle_yaml_path = preprocess_biigle_csv(
-            BIIGLE_CSV_PATH=data_path,
-            IMAGES_ROOT=IMAGES_ROOT,
-            DATASET_DIR=str(DATASET_DIR),
+            biigle_csv_path=data_path,
+            images_root=images_root,
+            dataset_dir=str(dataset_dir),
         )
 
-        # data["data_path"] = {"Biigle_path":str(biigle_yaml_path)}
-        data["data_path"].update({"Biigle_path": str(biigle_yaml_path)})
-        project.data_path["Biigle_path"] = str(biigle_yaml_path)
+        # data["data_path"] = {"biigle_path":str(biigle_yaml_path)}
+        data["data_path"].update({"biigle_path": str(biigle_yaml_path)})
+        project.data_path["biigle_path"] = str(biigle_yaml_path)
 
     yaml_data_dump(yaml_path=yaml_path, data=data)
     logging.info(f"Project YAML data path updated at {yaml_path}")

@@ -6,7 +6,7 @@ from .project import (
     load_project,
 )
 from .trainer import (
-    training_model,
+    train_model,
     export_experiment,
     import_experiment,
     loading_model,
@@ -38,7 +38,7 @@ __all__ = [
     "add_model",
     "add_data",
     "add_Biigle_data",
-    "training_model",
+    "train_model",
     "export_experiment",
     "import_experiment",
     "start_mlflow_server",
