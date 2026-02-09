@@ -21,7 +21,7 @@ def get_registry_modules():
 
 
 @pytest.fixture
-def mlp():
+def mlp(needs_wandb):
     project_name = "Template project"
     project = p_utils.find_project(project_name=project_name)
     # Initialise mlp
