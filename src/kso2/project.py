@@ -30,11 +30,13 @@ class Project:
     metadata: str = None
     # Mlflow: Optional[Dict[str, Any]] = None
 
-def sanitized_name(project_name:str):
+
+def sanitized_name(project_name: str):
     sanitized = "".join(c.lower() if c.isalnum() else "_" for c in project_name).strip(
         "_"
     )
     return sanitized
+
 
 def create_project(
     project_name: str,
@@ -51,21 +53,21 @@ def create_project(
     if not project_name or not isinstance(project_name, str):
         raise ValueError(f"{project_name} must be a non-empty string.")
 
-    sanitized=sanitized_name(project_name)
+    sanitized = sanitized_name(project_name)
 
     if project_path:
         project_path = Path(project_path).expanduser()
-        project=project_path / sanitized
+        project = project_path / sanitized
     else:
         base_dir = Path(__file__).resolve().parents[2]
         project_path = base_dir / "projects"
-        project=project_path / sanitized
-    
+        project = project_path / sanitized
+
     """index the last model added if none is provided"""
     index = -1
 
     if project.exists():
-       raise FileExistsError(f"the project {str(project)} already exist.")
+        raise FileExistsError(f"the project {str(project)} already exist.")
 
     else:
         project.mkdir(parents=True, exist_ok=True)
@@ -204,12 +206,12 @@ def preprocess_biigle_csv(
     biigle_csv_path: str,
     images_root: str,
     dataset_dir: str,
-    train_ratio:float = 0.7,
-    val_ratio:float = 0.2,
-    test_ratio:float = 0.1,
-    augment_factor:float = 0.5,
-    random_seed = 42,
-    augment_train = True
+    train_ratio: float = 0.7,
+    val_ratio: float = 0.2,
+    test_ratio: float = 0.1,
+    augment_factor: float = 0.5,
+    random_seed=42,
+    augment_train=True,
 ) -> Path:
     """
     Create a YOLO dataset from a biigle CSV file.
@@ -219,8 +221,6 @@ def preprocess_biigle_csv(
     # ----------------------------
     # Inline config (unchanged defaults)
     # ----------------------------
-    
-    
 
     AUGMENT_OPS = ["hflip", "vflip", "rot180"]
 
@@ -564,7 +564,7 @@ def add_data(
     data_type: str,
     data_path: str = None,
     images_root: str = None,
-    dataset_dir: str | None= None,
+    dataset_dir: str | None = None,
 ):
 
     if not project or not isinstance(project, Project):
