@@ -22,6 +22,7 @@ import shutil
 class Project:
     Project_name: str
     project_path: str | Path | None = None
+    Config_file_path: str | Path | None = None
     data_path: Optional[Dict[str, Any]] = None
     tracking: Optional[Dict[str, Any]] = None
     model_path: str = None
@@ -32,6 +33,7 @@ class Project:
 
 def create_project(
     Project_name: str,
+    Project_path: str | Path = None,
     ultralytics_data: Optional[Dict[str, Any]] = None,
     Biigle_path: Optional[Dict[str, Any]] = None,
     tracking: Optional[Dict[str, Any]] = None,
@@ -47,20 +49,19 @@ def create_project(
     sanitized = "".join(c.lower() if c.isalnum() else "_" for c in Project_name).strip(
         "_"
     )
-    # Get the directory of this file
-    base_dir = Path(__file__).resolve().parents[2]
 
-    project_path = base_dir / "projects"
-    yaml_path = project_path / sanitized / f"{sanitized}.project.yaml"
+    if Project_path:
+        Project_path = Path(Project_path).expanduser()
+    else:
+        base_dir = Path(__file__).resolve().parents[2]
+        Project_path = base_dir / "projects"
+    yaml_path = Project_path / sanitized / f"{sanitized}.project.yaml"
 
     """index the last model added if none is provided"""
     index = -1
 
     if yaml_path.exists():
-        with open(yaml_path, mode="r", newline="", encoding="utf-8") as file:
-            yaml_dict = yaml.load(file, Loader=yaml.SafeLoader)
-
-        logging.info(f"{Project_name} loaded successfully")
+        yaml_dict = yaml_data_retrieve(yaml_path)
         weights_paths = [m["model_path"] for m in yaml_dict["models"]]
         model_names = [m["model_name"] for m in yaml_dict["models"]]
 
@@ -73,20 +74,22 @@ def create_project(
                 yaml_dict["models"].append(
                     {"model_path": weights_path, "model_name": model_name}
                 )
-            with yaml_path.open("w", encoding="utf-8") as fh:
-                yaml.safe_dump(yaml_dict, fh, sort_keys=False, default_flow_style=False)
+            # with yaml_path.open("w", encoding="utf-8") as fh:
+            #     yaml.safe_dump(yaml_dict, fh, sort_keys=False, default_flow_style=False)
+            yaml_dict = yaml_data_dump(yaml_path, yaml_dict)
 
     else:
 
-        project = project_path / sanitized
+        project = Project_path / sanitized
         project.mkdir(parents=True, exist_ok=True)
 
         yaml_path = project / f"{sanitized}.project.yaml"
-        mlflow_path = project_path / "mlflow.db"
+        mlflow_path = project / "mlflow.db"
         # Assemble the YAML structure.
         yaml_dict: Dict[str, Any] = {
             "Project_name": sanitized,
             "Project_path": str(project),
+            "Config_file_path": str(yaml_path),
             "data_path": {
                 "ultralytics_data_path": ultralytics_data,
                 "Biigle_path": Biigle_path,
@@ -102,20 +105,19 @@ def create_project(
             "metadata": metadata,
         }
 
-        with yaml_path.open("w", encoding="utf-8") as fh:
-            yaml.safe_dump(yaml_dict, fh, sort_keys=False, default_flow_style=False)
+        yaml_dict = yaml_data_dump(yaml_path, yaml_dict)
 
-    runs_dir = str(project_path / sanitized / "runs")
-    datasets_dir = str(project_path / sanitized)
-    # print(runs_dir,datasets_dir)
+    runs_dir = str(Project_path / sanitized / "runs")
+    datasets_dir = str(Project_path / sanitized)
     # Update multiple settings
     settings.update({"datasets_dir": datasets_dir, "runs_dir": runs_dir})
 
-    logging.info(f"Project YAML created at {yaml_path}")
+    logging.info(f"Project YAML created at {str(Project_path)}")
     # Convert yaml into a project instance
     project = Project(
         Project_name=yaml_dict["Project_name"],
         project_path=yaml_dict["Project_path"],
+        Config_file_path=yaml_dict["Config_file_path"],
         data_path=yaml_dict["data_path"],
         tracking=yaml_dict["tracking"],
         model_path=yaml_dict["models"][index]["model_path"],
@@ -127,27 +129,23 @@ def create_project(
 
 
 def load_project(
-    Project_name: str, model_name: str | None = None, model_path: str | None = None
+    # Project_name : str,
+    Project_path: str | Path,
+    model_name: str = None,
+    model_path: str = None,
 ):
     """load an existing project"""
-    if not Project_name or not isinstance(Project_name, str):
-        raise ValueError("'Project_name' must be a non-empty string.")
+
+    if not Project_path or not isinstance(Project_path, (str, Path)):
+        raise ValueError(f"{Project_path} must be non-empty string or Path")
     if model_name and not isinstance(model_name, str):
         raise ValueError("'model_name' must be a non-empty string.")
     if model_path and not isinstance(model_path, str):
         raise ValueError("'model_path' must be a non-empty string.")
 
-    sanitized = "".join(c.lower() if c.isalnum() else "_" for c in Project_name).strip(
-        "_"
-    )
-    # Get the directory of this file
-    base_dir = Path(__file__).resolve().parents[2]
-
-    project_path = base_dir / "projects"
-    yaml_path = project_path / sanitized / f"{sanitized}.project.yaml"
+    yaml_path = Path(Project_path).expanduser()
     if yaml_path.exists():
-        with open(yaml_path, mode="r", newline="", encoding="utf-8") as file:
-            yaml_dict = yaml.load(file, Loader=yaml.SafeLoader)
+        yaml_dict = yaml_data_retrieve(yaml_path=yaml_path)
 
         """index the last model added if none is provided"""
         index = -1
@@ -160,14 +158,15 @@ def load_project(
             elif model_path in model_paths:
                 index = model_paths.index(model_path)
 
-        logging.info(f"{Project_name} loaded successfully")
+        logging.info(f"{Project_path} loaded successfully")
     else:
-        raise FileNotFoundError(f"project {Project_name} was not found")
+        raise FileNotFoundError(f"project {yaml_path} was not found")
 
     # Convert yaml into a project instance
     project = Project(
         Project_name=yaml_dict["Project_name"],
         project_path=yaml_dict["Project_path"],
+        Config_file_path=yaml_dict["Config_file_path"],
         data_path=yaml_dict["data_path"],
         tracking=yaml_dict["tracking"],
         model_path=yaml_dict["models"][index]["model_path"],
@@ -178,51 +177,41 @@ def load_project(
     return project
 
 
-def add_data(project: Project, data_path: str = None):
-
-    if not project or not isinstance(project, Project):
-        raise ValueError("'Project_path' must be a project instance.")
-    if data_path and not isinstance(data_path, str):
-        raise ValueError("'data_path' must be a non-empty string.")
-
-    project_name = project.Project_name
-
-    # Get the directory of this file
-    base_dir = Path(__file__).resolve().parents[2]
-
-    project_path = base_dir / "projects" / project_name
-    yaml_path = project_path / f"{project_name}.project.yaml"
-
-    if not yaml_path.exists():
-        raise FileNotFoundError(f"{yaml_path} not found.")
-
-    if data_path:
-
-        candidate = Path(data_path).expanduser()
-        if candidate.is_absolute():
-            data_path = candidate.resolve()
-        else:
-            data_path = (project_path / candidate).resolve()
-
-    else:
-        generated_yolo_data = add_ultralytics_dataset_yaml(
-            str(project_path / "coco8.yaml")
-        )
-        data_path = Path(generated_yolo_data).expanduser().resolve()
-    if not data_path.exists():
-        raise FileNotFoundError(f"Dataset file not found: {data_path}")
-
+def yaml_data_retrieve(yaml_path: str | Path, data: str = None):
+    """
+    retreive data from the yaml config file
+    if a data column was provided retreive it else return all the data
+    """
+    if not yaml_path or not isinstance(yaml_path, (str, Path)):
+        raise TypeError(f"{yaml_path} has to be a non empty string")
+    yaml_path = Path(yaml_path).expanduser()
     with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.load(f, Loader=yaml.SafeLoader)
+        yaml_data = yaml.load(f, Loader=yaml.SafeLoader)
+    if data:
+        data = yaml_data.get(data)
+        logging.info("data was rtreived successfully")
+        return data
+    elif data and not isinstance(data, str):
+        raise TypeError(f"{data} should be a non-empty string")
+    else:
+        logging.info("data was retreived successfully")
+        return yaml_data
 
-    data["data_path"]["ultralytics_data_path"] = str(data_path)
 
-    project.data_path["ultralytics_data_path"] = str(data_path)
+def yaml_data_dump(yaml_path: str | Path, data: str = None):
+    """
+    dump data to the yaml config file
+    """
+    if not yaml_path or not isinstance(yaml_path, (str, Path)):
+        raise TypeError(f"{yaml_path} has to be a non empty string")
+    if not data or not isinstance(data, Dict):
+        raise TypeError(f"{data} has to be a non empty Dictionary")
+
+    yaml_path = Path(yaml_path).expanduser()
     with open(yaml_path, "w", encoding="utf-8") as d:
         yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-
-    logging.info(f"Project YAML data path updated at {yaml_path}")
-    return pprint.pp(data)
+    logging.info("data was dumped successfully")
+    return data
 
 
 def preprocess_biigle_csv(
@@ -581,48 +570,74 @@ def preprocess_biigle_csv(
     return _write_data_yaml(dataset_dir, class_names)
 
 
-def add_Biigle_data(
+def add_data(
     project: Project,
-    BIIGLE_CSV_PATH: str,
-    IMAGES_ROOT: str,
+    data_type: str,
+    data_path: str = None,
+    IMAGES_ROOT: str = None,
     DATASET_DIR: str = None,
 ):
 
-    if not BIIGLE_CSV_PATH or not isinstance(BIIGLE_CSV_PATH, str):
-        raise ValueError(f"BIIGLE_CSV_PATH must be a non empty string")
-    if not IMAGES_ROOT or not isinstance(IMAGES_ROOT, str):
-        raise ValueError(f"IMAGES_ROOT must be a non empty string")
-    if DATASET_DIR and not isinstance(DATASET_DIR, str):
-        raise ValueError(f"DATASET_DIR must be a non empty string")
-    if DATASET_DIR:
-        DATASET_DIR_path = Path(DATASET_DIR).expanduser().resolve()
-        if not DATASET_DIR_path.exists():
-            raise FileNotFoundError(f"{DATASET_DIR_path} not found")
-    project_name = project.Project_name
-    base_dir = Path(__file__).resolve().parents[2]
-    project_path = base_dir / "projects" / project_name
-    if not DATASET_DIR:
-        DATASET_DIR = project_path / "Dataset"
-        DATASET_DIR.mkdir(parents=True, exist_ok=True)
+    if not project or not isinstance(project, Project):
+        raise ValueError("'Project_path' must be a project instance.")
+    if data_path and not isinstance(data_path, str):
+        raise ValueError("'data_path' must be a non-empty string.")
+    if not data_type or not isinstance(data_type, str):
+        raise ValueError("'data_type' must be a non-empty string .")
+    project_path = project.project_path
+    Config_file_path = project.Config_file_path
+    yaml_path = Path(Config_file_path).expanduser()
+    if not yaml_path.exists():
+        raise FileNotFoundError(f"{yaml_path} not found.")
 
-    biigle_yaml_path = preprocess_biigle_csv(
-        BIIGLE_CSV_PATH=BIIGLE_CSV_PATH,
-        IMAGES_ROOT=IMAGES_ROOT,
-        DATASET_DIR=str(DATASET_DIR),
-    )
+    data = yaml_data_retrieve(yaml_path=yaml_path)
 
-    yaml_path = project_path / f"{project_name}.project.yaml"
+    if data_type == "yolo_dataset":
 
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.load(f, Loader=yaml.SafeLoader)
-    # data["data_path"] = {"Biigle_path":str(biigle_yaml_path)}
-    data["data_path"].update({"Biigle_path": str(biigle_yaml_path)})
+        if data_path:
 
-    with open(yaml_path, "w", encoding="utf-8") as d:
-        yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
+            candidate = Path(data_path).expanduser()
+            if candidate.is_absolute():
+                data_path = candidate.resolve()
+            else:
+                data_path = (project_path / candidate).resolve()
 
-    project.data_path["Biigle_path"] = str(biigle_yaml_path)
+        else:
+            generated_yolo_data = add_ultralytics_dataset_yaml(
+                str(project_path / "coco8.yaml")
+            )
+            data_path = Path(generated_yolo_data).expanduser().resolve()
+        if not data_path.exists():
+            raise FileNotFoundError(f"Dataset file not found: {data_path}")
 
+        data["data_path"]["ultralytics_data_path"] = str(data_path)
+        project.data_path["ultralytics_data_path"] = str(data_path)
+
+    elif data_type == "Biigle_dataset":
+        if not IMAGES_ROOT or not isinstance(IMAGES_ROOT, str):
+            raise ValueError(f"IMAGES_ROOT must be a non empty string")
+        if DATASET_DIR and not isinstance(DATASET_DIR, str):
+            raise ValueError(f"DATASET_DIR must be a non empty string")
+        if DATASET_DIR:
+            DATASET_DIR_path = Path(DATASET_DIR).expanduser().resolve()
+            if not DATASET_DIR_path.exists():
+                raise FileNotFoundError(f"{DATASET_DIR_path} not found")
+        project_path = Path(project_path).expanduser()
+        if not DATASET_DIR:
+            DATASET_DIR = project_path / "Dataset"
+            DATASET_DIR.mkdir(parents=True, exist_ok=True)
+
+        biigle_yaml_path = preprocess_biigle_csv(
+            BIIGLE_CSV_PATH=data_path,
+            IMAGES_ROOT=IMAGES_ROOT,
+            DATASET_DIR=str(DATASET_DIR),
+        )
+
+        # data["data_path"] = {"Biigle_path":str(biigle_yaml_path)}
+        data["data_path"].update({"Biigle_path": str(biigle_yaml_path)})
+        project.data_path["Biigle_path"] = str(biigle_yaml_path)
+
+    yaml_data_dump(yaml_path=yaml_path, data=data)
     logging.info(f"Project YAML data path updated at {yaml_path}")
     return pprint.pp(data)
 
@@ -641,17 +656,15 @@ def add_model(project: Project, model_path: str = None, model_name: str = None):
     if not isinstance(model_name, str):
         raise ValueError("'model_name' must be a non-empty string")
 
-    project_name = project.Project_name
-    # Get the directory of this file
-    base_dir = Path(__file__).resolve().parents[2]
-
-    project_path = base_dir / "projects" / project_name
-    yaml_path = project_path / f"{project_name}.project.yaml"
+    Config_file_path = project.Config_file_path
+    project_path = project.project_path
+    project_path = Path(project_path).expanduser()
+    # Get the yaml path
+    yaml_path = Path(Config_file_path).expanduser()
     if not yaml_path.exists():
         raise FileExistsError(f"{yaml_path} does not exist.")
 
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.load(f, Loader=yaml.SafeLoader)
+    data = yaml_data_retrieve(yaml_path)
 
     if model_path and model_path.endswith(".pt"):
         candidate = Path(model_path).expanduser()
@@ -675,8 +688,9 @@ def add_model(project: Project, model_path: str = None, model_name: str = None):
     elif model_path and not model_path.endswith(".pt"):
         raise ValueError("model is not valid, must end with '.pt'")
 
-    with open(yaml_path, "w", encoding="utf-8") as d:
-        yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
+    # with open(yaml_path, "w", encoding="utf-8") as d:
+    #     yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
+    yaml_data_dump(yaml_path=yaml_path, data=data)
 
     """update project instance with provided model or last added model"""
     project.model_path = data["models"][index]["model_path"]

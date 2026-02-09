@@ -3,7 +3,6 @@ from .project import (
     create_project,
     add_model,
     add_data,
-    add_Biigle_data,
     load_project,
 )
 from .trainer import (
@@ -21,6 +20,7 @@ from .serving_utils import (
     deploy_mlflow_registered_model,
     plot_bboxes,
     save_predictions,
+    get_registered_models,
 )
 from .data_augmentation import (
     run_augmentation,
@@ -55,4 +55,5 @@ __all__ = [
     "internal_model",
     "inference_memory",
     "memory_estimator",
+    "get_registered_models",
 ]

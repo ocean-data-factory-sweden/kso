@@ -9,6 +9,7 @@ import logging
 from torchinfo import summary
 from .trainer import internal_model
 from mlflow.pyfunc import PyFuncModel
+import psutil
 
 
 def model_stats(model, image_path, batch_size=16):
@@ -16,11 +17,12 @@ def model_stats(model, image_path, batch_size=16):
         raise TypeError(f"model {model} is not PyFuncModel model")
     torch_model = internal_model(model)
     if not isinstance(torch_model, torch.nn.Module):
-        raise ValueError(f"model {torch_model} is not a nn.model")
+        raise ValueError(f"model {torch_model} is not a nn.Module")
     torch_model.eval()
 
     x = torchvision.io.read_image(path=image_path)
     x = x.float() / 255.0
+    print(f"batch_size: {batch_size}")
     x = x.unsqueeze(0).expand(batch_size, -1, -1, -1)  # (batch_size, 3, H, W)
     x = torch.nn.functional.interpolate(
         x, size=(640, 640), mode="bilinear", align_corners=False
@@ -54,24 +56,47 @@ def hardware_flops():
             shell=True,
             text=True,
         )
-    CUs = int(cu_output.strip())
+        CUs = int(cu_output.strip())
 
-    # MI250X official specs
-    FP32_PER_GCD_TFLOPS = 47.9
-    CUS_PER_GCD = 110
+        # MI250X official specs
+        FP32_PER_GCD_TFLOPS = 47.9
+        CUS_PER_GCD = 110
 
-    FP32_PER_CU_TFLOPS = FP32_PER_GCD_TFLOPS / CUS_PER_GCD
-    TFLOPS = CUs * FP32_PER_CU_TFLOPS
+        FP32_PER_CU_TFLOPS = FP32_PER_GCD_TFLOPS / CUS_PER_GCD
+        TFLOPS = CUs * FP32_PER_CU_TFLOPS
+    elif system == "Darwin":
+        # Apple M1/M2 GPU
+        try:
+            cores_output = subprocess.check_output(
+                "system_profiler SPDisplaysDataType | grep 'Total Number of Cores' | awk '{print $NF}'",
+                shell=True,
+                text=True,
+            )
+            cores = int(cores_output.strip())
+        except Exception as e:
+            logging.warning(f"Could not detect GPU cores: {e}")
+            cores = 0
 
-    logging.info(f"Detected Compute Units: {CUs}")
-    logging.info(f"Estimated FP32 peak TFLOPS of your Slurm allocation: {TFLOPS:.2f}")
+        TFLOPS_PER_CORE = 0.325  # M1 GPU approximation
+        TFLOPS = cores * TFLOPS_PER_CORE
+    # elif system=="Windows":
+    #     try:
+    #         cores_output = subprocess.check_output(
+    #         "powershell -Command \"(Get-CimInstance Win32_Processor).NumberOfCores\"",
+    #         shell=True,
+    #         text=True
+    #         )
+    #         cores = int(cores_output.strip())
+    #     except Exception as e:
+    #         logging.warning(f"Could not detect GPU cores: {e}")
+    # logging.info(f"Detected Compute Units: {CUs}")
+    # logging.info(f"Estimated FP32 peak TFLOPS of your Slurm allocation: {TFLOPS:.2f}")
     return TFLOPS
 
 
-def model_latency_inference(model, image_path, batch=None):
+def model_latency_inference(model, image_path, batch_size=16):
 
-    torch_model = internal_model(model)
-    macs, _ = model_stats(torch_model, image_path, batch)  # model FLOPs
+    macs, _ = model_stats(model, image_path, batch_size)  # model FLOPs
     FLOPs = macs * 2
 
     device_TFLOPs = hardware_flops()  # MI250X allocation
@@ -86,9 +111,9 @@ def model_latency_inference(model, image_path, batch=None):
 
 def inference_memory(model, batch_size=16):
     """estimate the model memory used during inference"""
-
+    my_device = "cuda" if torch.cuda.is_available() else "cpu"
     pytorch_model = internal_model(model)
-    pytorch_model.eval().to("cpu")
+    pytorch_model.eval().to(my_device)
 
     stats = summary(
         pytorch_model,
@@ -115,17 +140,18 @@ def memory_estimator(model, image_path, batch_size=16):
     """estimate the inference latency and the memory usage
     comenpared to the current slurm allocation"""
 
-    if "SLURM_JOB_ID" not in os.environ:
-        raise RuntimeError("No Slurm allocation found")
-    ram_gb = int(os.environ["SLURM_MEM_PER_NODE"]) / 1024
-    cpus = int(os.environ["SLURM_CPUS_PER_TASK"])
+    if "SLURM_JOB_ID" in os.environ:
+        ram_gb = int(os.environ["SLURM_MEM_PER_NODE"]) / 1024
+        cpus = int(os.environ["SLURM_CPUS_PER_TASK"])
+    else:
+        ram_gb = psutil.virtual_memory().total / (1024**3)
 
     inference_mb = inference_memory(model, batch_size)
     latency_ms = model_latency_inference(model, image_path)
     print(
-        f"current memory allocation is {ram_gb} and the model inference estimate memory is {inference_mb}"
+        f"current memory allocation is {ram_gb} and the model inference estimate memory is {inference_mb} mb"
     )
     print(
-        f"the model inference latency for the provided data {image_path} is {latency_ms}"
+        f"the model inference latency for the provided data {image_path} is {latency_ms} ms"
     )
     return latency_ms, inference_mb

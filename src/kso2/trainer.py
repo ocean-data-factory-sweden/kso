@@ -8,7 +8,7 @@ import os
 import sys
 from ultralytics import YOLO
 import re
-from .project import Project
+from .project import Project, yaml_data_retrieve, yaml_data_dump
 import psutil
 
 from mlflow_export_import.bulk.export_experiments import export_experiments
@@ -110,49 +110,49 @@ def set_group_writable_umask(mask=0o002):
 def training_model(
     project: Project, epochs: int = 100, imgsz: int = 640, change_umask=False
 ):
+    if not isinstance(project, Project):
+        raise ValueError("'model' must be a Project instance.")
+
     if change_umask:
         set_group_writable_umask()
 
     project_name = project.Project_name
     model_name = project.model_name
+    project_path = project.project_path
+    Config_file_path = project.Config_file_path
+    traking = project.tracking
+    mlflowdb_path = traking["Mlflow"].get("mlflow.db")
+    yaml_path = Path(Config_file_path).expanduser()
+    print(f"mlflowdb_path:{mlflowdb_path}")
 
     if not model_name:
         model_name = f"{Path(project.model_path).stem}"
 
-    base_dir = Path(__file__).resolve().parents[2]
-    project_path = base_dir / "projects" / project_name
-    yaml_path = project_path / f"{project_name}.project.yaml"
-
     if not yaml_path.exists():
         raise FileExistsError(f"{yaml_path} does not exist.")
 
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.load(f, Loader=yaml.SafeLoader)
-
-    # data_path = project.data_path["Biigle_path"]
-    data_path = project.data_path["ultralytics_data_path"]
-
-    if not isinstance(project, Project):
-        raise ValueError("'model' must be a Project instance.")
+    data = yaml_data_retrieve(yaml_path=yaml_path)
+    data_path = data["data_path"].get("Biigle_path") or data["data_path"].get(
+        "ultralytics_data_path"
+    )
+    if not data_path:
+        raise ValueError("No valid data path found in project configuration.")
 
     model_source = project.model_path
     if not model_source or not isinstance(model_source, str):
         raise ValueError("'model' must be a non-empty string.")
 
-    artifact_root = (
-        Path(__file__).resolve().parents[2] / "projects" / project_name / "mlruns"
-    )
+    artifact_root = Path(project_path).expanduser() / "mlruns"
     artifact_root.mkdir(parents=True, exist_ok=True)
 
-    mlflowdb_path = Path(__file__).resolve().parents[2] / "projects" / "mlflow.db"
     experiment_name = project_name
     settings.update({"mlflow": True})
-    os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{str(mlflowdb_path)}"
+    os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{mlflowdb_path}"
     os.environ["MLFLOW_EXPERIMENT_NAME"] = experiment_name
     os.environ["MLFLOW_ARTIFACT_URI"] = artifact_root.as_uri()
 
     # Check if experiment exists
-    mlflow.set_tracking_uri(f"sqlite:///{str(mlflowdb_path)}")
+    mlflow.set_tracking_uri(f"sqlite:///{mlflowdb_path}")
     experiment = mlflow.get_experiment_by_name(experiment_name)
 
     if experiment is None:
@@ -201,8 +201,9 @@ def training_model(
         "mlflow.db": str(mlflowdb_path),
     }
 
-    with yaml_path.open("w", encoding="utf-8") as fh:
-        yaml.safe_dump(data, fh, sort_keys=False, default_flow_style=False)
+    # with yaml_path.open("w", encoding="utf-8") as fh:
+    #     yaml.safe_dump(data, fh, sort_keys=False, default_flow_style=False)
+    yaml_data_dump(yaml_path=yaml_path, data=data)
 
     # Examine the deleted experiment details.
     experiment = mlflow.get_experiment(experiment_id)

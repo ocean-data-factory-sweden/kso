@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional, List, Union
 import requests
 import numpy as np
 from .project import Project
-
+import pandas as pd
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -172,7 +172,7 @@ def check_port_available(port):
     return len(processes) == 0
 
 
-def start_mlflow_server(host="127.0.0.1", port=8080, auto_open=True):
+def start_mlflow_server(project: Project, host="127.0.0.1", port=8080, auto_open=True):
     """
     Start the MLflow server
 
@@ -190,9 +190,9 @@ def start_mlflow_server(host="127.0.0.1", port=8080, auto_open=True):
         return False
 
     # check if mlflow.db exists.
-    dir_path = Path(__file__).resolve().parents[2]
-    mlflowdb_path = dir_path / "projects" / "mlflow.db"
-    artifact_path = dir_path / "projects" / "artifact"
+    proj_dir = Path(project.project_path)
+    mlflowdb_path = proj_dir / "mlflow.db"
+    artifact_path = proj_dir / "mlruns" / "artifact"
     artifact_path.mkdir(parents=True, exist_ok=True)
 
     if not mlflowdb_path.exists():
@@ -201,9 +201,7 @@ def start_mlflow_server(host="127.0.0.1", port=8080, auto_open=True):
     # Start the MLflow server
     logger.info(f"MLflow server, address {host}:{port}...")
 
-    dir = Path(__file__).resolve().parents[2]
-
-    log_dir = dir / "projects" / "mlflow_logs"
+    log_dir = proj_dir / "mlflow_logs"
 
     log_dir.mkdir(exist_ok=True)
     log_file = log_dir / "mlflow_stdout.log"
@@ -413,3 +411,31 @@ def save_predictions(project: Project, predictions: List, save_dir: str = None) 
     for i, pred in enumerate(predictions):
         cv2.imwrite(f"{new_dir}/annotated_{i}.jpg", pred["plot"])
     logging.info(f"Saving inference results to: {new_dir}")
+
+
+def get_registered_models(project) -> pd.DataFrame:
+    """
+    List all registered models in MLflow.
+
+    Returns:
+        DataFrame with registered model information
+    """
+    tracking_uri = "sqlite:////Users/ghaith/Desktop/kso/kso/projects/mlflow.db"
+    client = mlflow.tracking.MlflowClient(tracking_uri)  # type: ignore[attr-defined]
+    models = client.search_registered_models()
+
+    model_info = []
+    for model in models:
+        if model.latest_versions:
+            for version in model.latest_versions:
+                model_info.append(
+                    {
+                        "name": model.name,
+                        "version": version.version,
+                        "stage": version.current_stage,
+                        "run_id": version.run_id,
+                        "status": version.status,
+                    }
+                )
+
+    return pd.DataFrame(model_info)
