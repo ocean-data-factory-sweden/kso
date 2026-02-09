@@ -1,3 +1,4 @@
+import os
 import pytest
 
 
@@ -18,3 +19,9 @@ def zoo_user(request):
 @pytest.fixture
 def zoo_pass(request):
     return request.config.getoption("--zoo_pass")
+
+
+@pytest.fixture
+def needs_wandb():
+    if os.environ.get("WANDB_API_KEY", "") == "":
+        pytest.skip("No WANDB_API_KEY")

@@ -7,5 +7,5 @@ import kso_utils.project_utils as project_utils
 template = project_utils.find_project("Template project")
 
 
-def test_init_MLProjectProcessor():
+def test_init_MLProjectProcessor(needs_wandb):
     mlp = MLProjectProcessor(template)

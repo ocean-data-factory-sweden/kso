@@ -3,7 +3,7 @@ import shutil
 from kso_utils.train_models import train_models
 
 
-def test_train_models():
+def test_train_models(needs_wandb):
     """
     When the training of yolo (ultralytics) is called via pytest, the automatic logging in WandB does not work.
     See: https://github.com/ultralytics/ultralytics/blob/8ccb5fb8dd1b2e937314e56d041c592c91085d30/ultralytics/utils/callbacks/wb.py#L8
