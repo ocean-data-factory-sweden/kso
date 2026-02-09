@@ -29,6 +29,13 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Check whether workflow was triggered by a fork
+          if [[ "${{ github.repository }}" == "ocean-data-factory-sweden/kso" ]]; then
+            is_fork=false
+          else
+            is_fork=true
+          fi
+
           # Check whether workflow was triggered by a push of a tag
           is_tag=${{ github.ref_type == 'tag' }}
 
@@ -43,16 +50,22 @@ jobs:
           cache_tag_prefix=buildcache
           base_image_name=ghcr.io/${{ github.repository }}-base         # ghcr.io/ocean-data-factory-sweden/kso-base
           final_image_name=ghcr.io/${{ github.repository }}             # ghcr.io/ocean-data-factory-sweden/kso
-          cache_tag_2=false
+          extra_caches=()
           if $is_tag; then
             build_tag=${{ github.ref_name }}; build_tag=${build_tag#v}  # 1.2.3-beta
             cache_tag=$cache_tag_prefix-$base_tag                       # buildcache-dev
           else
-            build_tag=${{ github.ref_name }}                            # fix-ci
-            cache_tag=$cache_tag_prefix-$build_tag                      # buildcache-fix-ci
+            build_tag=${{ github.ref_name }}                            # name
+            cache_tag=$cache_tag_prefix-$build_tag                      # buildcache-name
             if [[ "$build_tag" != "$base_tag" ]]; then
-              cache_tag_2=$cache_tag_prefix-$base_tag                   # buildcache-dev
+              # Add dev branch as an extra cache for other branches
+              extra_caches+=("$base_image_name:$cache_tag_prefix-$base_tag")
             fi
+          fi
+
+          # Add upstream repo as an extra cache for forks
+          if $is_fork; then
+            extra_caches+=("ghcr.io/ocean-data-factory-sweden/kso-base:$cache_tag_prefix-$base_tag")
           fi
 
           # Find the commit sha of the latest successful workflow run.
@@ -187,9 +200,9 @@ jobs:
             # Build caches
             base_image_cache_to="type=registry,ref=$base_image_name:$cache_tag-$platform_tag,mode=max"
             base_image_cache_from="type=registry,ref=$base_image_name:$cache_tag-$platform_tag"
-            if [[ $cache_tag_2 != "false" ]]; then
-              base_image_cache_from="$base_image_cache_from"$'\n'"type=registry,ref=$base_image_name:$cache_tag_2-$platform_tag"
-            fi
+            for cache in "${extra_caches[@]}"; do
+              base_image_cache_from+=$'\n'"type=registry,ref=$cache-$platform_tag"
+            done
 
             # Update platform lists
             if $build_base_image; then
