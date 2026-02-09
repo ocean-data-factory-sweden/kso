@@ -2,14 +2,9 @@ name: Build and Test
 on:
   push:
     branches:
-      - main
-      - dev
+      - "*"
     tags:
       - "v*.*.*"
-  pull_request:
-    branches:
-      - main
-      - dev
   workflow_dispatch:
 
 jobs:
@@ -34,9 +29,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Check whether workflow was triggered by PR
-          is_pr=${{ github.event_name == 'pull_request' }}
-
           # Check whether workflow was triggered by a push of a tag
           is_tag=${{ github.ref_type == 'tag' }}
 
@@ -47,48 +39,44 @@ jobs:
           platforms=(cpu cuda rocm)
 
           # Names of the images
+          base_tag=dev
           cache_tag_prefix=buildcache
-          cache_tag_2=false
           base_image_name=ghcr.io/${{ github.repository }}-base         # ghcr.io/ocean-data-factory-sweden/kso-base
           final_image_name=ghcr.io/${{ github.repository }}             # ghcr.io/ocean-data-factory-sweden/kso
-          if $is_pr; then
-            build_tag=pr-${{ github.event.pull_request.number }}        # pr-480
-            pr_base_tag=${{ github.event.pull_request.base.ref }}       # dev
-            cache_tag=$cache_tag_prefix-$build_tag                      # buildcache-pr-480
-            cache_tag_2=$cache_tag_prefix-$pr_base_tag                  # buildcache-dev
-          elif $is_tag; then
+          cache_tag_2=false
+          if $is_tag; then
             build_tag=${{ github.ref_name }}; build_tag=${build_tag#v}  # 1.2.3-beta
-            cache_tag=$cache_tag_prefix-dev                             # buildcache-dev
+            cache_tag=$cache_tag_prefix-$base_tag                       # buildcache-dev
           else
-            build_tag=${{ github.ref_name }}                            # dev
-            cache_tag=$cache_tag_prefix-$build_tag                      # buildcache-dev
+            build_tag=${{ github.ref_name }}                            # fix-ci
+            cache_tag=$cache_tag_prefix-$build_tag                      # buildcache-fix-ci
+            if [[ "$build_tag" != "$base_tag" ]]; then
+              cache_tag_2=$cache_tag_prefix-$base_tag                   # buildcache-dev
+            fi
           fi
 
-          # Check changed files since previous successful workflow run for PRs
-          if $is_pr; then
-            # Default reference sha to PR base sha
-            ref_sha=${{ github.event.pull_request.base.sha }}
-            echo -e "Base commit: $ref_sha"
+          # Find the commit sha of the latest successful workflow run.
+          # The latest pushed image should correspond to this tag
+          sha=$(gh api repos/${{ github.repository }}/actions/runs?branch=${{ github.ref_name }} --paginate \
+            --jq '.workflow_runs | map(select(.name == "Build and Test" and .conclusion == "success")) | first | .head_sha')
 
-            # This would be the commit sha before this push
-            # ref_sha="${{ github.event.before }}"
+          # Check that this commit is part of the current branch
+          # (might not be if the branch has been rebased).
+          conditional_build=false
+          if [[ "$sha" != "" ]]; then
+            echo "Found commit with previous successful build: $sha"
+            if git cat-file -e "$sha"^{commit} 2>/dev/null; then
+              echo "This commit is valid -> Enabling conditional build"
+              ref_sha=$sha
+              conditional_build=true
+            else
+              echo "This commit is not valid (maybe rebased branch?) -> Building everything"
+            fi
+          fi
 
-            # Find commit shas of the successful workflow runs
-            shas=$(gh api repos/${{ github.repository }}/actions/runs --paginate \
-              --jq "[.workflow_runs[] | select(.pull_requests[]?.number == ${{ github.event.pull_request.number }} and .name == \"Build and Test\" and .conclusion == \"success\") | .head_sha] | .[]")
-
-            # Find the most recent sha that exists and set that as reference sha
-            # (all of them might not exist if the branch has been rebased)
-            for sha in $shas; do
-              if git cat-file -e "$sha"^{commit} 2>/dev/null; then
-                ref_sha=$sha
-                echo -e "Found commit with previous successful build: $ref_sha"
-                break
-              fi
-            done
-
+          if $conditional_build; then
             # Current commit sha
-            head_sha=${{ github.event.pull_request.head.sha }}
+            head_sha=${{ github.sha }}
 
             # Compare
             echo -e "Diffing from $ref_sha to $head_sha"
@@ -151,8 +139,8 @@ jobs:
 
             # Check whether the base image needs to be built
             base_image="$base_image_name:$build_tag-$platform_tag"
-            if $is_pr; then
-              # Build base image only if needed for PR
+            if $conditional_build; then
+              # Build base image only if needed
               build_base_image=false
               # Build if this ci workflow has changed
               if grep -qF '.github/workflows/build-and-test.yml' changed.txt; then
@@ -200,7 +188,6 @@ jobs:
             base_image_cache_to="type=registry,ref=$base_image_name:$cache_tag-$platform_tag,mode=max"
             base_image_cache_from="type=registry,ref=$base_image_name:$cache_tag-$platform_tag"
             if [[ $cache_tag_2 != "false" ]]; then
-              # Add cache of base branch for PRs
               base_image_cache_from="$base_image_cache_from"$'\n'"type=registry,ref=$base_image_name:$cache_tag_2-$platform_tag"
             fi
 
