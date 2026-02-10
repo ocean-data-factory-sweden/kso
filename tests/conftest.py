@@ -23,5 +23,5 @@ def zoo_pass(request):
 
 @pytest.fixture
 def needs_wandb():
-    if os.environ.get("WANDB_API_KEY", "") == "":
+    if not os.environ.get("WANDB_API_KEY"):
         pytest.skip("No WANDB_API_KEY")
