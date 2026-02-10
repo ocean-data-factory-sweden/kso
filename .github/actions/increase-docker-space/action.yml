@@ -9,10 +9,25 @@ runs:
       run: |
         df -h
 
-    # In the github runner, /mnt is mounted to some other volume with plenty of free space.
-    # We move the docker directory to this volume to have enough space for building images.
+    # Currently (February 2026), github runners have 92G or 23G free space on /.
+    # In the first case, no fixes are needed as there is enough space.
+    # In the second case, the runner has /mnt mounted to some other volume with 66G free space.
+    # Let's start by checking which kind of runner we got.
+    - name: Check if /mnt is mounted
+      id: mntcheck
+      shell: bash
+      run: |
+        if grep -qE '[[:space:]]/mnt[[:space:]]' /proc/mounts; then
+          echo "mounted=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "mounted=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    # If /mnt was mounted, then we don't likely have enough free space on /, so
+    # we move the docker directory to /mnt to have enough space for building images.
     # This is much faster than erasing files to free disk space
     - name: Move docker directory
+      if: steps.mntcheck.outputs.mounted == 'true'
       shell: bash
       run: |
         echo "---- Contents of /mnt -------------"
@@ -26,6 +41,8 @@ runs:
         mount --bind /mnt/docker /var/lib/docker
         EOF
 
+    # This fix was last tested in November 2025.
+    # If enabled later again, the list of removed paths might need to be updated.
     # We skip this erasing step to speed up the CI run.
     # If /mnt disappears at some point from the runner, you can gain disk space by enabling this.
     # See https://github.com/actions/runner-images/blob/0d358721aff04547ce591c7e1c444dc285fae993/images/ubuntu/Ubuntu2404-Readme.md
@@ -40,6 +57,8 @@ runs:
         rm -rf "$CONDA"                 #  1 GB
         EOF
 
+    # This fix was last tested in November 2025.
+    # If enabled later again, the list of removed packages might need to be updated.
     # We skip this erasing step to speed up the CI run.
     # If /mnt disappears at some point from the runner, you can gain disk space by enabling this.
     # See https://github.com/actions/runner-images/blob/0d358721aff04547ce591c7e1c444dc285fae993/images/ubuntu/Ubuntu2404-Readme.md
