@@ -112,9 +112,11 @@ ARG PIP_NO_CACHE_DIR=1
 
 # Install Python packages
 ARG PYTHON_REQUIREMENTS=requirements.txt
-COPY requirements.txt /opt/kso/
+COPY pyproject.toml /opt/kso/
 COPY $PYTHON_REQUIREMENTS /opt/kso/
-RUN pip install -r /opt/kso/requirements.txt -r "/opt/kso/$PYTHON_REQUIREMENTS"
+RUN cd /opt/kso && \
+    python3 -c 'import tomllib; p = tomllib.load(open("pyproject.toml", "rb"))["project"]; print("\n".join(p["dependencies"] + p["optional-dependencies"]["dev"]))' > requirements.txt && \
+    pip install -r requirements.txt -r "$PYTHON_REQUIREMENTS"
 RUN pip install papermill
 
 # Install MIOpen kdb files with ROCm PyTorch wheels, see
