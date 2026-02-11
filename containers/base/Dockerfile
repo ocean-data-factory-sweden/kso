@@ -54,7 +54,7 @@ RUN mkdir -p /opt/ffmpeg && \
           --extra-ldflags=-L/usr/local/cuda/lib64 \
       "; \
     fi && \
-    git clone -b n8.0.1 --depth 1 https://git.ffmpeg.org/ffmpeg.git && \
+    git clone -b n8.0.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git ffmpeg && \
     cd ffmpeg && \
     echo "ffmpeg configure flags: $ffmpeg_config_flags" && \
     ./configure $ffmpeg_config_flags && \
