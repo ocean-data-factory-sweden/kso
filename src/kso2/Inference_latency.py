@@ -10,9 +10,10 @@ from torchinfo import summary
 from .trainer import internal_model
 from mlflow.pyfunc import PyFuncModel
 import psutil
+from pathlib import Path
 
 
-def model_stats(model, image_path, batch_size=16):
+def model_stats(model, image_path, batch_size):
     if not isinstance(model, PyFuncModel):
         raise TypeError(f"model {model} is not PyFuncModel model")
     torch_model = internal_model(model)
@@ -94,7 +95,7 @@ def hardware_flops():
     return TFLOPS
 
 
-def model_latency_inference(model, image_path, batch_size=16):
+def model_latency_inference(model, image_path, batch_size):
 
     macs, _ = model_stats(model, image_path, batch_size)  # model FLOPs
     FLOPs = macs * 2
@@ -109,7 +110,7 @@ def model_latency_inference(model, image_path, batch_size=16):
     return latency_ms
 
 
-def inference_memory(model, batch_size=16):
+def inference_memory(model, batch_size):
     """estimate the model memory used during inference"""
     my_device = "cuda" if torch.cuda.is_available() else "cpu"
     pytorch_model = internal_model(model)
@@ -139,7 +140,7 @@ def inference_memory(model, batch_size=16):
 def memory_estimator(model, image_path, batch_size=16):
     """estimate the inference latency and the memory usage
     comenpared to the current slurm allocation"""
-
+    image_path = Path(image_path).expanduser()
     if "SLURM_JOB_ID" in os.environ:
         ram_gb = int(os.environ["SLURM_MEM_PER_NODE"]) / 1024
         cpus = int(os.environ["SLURM_CPUS_PER_TASK"])
@@ -147,7 +148,7 @@ def memory_estimator(model, image_path, batch_size=16):
         ram_gb = psutil.virtual_memory().total / (1024**3)
 
     inference_mb = inference_memory(model, batch_size)
-    latency_ms = model_latency_inference(model, image_path)
+    latency_ms = model_latency_inference(model, image_path, batch_size)
     print(
         f"current memory allocation is {ram_gb} and the model inference estimate memory is {inference_mb} mb"
     )

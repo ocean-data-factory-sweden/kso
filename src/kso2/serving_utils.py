@@ -22,6 +22,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+logging.getLogger("mlflow").setLevel(logging.ERROR)
+logging.getLogger("alembic").setLevel(logging.ERROR)
+
 
 def find_process_by_port(port):
     """
@@ -190,8 +193,8 @@ def start_mlflow_server(project: Project, host="127.0.0.1", port=8080, auto_open
         return False
 
     # check if mlflow.db exists.
-    proj_dir = Path(project.project_path)
-    mlflowdb_path = proj_dir / "mlflow.db"
+    proj_dir = Path(project.project_path) / project.project_name
+    mlflowdb_path = Path(project.tracking)
     artifact_path = proj_dir / "mlruns" / "artifact"
     artifact_path.mkdir(parents=True, exist_ok=True)
 
@@ -393,11 +396,11 @@ def save_predictions(project: Project, predictions: List, save_dir: str = None) 
         save_dir = Path(save_dir).expanduser()
     else:
         project_name = project.Project_name
-        base_dir = Path(__file__).resolve().parents[2]
-        save_dir = base_dir / "projects" / project_name
+        base_dir = Path(project.project_path).expanduser()
+        save_dir = base_dir / project_name
 
     if not save_dir.exists():
-        raise FileNotFoundError(f"{save_dir} was not found")
+        raise FileNotFoundError(f"dir {save_dir} was not found")
 
     idx = 0
     while True:
@@ -413,14 +416,16 @@ def save_predictions(project: Project, predictions: List, save_dir: str = None) 
     logging.info(f"Saving inference results to: {new_dir}")
 
 
-def get_registered_models(project) -> pd.DataFrame:
+def get_registered_models(project: Project) -> pd.DataFrame:
     """
     List all registered models in MLflow.
 
     Returns:
         DataFrame with registered model information
     """
-    tracking_uri = "sqlite:////Users/ghaith/Desktop/kso/kso/projects/mlflow.db"
+    mlflowdb = project.tracking
+
+    tracking_uri = f"sqlite:///{str(mlflowdb)}"
     client = mlflow.tracking.MlflowClient(tracking_uri)  # type: ignore[attr-defined]
     models = client.search_registered_models()
 

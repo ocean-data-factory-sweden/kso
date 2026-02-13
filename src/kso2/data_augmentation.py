@@ -54,12 +54,13 @@ def run_augmentation(
     if (
         not data_type
         or not isinstance(data_type, str)
-        or data_type not in {"Biigle_path", "ultralytics_data_path"}
+        or data_type not in {"biigle_path", "ultralytics_data_path"}
     ):
         raise ValueError(
             "data_type should be a non-empty string 'Biigle_path' or 'ultralytics_data_path'"
         )
     data_yaml_path = project.data_path.get(data_type)
+    print(data_yaml_path)
     data_yaml_path = Path(data_yaml_path).expanduser().resolve()
     cfg = yaml.safe_load(data_yaml_path.read_text())
 

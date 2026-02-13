@@ -31,9 +31,21 @@ import torch.nn as nn
 # Logging
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.WARNING,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    force=True,
 )
 logger = logging.getLogger(__name__)
+
+logging.getLogger("mlflow").setLevel(logging.WARNING)
+logging.getLogger("mlflow.store").setLevel(logging.WARNING)
+logging.getLogger("alembic").setLevel(logging.WARNING)
+
+logging.getLogger("ultralytics").setLevel(logging.WARNING)
+logging.getLogger("git").setLevel(logging.WARNING)
+logging.getLogger("git.cmd").setLevel(logging.WARNING)
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 
 
 class YOLOUltralyticsMLflowModel(PythonModel):
@@ -79,7 +91,7 @@ class YOLOUltralyticsMLflowModel(PythonModel):
             result_dict = {
                 "boxes": (
                     result.boxes.xyxy.cpu().numpy().tolist()
-                    if result.boxes is not None
+                    if result.boxes is not None and result.boxes.xyxy is not None
                     else []
                 ),
                 "plot": (result.plot() if result.plot() is not None else []),
@@ -118,12 +130,10 @@ def train_model(
 
     project_name = project.project_name
     model_name = project.model_name
-    project_path = project.project_path
-    Config_file_path = project.Config_file_path
-    traking = project.tracking
-    mlflowdb_path = traking["mlflow"].get("mlflow.db")
-    yaml_path = Path(Config_file_path).expanduser()
-    print(f"mlflowdb_path:{mlflowdb_path}")
+    model_source = project.model_path
+    project_path = Path(project.project_path)
+    yaml_path = Path(project.Config_file_path)
+    mlflowdb_path = project.tracking
 
     if not model_name:
         model_name = f"{Path(project.model_path).stem}"
@@ -132,23 +142,19 @@ def train_model(
         raise FileExistsError(f"{yaml_path} does not exist.")
 
     data = yaml_data_retrieve(yaml_path=yaml_path)
-    data_path = data["data_path"].get("biigle_path") or data["data_path"].get(
+    data_path = project.data_path.get("biigle_path") or project.data_path.get(
         "ultralytics_data_path"
     )
-    print(f"data:{data}")
-    print(f"data_path:{data_path}")
     if not data_path:
         raise ValueError("No valid data path found in project configuration.")
 
-    model_source = project.model_path
-    if not model_source or not isinstance(model_source, str):
+    if not model_source or not isinstance(model_source, (Path, str)):
         raise ValueError("'model' must be a non-empty string.")
 
-    artifact_root = Path(project_path).expanduser() / "mlruns"
+    artifact_root = project_path / project_name / "mlruns"
     artifact_root.mkdir(parents=True, exist_ok=True)
 
     experiment_name = project_name
-    settings.update({"mlflow": True})
     os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{mlflowdb_path}"
     os.environ["MLFLOW_EXPERIMENT_NAME"] = experiment_name
     os.environ["MLFLOW_ARTIFACT_URI"] = artifact_root.as_uri()
@@ -189,22 +195,12 @@ def train_model(
             registered_model_name=model_name,
         )
 
-    #     mlflow.pytorch.log_model(
-    #         artifact_path="model",
-    #         pytorch_model=model.model,
-    #         registered_model_name=model_name,
-    #     )
-
-    # mlflow.end_run()
-
     data["mlflow"] = {
         "path": str(mlflowdb_path),
         "experiment_name": project_name,
         "mlflow.db": str(mlflowdb_path),
     }
 
-    # with yaml_path.open("w", encoding="utf-8") as fh:
-    #     yaml.safe_dump(data, fh, sort_keys=False, default_flow_style=False)
     yaml_data_dump(yaml_path=yaml_path, data=data)
 
     # Examine the deleted experiment details.
@@ -226,9 +222,7 @@ def export_experiment(
     mlflow.set_tracking_uri(f"http://localhost:{port}")
     # Check if experiment exists
     experiment = mlflow.get_experiment_by_name(experiment_name)
-    artifact_root = (
-        Path(__file__).resolve().parents[2] / "projects" / project_name / "output"
-    )
+    artifact_root = Path(project.project_path) / project_name / "output"
     artifact_root.mkdir(parents=True, exist_ok=True)
 
     client = mlflow.MlflowClient()
@@ -260,10 +254,13 @@ def import_experiment(project: Project, input_dir: str, port: int = 8080):
     )
 
 
-def loading_model(model_name: str, version: int):
+def loading_model(project: Project, model_name: str, version: int):
     """load pyfuncModel from registred Mlflow models and versions"""
-    mlflowdb_path = Path(__file__).resolve().parents[2] / "projects" / "mlflow.db"
-    os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{str(mlflowdb_path)}"
+
+    mlflowdb = project.tracking
+    tracking_uri = f"sqlite:///{str(mlflowdb)}"
+
+    os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
     model_uri = f"models:/{model_name}/{version}"
     model = mlflow.pyfunc.load_model(model_uri)
     return model
@@ -274,7 +271,8 @@ def model_inference(model: PyFuncModel, data_path: str):
         raise TypeError(f"model {model} must be an mlflow pyfunc model.")
     if not isinstance(data_path, str):
         raise TypeError(f"data path {data_path} must be a non-empty string.")
-    result = model.predict({"image": data_path})
+    data_path = Path(data_path).expanduser()
+    result = model.predict({"image": str(data_path)})
     return result
 
 
