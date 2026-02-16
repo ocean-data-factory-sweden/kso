@@ -16,10 +16,11 @@ from pathlib import Path
 def model_stats(model, image_path, batch_size):
     if not isinstance(model, PyFuncModel):
         raise TypeError(f"model {model} is not PyFuncModel model")
-    torch_model = internal_model(model)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    torch_model = internal_model(model).to(device).eval()
     if not isinstance(torch_model, torch.nn.Module):
         raise ValueError(f"model {torch_model} is not a nn.Module")
-    torch_model.eval()
+    torch_model.requires_grad_(False)
 
     x = torchvision.io.read_image(path=image_path)
     x = x.float() / 255.0
@@ -28,6 +29,8 @@ def model_stats(model, image_path, batch_size):
     x = torch.nn.functional.interpolate(
         x, size=(640, 640), mode="bilinear", align_corners=False
     )
+    x = x.to(device, non_blocking=False)
+
     macs, params = profile(torch_model, inputs=(x,), verbose=False)
     print(f"model macs: {macs:.2e}")
     print(f"model flops: {macs * 2:.2e}")

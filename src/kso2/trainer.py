@@ -25,6 +25,7 @@ from mlflow.pyfunc import PythonModel, PyFuncModel
 import numpy as np
 from ultralytics import settings
 import mlflow
+import torch
 import torch.nn as nn
 
 
@@ -68,7 +69,7 @@ class YOLOUltralyticsMLflowModel(PythonModel):
 
     def predict(
         self,
-        model_input,
+        model_input: List[Union[pd.DataFrame, np.ndarray, List[Any], Dict[str, Any]]],
     ):
         # Import libraries when needed to avoid serialization issues
         image = model_input.get("image")
@@ -271,8 +272,10 @@ def model_inference(model: PyFuncModel, data_path: str):
         raise TypeError(f"model {model} must be an mlflow pyfunc model.")
     if not isinstance(data_path, str):
         raise TypeError(f"data path {data_path} must be a non-empty string.")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info(f"current device: {device}")
     data_path = Path(data_path).expanduser()
-    result = model.predict({"image": str(data_path)})
+    result = model.predict({"image": str(data_path)}, params={"device": device})
     return result
 
 
