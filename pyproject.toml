@@ -217,6 +217,7 @@ dependencies = [
     "pylint==3.3.8",
     "pyparsing==3.2.5",
     "pysocks==1.7.1",
+    "pytest==8.4.2",
     "python-dateutil==2.9.0.post0",
     "python-dotenv==1.2.1",
     "python-json-logger==4.0.0",
@@ -303,6 +304,9 @@ dependencies = [
     "zipp==3.23.0",
     "zstandard==0.25.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
 
 [project.optional-dependencies]
 dev = [
