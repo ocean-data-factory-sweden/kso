@@ -23,7 +23,7 @@ jobs:
       - name: Chechout code
         uses: actions/chechout@v6
 
-      - names: Set up python
+      - name: Set up python
         uses: actions/setup-python@v6
         with:
           python-version: ${{matrix.python-version }}
