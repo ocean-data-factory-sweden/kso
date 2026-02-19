@@ -1,6 +1,6 @@
 # KSO System
 
-The KSO System is an open-source machine learning framework for underwater video analysis, developed from the [Koster Seafloor Observatory][koster-url] research initiative and the Swedish Platform for Subsea Image Analysis ([SUBSIM][subsim-url]).
+The KSO System is an open-source machine learning framework for underwater video analysis, developed from the [Koster Seafloor Observatory][koster-url] research initiative and the Swedish Platform for Subsea Image Analysis ([SUBSIM][subsim-url]). It is optimized for GPU-accelerated HPC environments, particularly LUMI, and integrates with MLflow for experiment tracking.
 
 <!-- PROJECT SHIELDS -->
 [![Contributors][contributors-shield]][contributors-url]
@@ -9,28 +9,13 @@ The KSO System is an open-source machine learning framework for underwater video
 [![Issues][issues-shield]][issues-url]
 [![GPL License][license-shield]][license-url]
 
-> **📘 New to KSO?** Each notebook contains detailed, step-by-step instructions with clearly marked **EDIT THIS** cells. This README provides an overview—the notebooks will guide you through each stage.
+> **📘 New to KSO?** Each notebook contains step-by-step instructions with clearly marked **EDIT THIS** cells. This README provides an overview — the notebooks will guide you through each stage.
 
-## Overview
-
-KSO is a Python-based toolkit for training object detection models on underwater imagery and video. It supports a full workflow from annotation (primarily Biigle, with optional Roboflow and legacy Zooniverse paths) through YOLO model training, inference, analysis, and publication of models and derived data. The system is optimized for GPU-accelerated HPC environments (especially LUMI) and integrates with Weights & Biases (W&B) and MLflow for experiment tracking.
+## System Overview
 
 ![KSO System Overview][high-level-overview]
 
-## Documentation
-
-Quick links:
-
-- **Quick Start** – Get running in minutes (see [Quick Start](#quick-start))
-- **Notebook Pipeline** – Five-stage workflow, Stages I–II stable (see [Notebooks](#notebooks))
-- **Installation Guide** – HPC, Docker, and local setup (see [Installation](#installation))
-- **LUMI Setup Guide** – Detailed HPC instructions in [`docs/LUMI_SETUP.md`](./docs/LUMI_SETUP.md)
-- **Developer Guide** – Contribution workflow (see [Developer Instructions](#developer-instructions))
-- **Citation** – How to reference SUBSIM/KSO (see [Citation](#citation))
-
 ## Quick Start
-
-Minimal steps for a local or HPC-backed run.
 
 ### 1. Clone the repository
 
@@ -39,101 +24,81 @@ git clone -b dev https://github.com/ocean-data-factory-sweden/kso.git
 cd kso
 ```
 
-### 2. Install dependencies (local dev)
+### 2. Choose your environment
+
+For **LUMI** (recommended): see [`docs/LUMI_SETUP.md`](./docs/LUMI_SETUP.md) for container setup and Jupyter session configuration.
+
+For **local development**:
 
 ```bash
 pip install -r requirements.txt
-```
-
-For LUMI or other HPC systems, follow your site's container or module best practices and see [`docs/LUMI_SETUP.md`](./docs/LUMI_SETUP.md) for a full LUMI recipe.
-
-### 3. Launch Jupyter and run the notebooks in order
-
-```bash
 jupyter lab
-# or: jupyter notebook
 ```
 
-**Suggested workflow:**
+### 3. Run the notebooks
 
-- **Stage I – Setup** (`01_Project_Setup.ipynb`):
-  - Create a KSO2 project (writes a `.project.yaml` with paths, model slot, and tracking config).
-  - Attach data by either pointing to an existing YOLO `data.yaml` (Ultralytics/Roboflow style), or converting Biigle CSV → YOLO.
-  - *(Optional)* Run offline augmentation on the training split.
+Use the table below to choose the first stage that matches what you already have.
 
-- **Stage II – Training & Evaluation** (`02_Train_and_Eval_Models.ipynb`):
-  - Re-open the project from Stage I.
-  - Choose and register a YOLO model.
-  - Train with the selected dataset, track runs with W&B or MLflow, and evaluate on the test set.
+| You have… | Start at |
+|---|---|
+| Raw footage only OR Already annotated images in Biigle but need a dataset | **00** Data Preparation |
+| A YOLO dataset (`data.yaml` + train/val/test splits) | **01** Project Setup |
+| A trained model (or weights) and you want to fine-tune on a dataset | **02** Training & Eval |
+| A trained model and you want to run inference on images/video | **03** Inference + **04** Analysis |
+| A validated model that you want to publish along with your dataset | **05** Publish Model |
 
-- **Stages III–V** – Inference, Analysis, Publication: follow additional notebooks as they become available (see [Notebooks](#notebooks)).
+> **Note:** Notebooks 00, 03, 04, and 05 are still in development. For a working path today, see the **Standalone Notebooks** section below.
 
-## Notebooks
+### Official Pipeline (00–05)
 
-The pipeline is organized into five stages; **Stages I–II are stable**, later stages are under active development.
+| # | Notebook | Description | Status |
+|--:|----------|-------------|--------|
+| 00 | 00_Data_Preparation.ipynb | Transfer footage to LUMI (optional), extract frames, build your image set for annotation in [Biigle](https://biigle.de), convert annotation CSV to YOLO format. *Skip if you already have a YOLO dataset.* | 🔜 In development |
+| 01 | 01_Project_Setup.ipynb | Create a KSO2 project (`.project.yaml`), attach your YOLO dataset, configure tracking, and optionally run offline augmentation. | ✅ Stable |
+| 02 | 02_Train_and_Eval_Models.ipynb | Train or fine-tune a YOLO model, track runs with MLflow, and evaluate on the test set. | ✅ Stable |
+| 03 | 03_Inference.ipynb | Run inference or batch inference on new images or video; export detections (CSV + annotated media). | 🔜 In development |
+| 04 | 04_Analysis.ipynb | Summary statistics, maxN, per-class summaries, and visualizations. | 🚧 Planned |
+| 05 | 05_Publish_Models.ipynb | Package models and metadata; publish to Zenodo or Researchdata.se. | 🚧 Planned |
 
-### Main workflow
+### Standalone Notebooks
 
-| Stage | Notebook | Description | Status |
-|-------|----------|-------------|--------|
-| I. Setup | [01_Project_Setup.ipynb](./notebooks/01_Project_Setup.ipynb) | Create a KSO2 project (`*.project.yaml`), attach data (existing YOLO `data.yaml` or Biigle CSV → YOLO), and optionally run offline augmentation on the train split. | ✅ Stable |
-| II. Training & Eval | [02_Train_and_Eval_Models.ipynb](./notebooks/02_Train_and_Eval_Models.ipynb) | Re-open a project, choose and register a YOLO model, run training (v8–v11), track runs with W&B/MLflow, compute test metrics, and export artifacts. | ✅ Stable |
-| III. Inference | 03_Inference.ipynb | Batch inference on new images or video; export detections (CSV + annotated media). | 🚧 In development |
-| IV. Analysis | 04_Analysis.ipynb | Summary statistics, maxN, per-class summaries, and visualizations for ecological analysis. | 🚧 Planned |
-| V. Publication | 05_Publish_Models.ipynb | Package models and metadata and publish to Zenodo or Researchdata.se. | 🚧 Planned |
+While the official pipeline is being finalized, these notebooks provide a working path for new users — covering dataset preparation in [Biigle](https://biigle.de), and model training end-to-end.
+
+| Notebook | Path | Covers |
+|----------|------|--------|
+| Biigle_to_YOLO.ipynb | [`notebooks/setup/Biigle_to_YOLO.ipynb`](./notebooks/setup/Biigle_to_YOLO.ipynb) | Biigle CSV → YOLO conversion (data preparation for our Biigle users) |
+| Train_models.ipynb | [`notebooks/analyse/Train_models.ipynb`](./notebooks/analyse/Train_models.ipynb) | YOLO model training and fine-tuning using Ultralytics |
 
 ### Available YOLO models
 
-This section stays high-level; the training notebook contains full details.
+The training notebook supports several Ultralytics model families. See the notebook itself for full model tables.
 
 <details>
-<summary><b>YOLO families and sizes</b> (click to expand)</summary>
+<summary><b>Model families and sizing guidance</b> (click to expand)</summary>
 
-- **Supported families**: YOLOv8, YOLOv9, YOLOv10, YOLOv11.
-- **Sizes**: nano (n), small (s), medium (m), large (l), xlarge (x), plus task-specific variants where available.
+Supported families include YOLOv8, YOLOv9, YOLOv10, and YOLO11. Each offers sizes from nano (n) through xlarge (x).
 
 Practical guidance:
 
-- Small datasets (~100–250 images): prefer **nano** or **small** models.
-- Medium datasets (~250–800 images): use **medium** models.
-- Large datasets (800+ images): consider **large** or **xlarge** if resources allow.
-- For exploratory work, start with a small model and scale up once the pipeline is stable.
+- **Small datasets (~100–250 images):** prefer **nano** or **small** — larger models will overfit.
+- **Medium datasets (~250–750 images):** use **medium** for a good balance.
+- **Large datasets (750+ images):** consider **large** or **xlarge** if resources allow.
 
 </details>
-
-### Legacy notebooks (Zooniverse workflow)
-
-These notebooks implement the original Zooniverse-centric citizen-science pipeline and remain available but are no longer the recommended path for new projects.
-
-| Task | Notebook | Description | Colab |
-|------|----------|-------------|-------|
-| Set up | Check_metadata | Check format and contents of footage, sites, media and species CSV files | [![Open In Colab][colab-badge]][colab_tut_1] |
-| Classify | Upload_subjects_to_Zooniverse | Prepare original footage and upload short clips to Zooniverse | [![Open In Colab][colab-badge]][colab_tut_3] |
-| Classify | Process_classifications | Pull and process classifications from Zooniverse | [![Open In Colab][colab-badge]][colab_tut_8] |
-| Analyse | Evaluate_models | Standalone model evaluation (now integrated into Stage II) | [![Open In Colab][colab-badge]][colab_tut_6] |
-| Publish | Publish_models | Publish model to a public repository | [![Open In Colab][colab-badge]][colab_tut_7] |
-| Publish | Publish_observations | Export observations to GBIF/OBIS | [![Open In Colab][colab-badge]][colab_tut_9] |
-
-For new projects, use the **Biigle → YOLO** pathway in Stage I instead of the Zooniverse workflow.
 
 ## Installation
 
 ### System requirements
 
 - **Minimum**: Python 3.12, 16 GB RAM, ≈10 GB free disk space.
-- **Recommended**: CUDA-capable GPU (≥8 GB VRAM) and access to an HPC system (e.g. LUMI).
+- **Recommended**: CUDA/ROCm-capable GPU (≥8 GB VRAM) and access to an HPC system (e.g. LUMI).
 
-### Option 1 – HPC: LUMI (recommended)
+### Option 1 — LUMI (recommended)
 
-KSO is currently tuned for the LUMI supercomputer and is typically run via a Singularity/Apptainer container on GPU nodes. For a full step-by-step guide (interactive Jupyter sessions, batch jobs, storage layout, and troubleshooting), see:
+KSO is primarily developed and tested on the LUMI supercomputer, running via a Singularity/Apptainer container on GPU nodes. If you're a first time user:
+- head to [`contrib/lumi/`](./contrib/lumi/) and check [`contrib/lumi/README.md`](./contrib/lumi/README.md) to get started.
 
-- [`docs/LUMI_SETUP.md`](./docs/LUMI_SETUP.md)
-
-Then launch Jupyter through the LUMI web interface and open the notebooks under `notebooks/` as described in the Quick Start.
-
-### Option 2 – Other HPC systems
-
-For other HPC clusters:
+### Option 2 — Other HPC systems
 
 ```bash
 git clone -b dev https://github.com/ocean-data-factory-sweden/kso.git
@@ -143,7 +108,13 @@ cd kso
 
 Use your center's standard GPU modules or containers, and bind project and scratch storage as appropriate.
 
-### Option 3 – Local: Docker (recommended for users without HPC)
+### Option 3 — Local development
+
+For local use without HPC access. Note that training without a GPU will be slow, and smaller models with lower batch sizes are recommended.
+
+**Docker:**
+
+> **⚠️ Note:** The Docker image may not be up to date with the current codebase. Verify it works for your use case before relying on it.
 
 ```bash
 docker pull ghcr.io/ocean-data-factory-sweden/kso:dev
@@ -151,9 +122,7 @@ docker run --gpus all -it -p 8888:8888 ghcr.io/ocean-data-factory-sweden/kso:dev
 # Then open http://localhost:8888 in your browser
 ```
 
-This keeps dependencies isolated and makes it easy to reproduce environments.
-
-### Option 4 – Local: pip (for development)
+**pip:**
 
 ```bash
 git clone -b dev https://github.com/ocean-data-factory-sweden/kso.git
@@ -161,8 +130,6 @@ cd kso
 pip install -r requirements.txt
 jupyter lab
 ```
-
-On local machines without HPC, use smaller models and lower batch sizes to avoid out-of-memory errors and accept longer training times.
 
 ## Developer Instructions
 
@@ -173,12 +140,7 @@ We welcome contributions!
    ```bash
    black filename.py
    ```
-3. Use **Conventional Commits** for messages:
-   - `feat:` – new features
-   - `fix:` – bug fixes
-   - `docs:` – documentation changes
-   - `refactor:` – code restructuring
-   - `test:` – adding or updating tests
+3. Use **Conventional Commits** for messages: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`.
 4. Keep commit history clean and logical (squash where appropriate) and **rebase** onto `dev` (never merge).
 5. Open a Pull Request targeting `dev` and request at least 2 reviewers.
 
@@ -192,26 +154,22 @@ If this code or its trained models contribute to your research, please cite:
 
 - **Website**: [https://subsim.se](https://subsim.se)
 - **Issues**: [GitHub Issues][issues-url]
-- **Contact**: matthias.obst[at]marine.gu.se
+- **Contact**: matthias.obst(at)marine.gu.se
 
 We are always excited to collaborate with marine scientists. Feel free to reach out with questions or ideas!
 
-External resources:
+## Legacy Notebooks (Zooniverse workflow)
 
-- [Biigle Annotation Platform](https://biigle.de)
-- [Ultralytics YOLO Documentation](https://docs.ultralytics.com)
-- [LUMI Supercomputer Documentation](https://docs.lumi-supercomputer.eu)
+These notebooks implement the original Zooniverse citizen-science pipeline and are maintained for existing projects. For new work, use the main workflow above.
 
-## Roadmap
-
-Planned and ongoing work:
-
-- ✅ Stage I – YAML-based project setup + Biigle → YOLO conversion + optional augmentation.
-- ✅ Stage II – Model selection + YOLO training + evaluation + MLflow tracking.
-- ⬜ Stage III – Batch inference notebook for new footage.
-- ⬜ Stage IV – Analysis notebook for ecological metrics and visualizations.
-- ⬜ Stage V – Publishing notebook for models and datasets (e.g. Zenodo).
-- ⬜ Updated workflow diagram reflecting the five-stage pipeline.
+| Task | Notebook | Description | Colab |
+|------|----------|-------------|-------|
+| Check Zooniverse metadata | Check_metadata | Check format of footage, sites, media and species CSV files | [![Open In Colab][colab-badge]][colab_tut_1] |
+| Classify | Upload_subjects_to_Zooniverse | Prepare footage and upload clips to Zooniverse | [![Open In Colab][colab-badge]][colab_tut_3] |
+| Classify | Process_classifications | Pull and process classifications from Zooniverse | [![Open In Colab][colab-badge]][colab_tut_8] |
+| Analyse | Evaluate_models | Standalone model evaluation | [![Open In Colab][colab-badge]][colab_tut_6] |
+| Publish | Publish_models | Publish model to a public repository | [![Open In Colab][colab-badge]][colab_tut_7] |
+| Publish | Publish_observations | Export observations to GBIF/OBIS | [![Open In Colab][colab-badge]][colab_tut_9] |
 
 ## License
 
@@ -227,8 +185,8 @@ SUBSIM/KSO is released under the **GPL-3.0 license**. See [LICENSE.txt](./LICENS
 [issues-shield]: https://img.shields.io/github/issues/ocean-data-factory-sweden/kso.svg?style=for-the-badge
 [issues-url]: https://github.com/ocean-data-factory-sweden/kso/issues
 [license-shield]: https://img.shields.io/github/license/ocean-data-factory-sweden/kso.svg?style=for-the-badge
-[license-url]: https://github.com/ocean-data-factory-sweden/kso/blob/main/LICENSE.txt
-[high-level-overview]: https://github.com/ocean-data-factory-sweden/kso/blob/main/assets/high-level-overview.png?raw=true
+[license-url]: https://github.com/ocean-data-factory-sweden/kso/blob/dev/LICENSE.txt
+[high-level-overview]: https://github.com/ocean-data-factory-sweden/kso/blob/dev/assets/high-level-overview.png?raw=true
 [koster-url]: https://www.zooniverse.org/projects/victorav/the-koster-seafloor-observatory
 [subsim-url]: https://subsim.se
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
