@@ -1,6 +1,6 @@
 # Using KSO on LUMI
 
-This guide covers how to run KSO notebooks on the LUMI supercomputer, both interactively via Jupyter and as batch jobs. For uploading files (footage, datasets, model weights), see [`TRANSFERS.md`](./TRANSFERS.md).
+This guide covers how to run KSO notebooks on the LUMI supercomputer, both interactively via Jupyter and as batch jobs. For uploading files (footage, datasets, model weights), see [`FILE_TRANSFERS.md`](./FILE_TRANSFERS.md).
 
 > Make sure you replace `project_...` with your actual project code throughout.
 
