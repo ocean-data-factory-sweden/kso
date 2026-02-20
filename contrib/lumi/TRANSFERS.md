@@ -8,7 +8,7 @@ For Jupyter session setup and workspace layout, see [`README.md`](./README.md).
 
 ## Prerequisites
 
-- A LUMI account with SSH access
+- A LUMI account
 - Your LUMI username and project number
 - Access to [MyAccessID](https://mms.myaccessid.org/) for SSH key registration
 - Internet access on port 22 (SSH)
