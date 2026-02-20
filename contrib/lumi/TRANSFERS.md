@@ -2,7 +2,7 @@
 
 This guide explains how to upload large files (video footage, datasets, pretrained models) to LUMI using SSH and rsync. It covers Windows (via WSL), macOS, and Linux.
 
-For Jupyter session setup and workspace layout, see [`LUMI_SETUP.md`](./LUMI_SETUP.md).
+For Jupyter session setup and workspace layout, see [`README.md`](./README.md).
 
 ---
 
