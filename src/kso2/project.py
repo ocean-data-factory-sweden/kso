@@ -53,7 +53,12 @@ def make_relative_path(abs_path: Path = None, startPoint: Path = None):
         raise TypeError(f"{abs_path} must be non-empty path")
     if not startPoint or not isinstance(startPoint, Path):
         raise TypeError(f"{startPoint} must be non-empty path")
-    relative_path = abs_path.relative_to(startPoint)
+
+    if abs_path.is_relative_to(startPoint):
+        relative_path = abs_path.relative_to(startPoint)
+    else:
+        relative_path = abs_path
+
     return relative_path
 
 
@@ -67,6 +72,27 @@ def make_abs_path(relative_path: str | Path, startPoint: str | Path):
     relative_path = Path(relative_path).expanduser()
     abs_path = os.path.join(startPoint, relative_path)
     return abs_path
+
+
+def resolve_up(relative_path: str | Path) -> Path:
+    """
+    Resolve a relative path by searching upward from base.
+    Returns the first existing match.
+    """
+    base = Path.cwd()
+    relative_path = Path(relative_path)
+
+    if relative_path.is_absolute():
+        return relative_path
+
+    for parent in [base] + list(base.parents):
+        candidate = parent / relative_path
+        if candidate.exists():
+            return candidate
+
+    raise FileNotFoundError(
+        f"Could not resolve '{relative_path}' from '{base}' upward."
+    )
 
 
 def create_project(
@@ -88,6 +114,8 @@ def create_project(
 
     if project_path:
         project_path = Path(project_path).expanduser()
+        if not project_path.is_absolute():
+            project_path = resolve_up(relative_path=project_path)
         project = project_path / sanitized
     else:
         base_dir = Path(__file__).resolve().parents[2]
@@ -126,13 +154,18 @@ def create_project(
         else:
             weights_relative_path = weights_path
 
+        ultralytics_data = (
+            str(ultralytics_data) if ultralytics_data else ultralytics_data
+        )
+        biigle_path = str(biigle_path) if biigle_path else biigle_path
+
         # Assemble the YAML structure.
         yaml_dict: Dict[str, Any] = {
             "project_name": sanitized,
             "Config_file_path": str(yaml_relative_path),
             "data_path": {
-                "ultralytics_data_path": str(ultralytics_data),
-                "biigle_path": str(biigle_path),
+                "ultralytics_data_path": ultralytics_data,
+                "biigle_path": biigle_path,
             },
             "models": [
                 {"model_path": str(weights_relative_path), "model_name": model_name}
@@ -184,6 +217,9 @@ def load_project(
         raise ValueError("'model_path' must be a non-empty string.")
 
     yaml_path = Path(yaml_path).expanduser()
+    if not yaml_path.is_absolute():
+        yaml_path = resolve_up(relative_path=yaml_path)
+
     project_abs_path = yaml_path.parents[1]  # project cfg file path
 
     if yaml_path.exists():
@@ -209,16 +245,16 @@ def load_project(
         relative_path=yaml_dict["Config_file_path"], startPoint=project_abs_path
     )
     mlflow_db_path = yaml_dict["tracking"]["mlflow"]["mlflow.db"]
-
+    print(f"data_path_before:{yaml_dict["data_path"]}")
     data_path = {
         u: (
-            make_abs_path(relative_path=v, startPoint=project_abs_path)
+            make_abs_path(relative_path=v, startPoint=project_abs_path.parent)
             if v is not None
             else None
         )
         for u, v in yaml_dict["data_path"].items()
     }
-
+    print(f"data_path_after:{data_path}")
     mlflow_db_abs_path = make_abs_path(
         relative_path=mlflow_db_path, startPoint=project_abs_path
     )
@@ -660,25 +696,42 @@ def add_data(
 
     data = yaml_data_retrieve(yaml_path=yaml_path)
 
+    if dataset_dir and not isinstance(dataset_dir, str):
+        raise ValueError(f"dataset_dir must be a non empty string")
+    if dataset_dir:
+        dataset_dir = Path(dataset_dir).expanduser()
+        if not dataset_dir.is_absolute():
+            dataset_dir = resolve_up(relative_path=dataset_dir)
+            print(f"dataset_dir:{dataset_dir}")
+        if not dataset_dir.exists():
+            raise FileNotFoundError(f"{dataset_dir} not found")
+    if not dataset_dir:
+        dataset_dir = project_path / "Dataset"
+        dataset_dir.mkdir(parents=True, exist_ok=True)
+
     if data_type == "yolo_dataset":
 
         if data_path:
 
             candidate = Path(data_path).expanduser()
-            if candidate.is_absolute():
-                data_path = candidate.resolve()
-            else:
-                data_path = (project_path / candidate).resolve()
-
+            if not candidate.is_absolute():
+                # data_path = (project_path / candidate).resolve()
+                data_path = make_abs_path(
+                    relative_path=candidate, startPoint=project_path
+                )
+                print(f"data_path:{data_path}")
         else:
             generated_yolo_data = add_ultralytics_dataset_yaml(
                 str(project_path / "coco8.yaml")
             )
-            data_path = Path(generated_yolo_data).expanduser().resolve()
-        if not data_path.exists():
+            print(f"generated_yolo_data:{generated_yolo_data}")
+            data_path = Path(generated_yolo_data).expanduser()
+        if data_path.exists():
             data_relative_path = make_relative_path(
-                abs_path=data_path, startPoint=project_path
+                abs_path=data_path, startPoint=project_path.parent
             )
+
+            print(f"data_relative_path:{data_relative_path},data_path:{data_path}")
         else:
             raise FileNotFoundError(f"Dataset file not found: {data_path}")
         data["data_path"]["ultralytics_data_path"] = str(data_relative_path)
@@ -687,23 +740,15 @@ def add_data(
     elif data_type == "Biigle_dataset":
         if not images_root or not isinstance(images_root, str):
             raise ValueError(f"images_root must be a non empty string")
-        if dataset_dir and not isinstance(dataset_dir, str):
-            raise ValueError(f"dataset_dir must be a non empty string")
-        if dataset_dir:
-            dataset_dir = Path(dataset_dir).expanduser().resolve()
-            if not dataset_dir.exists():
-                raise FileNotFoundError(f"{dataset_dir} not found")
-        if not dataset_dir:
-            dataset_dir = project_path / "Dataset"
-            dataset_dir.mkdir(parents=True, exist_ok=True)
 
         biigle_yaml_path = preprocess_biigle_csv(
             biigle_csv_path=data_path,
             images_root=images_root,
             dataset_dir=str(dataset_dir),
         )
+
         biigle_yaml_relative_path = make_relative_path(
-            abs_path=biigle_yaml_path, startPoint=project_path
+            abs_path=biigle_yaml_path, startPoint=project_path.parent
         )
         # data["data_path"] = {"biigle_path":str(biigle_yaml_path)}
         data["data_path"].update({"biigle_path": str(biigle_yaml_relative_path)})

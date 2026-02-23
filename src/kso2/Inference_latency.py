@@ -53,6 +53,8 @@ def os_system():
 
 
 def hardware_flops():
+
+    TFLOPS = 0.0
     system = os_system()
     if system == "Linux" and torch.cuda.is_available():
         cu_output = subprocess.check_output(

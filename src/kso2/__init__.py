@@ -37,7 +37,6 @@ __all__ = [
     "create_project",
     "add_model",
     "add_data",
-    "add_Biigle_data",
     "train_model",
     "export_experiment",
     "import_experiment",

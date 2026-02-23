@@ -8,7 +8,7 @@ import os
 import sys
 from ultralytics import YOLO
 import re
-from .project import Project, yaml_data_retrieve, yaml_data_dump
+from .project import Project, yaml_data_retrieve, yaml_data_dump, resolve_up
 import psutil
 
 from mlflow_export_import.bulk.export_experiments import export_experiments
@@ -71,46 +71,48 @@ class YOLOUltralyticsMLflowModel(PythonModel):
         self,
         model_input: List[Union[pd.DataFrame, np.ndarray, List[Any], Dict[str, Any]]],
     ):
-        # Import libraries when needed to avoid serialization issues
-        image = model_input.get("image")
-
-        if isinstance(image, list) and all(isinstance(p, str) for p in image):
-            for p in image:
-                if not Path(p).exists():
-                    raise ValueError(f"Path does not exist: {p}")
-
-        elif isinstance(image, str):
-            if not Path(image).exists():
-                raise FileNotFoundError(f"the provided file {image} was not found")
-
-        # Run prediction
-        results = self.model.predict(image)
-
-        # Convert to JSON string
         output = []
-        for result in results:
-            result_dict = {
-                "boxes": (
-                    result.boxes.xyxy.cpu().numpy().tolist()
-                    if result.boxes is not None and result.boxes.xyxy is not None
-                    else []
-                ),
-                "plot": (result.plot() if result.plot() is not None else []),
-                "scores": (
-                    result.boxes.conf.cpu().numpy().tolist()
-                    if result.boxes is not None
-                    else []
-                ),
-                "classes": (
-                    result.boxes.cls.cpu().numpy().astype(int).tolist()
-                    if result.boxes is not None
-                    else []
-                ),
-                "names": result.names,
-                "shape": list(result.orig_shape),
-            }
-            output.append(result_dict)
-        logger.info(output)
+        for item in model_input:
+
+            image = item.get("image")
+
+            if isinstance(image, list) and all(isinstance(p, str) for p in image):
+                for p in image:
+                    if not Path(p).exists():
+                        raise ValueError(f"Path does not exist: {p}")
+
+            elif isinstance(image, str):
+                if not Path(image).exists():
+                    raise FileNotFoundError(f"the provided file {image} was not found")
+
+            # Run prediction
+            results = self.model.predict(image)
+
+            # Convert to JSON string
+
+            for result in results:
+                result_dict = {
+                    "boxes": (
+                        result.boxes.xyxy.cpu().numpy().tolist()
+                        if result.boxes is not None and result.boxes.xyxy is not None
+                        else []
+                    ),
+                    "plot": (result.plot() if result.plot() is not None else []),
+                    "scores": (
+                        result.boxes.conf.cpu().numpy().tolist()
+                        if result.boxes is not None
+                        else []
+                    ),
+                    "classes": (
+                        result.boxes.cls.cpu().numpy().astype(int).tolist()
+                        if result.boxes is not None
+                        else []
+                    ),
+                    "names": result.names,
+                    "shape": list(result.orig_shape),
+                }
+                output.append(result_dict)
+            logger.info(output)
         # Return as JSON string
         return output
 
@@ -146,6 +148,7 @@ def train_model(
     data_path = project.data_path.get("biigle_path") or project.data_path.get(
         "ultralytics_data_path"
     )
+    print(f"data_path:{data_path}")
     if not data_path:
         raise ValueError("No valid data path found in project configuration.")
 
@@ -242,6 +245,9 @@ def import_experiment(project: Project, input_dir: str, port: int = 8080):
 
     project_name = project.project_name
     experiment_name = project_name
+    input_dir = Path(input_dir).expanduser()
+    if not input_dir.is_absolute():
+        input_dir = resolve_up(input_dir)
     # 1) Tracking URI points to your local mlruns folder
     mlflow.set_tracking_uri(f"http://localhost:{port}")
 
@@ -249,7 +255,7 @@ def import_experiment(project: Project, input_dir: str, port: int = 8080):
 
     import_experiments(
         mlflow_client=client,
-        input_dir=input_dir,
+        input_dir=str(input_dir),
         use_src_user_id=False,
         use_threads=False,
     )
@@ -275,7 +281,7 @@ def model_inference(model: PyFuncModel, data_path: str):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"current device: {device}")
     data_path = Path(data_path).expanduser()
-    result = model.predict({"image": str(data_path)}, params={"device": device})
+    result = model.predict([{"image": str(data_path)}], params={"device": device})
     return result
 
 

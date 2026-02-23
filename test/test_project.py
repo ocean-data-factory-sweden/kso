@@ -2,16 +2,6 @@ from pathlib import Path
 from kso2 import create_project, Project
 import pytest
 
-# @pytest.fixture()
-# def project():
-#     project_temp=Project(
-#                     project_name="Test project 1",
-#                     project_path="~/desktop/",
-#                     model_name="best model",
-#                     model_path="yolov8n.pt",
-#                 )
-#     return project_temp
-
 
 def test_init_create_project():
     """
