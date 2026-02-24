@@ -17,70 +17,71 @@ The KSO System is an open-source machine learning framework for underwater video
 
 ## Quick Start
 
-### 1. Clone the repository
+### 1) Clone the repository
 
 ```bash
 git clone -b dev https://github.com/ocean-data-factory-sweden/kso.git
 cd kso
 ```
 
-### 2. Choose your environment
+### 2) Choose your environment
 
-For **LUMI** (recommended): see [`docs/LUMI_SETUP.md`](./docs/LUMI_SETUP.md) for container setup and Jupyter session configuration.
+**LUMI** (recommended): see [`contrib/lumi/README.md`](./contrib/lumi/README.md) for container setup and Jupyter session configuration.
 
-For **local development**:
+OR **Local development** (best effort)
 
 ```bash
 pip install -r requirements.txt
 jupyter lab
 ```
 
-### 3. Run the notebooks
+### 3) Run the notebooks
 
 Use the table below to choose the first stage that matches what you already have.
 
 | You have… | Start at |
 |---|---|
-| Raw footage only OR Already annotated images in Biigle but need a dataset | **00** Data Preparation |
+| Raw footage only **OR** Biigle-annotted images but need a YOLO dataset | **00** Data Preparation |
 | A YOLO dataset (`data.yaml` + train/val/test splits) | **01** Project Setup |
 | A trained model (or weights) and you want to fine-tune on a dataset | **02** Training & Eval |
 | A trained model and you want to run inference on images/video | **03** Inference + **04** Analysis |
 | A validated model that you want to publish along with your dataset | **05** Publish Model |
 
-> **Note:** Notebooks 00, 03, 04, and 05 are still in development. For a working path today, see the **Standalone Notebooks** section below.
+> **Note:** Notebooks 00, 03, 04, and 05 are still in development. For the recommended working path today, see the [Standalone notebooks](#standalone-notebooks) section below.
+
+## Notebook workflow
+KSO is transitioning to a clear, staged notebook pipeline. Stages **01–02** are stable today; later stages are under active development.
 
 ### Official Pipeline (00–05)
 
 | # | Notebook | Description | Status |
 |--:|----------|-------------|--------|
-| 00 | 00_Data_Preparation.ipynb | Transfer footage to LUMI (optional), extract frames, build your image set for annotation in [Biigle](https://biigle.de), convert annotation CSV to YOLO format. *Skip if you already have a YOLO dataset.* | 🔜 In development |
+| 00 | 00_Data_Preparation.ipynb | Transfer footage to LUMI (optional), extract frames, build your image set for annotation in [Biigle](https://biigle.de), convert annotation CSV → YOLO. *Skip if you already have a YOLO dataset.* | 🔜 In development |
 | 01 | 01_Project_Setup.ipynb | Create a KSO2 project (`.project.yaml`), attach your YOLO dataset, configure tracking, and optionally run offline augmentation. | ✅ Stable |
 | 02 | 02_Train_and_Eval_Models.ipynb | Train or fine-tune a YOLO model, track runs with MLflow, and evaluate on the test set. | ✅ Stable |
 | 03 | 03_Inference.ipynb | Run inference or batch inference on new images or video; export detections (CSV + annotated media). | 🔜 In development |
-| 04 | 04_Analysis.ipynb | Summary statistics, maxN, per-class summaries, and visualizations. | 🚧 Planned |
+| 04 | 04_Analysis.ipynb | Summary statistics, maxN, per-class summaries, and visualisations. | 🚧 Planned |
 | 05 | 05_Publish_Models.ipynb | Package models and metadata; publish to Zenodo or Researchdata.se. | 🚧 Planned |
 
-### Standalone Notebooks
+### Standalone Notebooks 
 
-While the official pipeline is being finalized, these notebooks provide a working path for new users — covering dataset preparation in [Biigle](https://biigle.de), and model training end-to-end.
+While the official pipeline is being finalized, these notebooks provide a working path for new users — covering dataset preparation in [Biigle](https://biigle.de), and end-to-end model training.
 
 | Notebook | Path | Covers |
 |----------|------|--------|
-| Biigle_to_YOLO.ipynb | [`notebooks/setup/Biigle_to_YOLO.ipynb`](./notebooks/setup/Biigle_to_YOLO.ipynb) | Biigle CSV → YOLO conversion (data preparation for our Biigle users) |
+| Biigle_to_YOLO.ipynb | [`notebooks/setup/Biigle_to_YOLO.ipynb`](./notebooks/setup/Biigle_to_YOLO.ipynb) | Biigle CSV → YOLO conversion (data preparation for Biigle users) |
 | Train_models.ipynb | [`notebooks/analyse/Train_models.ipynb`](./notebooks/analyse/Train_models.ipynb) | YOLO model training and fine-tuning using Ultralytics |
 
 ### Available YOLO models
 
-The training notebook supports several Ultralytics model families. See the notebook itself for full model tables.
+The training notebook supports several Ultralytics model families, including [YOLO11](https://docs.ultralytics.com/models/yolo11/). See the notebook itself for the authoritative model list and parameters.
 
 <details>
-<summary><b>Model families and sizing guidance</b> (click to expand)</summary>
-
-Supported families include YOLOv8, YOLOv9, YOLOv10, and YOLO11. Each offers sizes from nano (n) through xlarge (x).
+<summary><b>Model sizing guidance</b> (click to expand)</summary>
 
 Practical guidance:
 
-- **Small datasets (~100–250 images):** prefer **nano** or **small** — larger models will overfit.
+- **Small datasets (~100–250 images):** prefer **nano** or **small** — larger models may overfit.
 - **Medium datasets (~250–750 images):** use **medium** for a good balance.
 - **Large datasets (750+ images):** consider **large** or **xlarge** if resources allow.
 
@@ -95,8 +96,10 @@ Practical guidance:
 
 ### Option 1 — LUMI (recommended)
 
-KSO is primarily developed and tested on the LUMI supercomputer, running via a Singularity/Apptainer container on GPU nodes. If you're a first time user:
-- head to [`contrib/lumi/`](./contrib/lumi/) and check [`contrib/lumi/README.md`](./contrib/lumi/README.md) to get started.
+KSO is primarily developed and tested on the LUMI supercomputer, running via a Singularity/Apptainer container on GPU nodes. 
+
+If you're a first time user, start here:
+- [`contrib/lumi/README.md`](./contrib/lumi/README.md)
 
 ### Option 2 — Other HPC systems
 
@@ -110,9 +113,9 @@ Use your center's standard GPU modules or containers, and bind project and scrat
 
 ### Option 3 — Local development
 
-For local use without HPC access. Note that training without a GPU will be slow, and smaller models with lower batch sizes are recommended.
+For local use without HPC access. Training without a GPU will be slow; smaller models and lower batch sizes are recommended.
 
-**Docker:**
+**Docker**
 
 > **⚠️ Note:** The Docker image may not be up to date with the current codebase. Verify it works for your use case before relying on it.
 
@@ -121,8 +124,7 @@ docker pull ghcr.io/ocean-data-factory-sweden/kso:dev
 docker run --gpus all -it -p 8888:8888 ghcr.io/ocean-data-factory-sweden/kso:dev
 # Then open http://localhost:8888 in your browser
 ```
-
-**pip:**
+**pip**
 
 ```bash
 git clone -b dev https://github.com/ocean-data-factory-sweden/kso.git
