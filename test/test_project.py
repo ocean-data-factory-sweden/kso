@@ -9,7 +9,7 @@ def test_init_create_project():
     """
     project_test = create_project(
         project_name="Test project 1",
-        project_path="kso/proj",
+        project_path="kso",
         model_name="best model",
         weights_path="yolov8n.pt",
     )
@@ -24,7 +24,7 @@ def test_load_project():
     """
 
     loaded_project = load_project(
-        yaml_path="kso/proj/test_project_1/test_project_1.project.yaml"
+        yaml_path="kso/test_project_1/test_project_1.project.yaml"
     )
     assert isinstance(
         loaded_project, Project
