@@ -55,7 +55,7 @@ def make_relative_path(abs_path: Path = None, startPoint: Path = None):
         raise TypeError(f"{startPoint} must be non-empty path")
 
     if abs_path.is_relative_to(startPoint):
-        relative_path = abs_path.relative_to(startPoint)
+        relative_path = abs_path.relative_to(startPoint.parents[1])
     else:
         relative_path = abs_path
 
@@ -70,7 +70,7 @@ def make_abs_path(relative_path: str | Path, startPoint: str | Path):
         raise TypeError(f"{startPoint} must be non-empty path or string")
     startPoint = Path(startPoint).expanduser()
     relative_path = Path(relative_path).expanduser()
-    abs_path = os.path.join(startPoint, relative_path)
+    abs_path = os.path.join(startPoint.parents[1], relative_path)
     return abs_path
 
 
@@ -245,16 +245,14 @@ def load_project(
         relative_path=yaml_dict["Config_file_path"], startPoint=project_abs_path
     )
     mlflow_db_path = yaml_dict["tracking"]["mlflow"]["mlflow.db"]
-    print(f"data_path_before:{yaml_dict["data_path"]}")
     data_path = {
         u: (
-            make_abs_path(relative_path=v, startPoint=project_abs_path.parent)
+            make_abs_path(relative_path=v, startPoint=project_abs_path)
             if v is not None
             else None
         )
         for u, v in yaml_dict["data_path"].items()
     }
-    print(f"data_path_after:{data_path}")
     mlflow_db_abs_path = make_abs_path(
         relative_path=mlflow_db_path, startPoint=project_abs_path
     )
@@ -346,9 +344,15 @@ def preprocess_biigle_csv(
     # ----------------------------
     # Normalize paths
     # ----------------------------
-    csv_path = Path(biigle_csv_path).expanduser().resolve()
-    images_root = Path(images_root).expanduser().resolve()
-    dataset_dir = Path(dataset_dir).expanduser().resolve()
+    csv_path = Path(biigle_csv_path).expanduser()
+    images_root = Path(images_root).expanduser()
+    dataset_dir = Path(dataset_dir).expanduser()
+    if not csv_path.is_absolute():
+        csv_path = resolve_up(relative_path=csv_path)
+    if not images_root.is_absolute():
+        images_root = resolve_up(relative_path=images_root)
+    if not dataset_dir.is_absolute():
+        dataset_dir = resolve_up(relative_path=dataset_dir)
 
     # ----------------------------
     # Nested helpers (private)
@@ -724,14 +728,12 @@ def add_data(
             generated_yolo_data = add_ultralytics_dataset_yaml(
                 str(project_path / "coco8.yaml")
             )
-            print(f"generated_yolo_data:{generated_yolo_data}")
             data_path = Path(generated_yolo_data).expanduser()
         if data_path.exists():
             data_relative_path = make_relative_path(
-                abs_path=data_path, startPoint=project_path.parent
+                abs_path=data_path, startPoint=project_path
             )
 
-            print(f"data_relative_path:{data_relative_path},data_path:{data_path}")
         else:
             raise FileNotFoundError(f"Dataset file not found: {data_path}")
         data["data_path"]["ultralytics_data_path"] = str(data_relative_path)

@@ -14,7 +14,7 @@ import cv2
 from typing import Any, Dict, Optional, List, Union
 import requests
 import numpy as np
-from .project import Project
+from .project import Project, resolve_up
 import pandas as pd
 
 logging.basicConfig(
@@ -394,6 +394,8 @@ def save_predictions(project: Project, predictions: List, save_dir: str = None) 
 
     if save_dir:
         save_dir = Path(save_dir).expanduser()
+        if not save_dir.is_absolute():
+            save_dir = resolve_up(relative_path=save_dir)
     else:
         project_name = project.Project_name
         base_dir = Path(project.project_path).expanduser()

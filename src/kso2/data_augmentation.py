@@ -2,7 +2,7 @@ from pathlib import Path
 import yaml
 from PIL import Image
 import random
-from .project import Project
+from .project import Project, resolve_up
 import logging
 
 VALID_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
@@ -39,9 +39,7 @@ def _apply_transform(img, op):
     raise ValueError(f"Unknown op: {op}")
 
 
-def run_augmentation(
-    project: Project, data_type: str, augment_factor=0.5, random_seed=42
-):
+def run_augmentation(data_yaml_path: str, augment_factor=0.5, random_seed=42):
     """
     Offline geometric augmentation for YOLO datasets.
 
@@ -49,19 +47,10 @@ def run_augmentation(
     augment_factor: 0.5 -> create ~50% as many augmented images as annotated originals
     random_seed:    RNG seed for reproducibility
     """
-    if not project or not isinstance(project, Project):
-        raise ValueError("'project' must be a Project instance.")
-    if (
-        not data_type
-        or not isinstance(data_type, str)
-        or data_type not in {"biigle_path", "ultralytics_data_path"}
-    ):
-        raise ValueError(
-            "data_type should be a non-empty string 'Biigle_path' or 'ultralytics_data_path'"
-        )
-    data_yaml_path = project.data_path.get(data_type)
-    print(data_yaml_path)
-    data_yaml_path = Path(data_yaml_path).expanduser().resolve()
+    if not data_yaml_path or not isinstance(data_yaml_path, str):
+        raise ValueError(f"{data_yaml_path} must be a non-empty string.")
+
+    data_yaml_path = resolve_up(relative_path=data_yaml_path)
     cfg = yaml.safe_load(data_yaml_path.read_text())
 
     # If 'path' missing (e.g. Roboflow), fall back to directory of data.yaml
