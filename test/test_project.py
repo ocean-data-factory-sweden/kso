@@ -1,5 +1,5 @@
 from pathlib import Path
-from kso2 import create_project, Project, load_project
+from kso import create_project, Project, load_project
 import pytest
 
 
