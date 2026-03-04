@@ -1,13 +1,15 @@
 from pathlib import Path
-from kso import create_project, Project, load_project
+from kso import Project, ProjectManager
 import pytest
+
+proj = ProjectManager()
 
 
 def test_init_create_project():
     """
     test project config function creat_project
     """
-    project_test = create_project(
+    project_test = proj.create_project(
         project_name="Test project 1",
         project_path="kso",
         model_name="best model",
@@ -23,7 +25,7 @@ def test_load_project():
     test the loading of an existing project using the function creat_project
     """
 
-    loaded_project = load_project(
+    loaded_project = proj.load_project(
         yaml_path="kso/test_project_1/test_project_1.project.yaml"
     )
     assert isinstance(
