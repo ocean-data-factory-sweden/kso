@@ -8,7 +8,8 @@ import os
 import sys
 from ultralytics import YOLO
 import re
-from .project import Project, yaml_data_retrieve, yaml_data_dump, resolve_up
+from .project import Project, ProjectManager
+from .data_preprocessing import resolve_up
 import psutil
 
 from mlflow_export_import.bulk.export_experiments import export_experiments
@@ -47,6 +48,9 @@ logging.getLogger("git").setLevel(logging.WARNING)
 logging.getLogger("git.cmd").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
+
+
+proj = ProjectManager()
 
 
 class YOLOUltralyticsMLflowModel(PythonModel):
@@ -122,175 +126,181 @@ def set_group_writable_umask(mask=0o002):
     logging.info(f"Changed umask from {oct(old_umask)} to {oct(mask)}")
 
 
-def train_model(
-    project: Project, epochs: int = 100, imgsz: int = 640, change_umask=False
-):
-    if not isinstance(project, Project):
-        raise ValueError("'model' must be a Project instance.")
+class ExperimentManager:
+    def __init__(self):
+        pass
 
-    if change_umask:
-        set_group_writable_umask()
+    def train_model(
+        self,
+        project: Project,
+        epochs: int = 100,
+        imgsz: int = 640,
+        change_umask=False,
+        **kwargs,
+    ):
+        if not isinstance(project, Project):
+            raise ValueError("'model' must be a Project instance.")
 
-    project_name = project.project_name
-    model_name = project.model_name
-    model_source = project.model_path
-    project_path = Path(project.project_path)
-    yaml_path = Path(project.Config_file_path)
-    mlflowdb_path = project.tracking
+        if change_umask:
+            set_group_writable_umask()
 
-    if not model_name:
-        model_name = f"{Path(project.model_path).stem}"
+        project_name = project.project_name
+        model_name = project.model_name
+        model_source = project.model_path
+        project_path = Path(project.project_path)
+        yaml_path = Path(project.Config_file_path)
+        mlflowdb_path = project.tracking
 
-    if not yaml_path.exists():
-        raise FileExistsError(f"{yaml_path} does not exist.")
+        if not model_name:
+            model_name = f"{Path(project.model_path).stem}"
 
-    data = yaml_data_retrieve(yaml_path=yaml_path)
-    data_path = project.data_path.get("biigle_path") or project.data_path.get(
-        "ultralytics_data_path"
-    )
-    print(f"data_path:{data_path}")
-    if not data_path:
-        raise ValueError("No valid data path found in project configuration.")
+        if not yaml_path.exists():
+            raise FileExistsError(f"{yaml_path} does not exist.")
 
-    if not model_source or not isinstance(model_source, (Path, str)):
-        raise ValueError("'model' must be a non-empty string.")
-
-    artifact_root = project_path / project_name / "mlruns"
-    artifact_root.mkdir(parents=True, exist_ok=True)
-
-    experiment_name = project_name
-    os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{mlflowdb_path}"
-    os.environ["MLFLOW_EXPERIMENT_NAME"] = experiment_name
-    os.environ["MLFLOW_ARTIFACT_URI"] = artifact_root.as_uri()
-
-    # Check if experiment exists
-    mlflow.set_tracking_uri(f"sqlite:///{mlflowdb_path}")
-    experiment = mlflow.get_experiment_by_name(experiment_name)
-
-    if experiment is None:
-        # create the experiment with a project location
-        experiment_id = mlflow.create_experiment(
-            name=experiment_name, artifact_location=artifact_root.as_uri()
+        data = proj.yaml_data_retrieve(yaml_path=yaml_path)
+        data_path = project.data_path.get("biigle_path") or project.data_path.get(
+            "ultralytics_data_path"
         )
-    else:
-        experiment_id = experiment.experiment_id
+        print(f"data_path:{data_path}")
+        if not data_path:
+            raise ValueError("No valid data path found in project configuration.")
 
-    mlflow.set_experiment(experiment_name)
+        if not model_source or not isinstance(model_source, (Path, str)):
+            raise ValueError("'model' must be a non-empty string.")
 
-    model = YOLO(model_source)
+        artifact_root = project_path / project_name / "mlruns"
+        artifact_root.mkdir(parents=True, exist_ok=True)
 
-    def dict_mapper(yolo_result):
+        experiment_name = project_name
+        os.environ["MLFLOW_TRACKING_URI"] = f"sqlite:///{mlflowdb_path}"
+        os.environ["MLFLOW_EXPERIMENT_NAME"] = experiment_name
+        os.environ["MLFLOW_ARTIFACT_URI"] = artifact_root.as_uri()
 
-        return re.sub(r"[(B)]", "", yolo_result)
+        # Check if experiment exists
+        mlflow.set_tracking_uri(f"sqlite:///{mlflowdb_path}")
+        experiment = mlflow.get_experiment_by_name(experiment_name)
 
-    with mlflow.start_run():
-        results = model.train(data=data_path, epochs=epochs, imgsz=imgsz)
-        mlflow.log_param("epochs", epochs)
-        mlflow.log_metrics({dict_mapper(k): v for k, v in results.results_dict.items()})
+        if experiment is None:
+            # create the experiment with a project location
+            experiment_id = mlflow.create_experiment(
+                name=experiment_name, artifact_location=artifact_root.as_uri()
+            )
+        else:
+            experiment_id = experiment.experiment_id
 
-        mlflow.log_artifacts(results.save_dir, artifact_path="yolo")
+        mlflow.set_experiment(experiment_name)
 
-        best_weight_path = Path(results.save_dir) / "weights" / "best.pt"
+        model = YOLO(model_source)
 
-        mlflow.pyfunc.log_model(
-            artifact_path="model",
-            python_model=YOLOUltralyticsMLflowModel(),
-            artifacts={"weights": str(best_weight_path)},
-            registered_model_name=model_name,
+        def dict_mapper(yolo_result):
+
+            return re.sub(r"[(B)]", "", yolo_result)
+
+        with mlflow.start_run():
+            results = model.train(data=data_path, epochs=epochs, imgsz=imgsz, **kwargs)
+            mlflow.log_param("epochs", epochs)
+            mlflow.log_metrics(
+                {dict_mapper(k): v for k, v in results.results_dict.items()}
+            )
+
+            mlflow.log_artifacts(results.save_dir, artifact_path="yolo")
+
+            best_weight_path = Path(results.save_dir) / "weights" / "best.pt"
+
+            mlflow.pyfunc.log_model(
+                artifact_path="model",
+                python_model=YOLOUltralyticsMLflowModel(),
+                artifacts={"weights": str(best_weight_path)},
+                registered_model_name=model_name,
+            )
+
+        data["mlflow"] = {
+            "path": str(mlflowdb_path),
+            "experiment_name": project_name,
+            "mlflow.db": str(mlflowdb_path),
+        }
+
+        proj.yaml_data_dump(yaml_path=yaml_path, data=data)
+
+        # Examine the deleted experiment details.
+        experiment = mlflow.get_experiment(experiment_id)
+        print(f"Name: {experiment.name}")
+        print(f"Artifact Location: {experiment.artifact_location}")
+        print(f"Lifecycle_stage: {experiment.lifecycle_stage}")
+        print(f"Last Updated timestamp: {experiment.last_update_time}")
+        return results
+
+    def export_experiment(
+        self, project: Project, port=8080, notebook_formats=None, use_threads=False
+    ):
+
+        project_name = project.project_name
+        experiment_name = project_name
+        # 1) Tracking URI points to your local mlruns folder
+        mlflow.set_tracking_uri(f"http://localhost:{port}")
+        # Check if experiment exists
+        experiment = mlflow.get_experiment_by_name(experiment_name)
+        artifact_root = Path(project.project_path) / project_name / "output"
+        artifact_root.mkdir(parents=True, exist_ok=True)
+
+        client = mlflow.MlflowClient()
+
+        # 2) Export experiment(s)
+        export_experiments(
+            mlflow_client=client,
+            experiments=[experiment.experiment_id],
+            output_dir=str(artifact_root),
+            notebook_formats=None,
+            use_threads=False,
         )
 
-    data["mlflow"] = {
-        "path": str(mlflowdb_path),
-        "experiment_name": project_name,
-        "mlflow.db": str(mlflowdb_path),
-    }
+    def import_experiment(self, project: Project, input_dir: str, port: int = 8080):
 
-    yaml_data_dump(yaml_path=yaml_path, data=data)
+        project_name = project.project_name
+        experiment_name = project_name
+        input_dir = Path(input_dir).expanduser()
+        if not input_dir.is_absolute():
+            input_dir = resolve_up(input_dir)
+        # 1) Tracking URI points to your local mlruns folder
+        mlflow.set_tracking_uri(f"http://localhost:{port}")
 
-    # Examine the deleted experiment details.
-    experiment = mlflow.get_experiment(experiment_id)
-    print(f"Name: {experiment.name}")
-    print(f"Artifact Location: {experiment.artifact_location}")
-    print(f"Lifecycle_stage: {experiment.lifecycle_stage}")
-    print(f"Last Updated timestamp: {experiment.last_update_time}")
-    return results
+        client = mlflow.MlflowClient()
 
+        import_experiments(
+            mlflow_client=client,
+            input_dir=str(input_dir),
+            use_src_user_id=False,
+            use_threads=False,
+        )
 
-def export_experiment(
-    project: Project, port=8080, notebook_formats=None, use_threads=False
-):
+    def loading_model(self, project: Project, model_name: str, version: int):
+        """load pyfuncModel from registred Mlflow models and versions"""
 
-    project_name = project.project_name
-    experiment_name = project_name
-    # 1) Tracking URI points to your local mlruns folder
-    mlflow.set_tracking_uri(f"http://localhost:{port}")
-    # Check if experiment exists
-    experiment = mlflow.get_experiment_by_name(experiment_name)
-    artifact_root = Path(project.project_path) / project_name / "output"
-    artifact_root.mkdir(parents=True, exist_ok=True)
+        mlflowdb = project.tracking
+        tracking_uri = f"sqlite:///{str(mlflowdb)}"
 
-    client = mlflow.MlflowClient()
+        os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
+        model_uri = f"models:/{model_name}/{version}"
+        model = mlflow.pyfunc.load_model(model_uri)
+        return model
 
-    # 2) Export experiment(s)
-    export_experiments(
-        mlflow_client=client,
-        experiments=[experiment.experiment_id],
-        output_dir=str(artifact_root),
-        notebook_formats=None,
-        use_threads=False,
-    )
+    def model_inference(self, model: PyFuncModel, data_path: str):
+        if not isinstance(model, PyFuncModel):
+            raise TypeError(f"model {model} must be an mlflow pyfunc model.")
+        if not isinstance(data_path, str):
+            raise TypeError(f"data path {data_path} must be a non-empty string.")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        logger.info(f"current device: {device}")
+        data_path = Path(data_path).expanduser()
+        result = model.predict([{"image": str(data_path)}], params={"device": device})
+        return result
 
-
-def import_experiment(project: Project, input_dir: str, port: int = 8080):
-
-    project_name = project.project_name
-    experiment_name = project_name
-    input_dir = Path(input_dir).expanduser()
-    if not input_dir.is_absolute():
-        input_dir = resolve_up(input_dir)
-    # 1) Tracking URI points to your local mlruns folder
-    mlflow.set_tracking_uri(f"http://localhost:{port}")
-
-    client = mlflow.MlflowClient()
-
-    import_experiments(
-        mlflow_client=client,
-        input_dir=str(input_dir),
-        use_src_user_id=False,
-        use_threads=False,
-    )
-
-
-def loading_model(project: Project, model_name: str, version: int):
-    """load pyfuncModel from registred Mlflow models and versions"""
-
-    mlflowdb = project.tracking
-    tracking_uri = f"sqlite:///{str(mlflowdb)}"
-
-    os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
-    model_uri = f"models:/{model_name}/{version}"
-    model = mlflow.pyfunc.load_model(model_uri)
-    return model
-
-
-def model_inference(model: PyFuncModel, data_path: str):
-    if not isinstance(model, PyFuncModel):
-        raise TypeError(f"model {model} must be an mlflow pyfunc model.")
-    if not isinstance(data_path, str):
-        raise TypeError(f"data path {data_path} must be a non-empty string.")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    logger.info(f"current device: {device}")
-    data_path = Path(data_path).expanduser()
-    result = model.predict([{"image": str(data_path)}], params={"device": device})
-    return result
-
-
-def internal_model(model: PyFuncModel):
-    """load the internal pytorch model of type torch.nn.Module"""
-    if not isinstance(model, PyFuncModel):
-        raise TypeError(f"model {model} must be a mlflow pyfuncModel")
-    internal_model = model._model_impl.python_model
-    pytorch_model = internal_model.nn_model()
-    if not isinstance(pytorch_model, nn.Module):
-        raise TypeError(f"model {pytorch_model} is not a pytorch model")
-    return pytorch_model
+    def internal_model(self, model: PyFuncModel):
+        """load the internal pytorch model of type torch.nn.Module"""
+        if not isinstance(model, PyFuncModel):
+            raise TypeError(f"model {model} must be a mlflow pyfuncModel")
+        internal_model = model._model_impl.python_model
+        pytorch_model = internal_model.nn_model()
+        if not isinstance(pytorch_model, nn.Module):
+            raise TypeError(f"model {pytorch_model} is not a pytorch model")
+        return pytorch_model
