@@ -4,6 +4,7 @@ import pytest
 
 proj = ProjectManager()
 
+
 def test_init_create_project():
     """
     test project config function creat_project
