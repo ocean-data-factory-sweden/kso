@@ -11,7 +11,7 @@ from .trainer import TrainingManager
 from mlflow.pyfunc import PyFuncModel
 import psutil
 from pathlib import Path
-
+from .data_preprocessing import resolve_up
 
 train = TrainingManager()
 
@@ -146,7 +146,10 @@ class ModelProfiler:
     def memory_estimator(self, model, image_path, batch_size=16):
         """estimate the inference latency and the memory usage
         comenpared to the current slurm allocation"""
-        image_path = Path(image_path).expanduser()
+        image_path = Path(image_path)
+        if not image_path.is_absolute():
+            image_path = resolve_up(relative_path=image_path)
+
         if "SLURM_JOB_ID" in os.environ:
             ram_gb = int(os.environ["SLURM_MEM_PER_NODE"]) / 1024
             cpus = int(os.environ["SLURM_CPUS_PER_TASK"])
