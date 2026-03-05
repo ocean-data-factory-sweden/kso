@@ -1,8 +1,8 @@
 from pathlib import Path
-from kso import Project, ProjectManager
+from kso import Project, TrainingManager
 import pytest
 
-proj = ProjectManager()
+proj = TrainingManager()
 
 
 def test_init_create_project():

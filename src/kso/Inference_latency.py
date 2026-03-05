@@ -7,13 +7,13 @@ import platform
 import subprocess
 import logging
 from torchinfo import summary
-from .trainer import ExperimentManager
+from .trainer import TrainingManager
 from mlflow.pyfunc import PyFuncModel
 import psutil
 from pathlib import Path
 
 
-train = ExperimentManager()
+train = TrainingManager()
 
 
 class ModelProfiler:

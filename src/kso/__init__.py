@@ -3,7 +3,7 @@ from .project import (
     Project,
 )
 from .trainer import (
-    ExperimentManager,
+    TrainingManager,
 )
 from .serving_utils import (
     MLflowServerManager,
@@ -18,7 +18,7 @@ from .Inference_latency import (
 
 __all__ = [
     "ProjectManager",
-    "ExperimentManager",
+    "TrainingManager",
     "MLflowServerManager",
     "ModelProfiler",
     "run_augmentation",

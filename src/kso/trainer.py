@@ -126,7 +126,7 @@ def set_group_writable_umask(mask=0o002):
     logging.info(f"Changed umask from {oct(old_umask)} to {oct(mask)}")
 
 
-class ExperimentManager:
+class TrainingManager:
     def __init__(self):
         pass
 
