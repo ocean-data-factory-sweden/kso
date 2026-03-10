@@ -12,7 +12,7 @@ from .data_preprocessing import (
     run_augmentation,
 )
 
-from .Inference_latency import (
+from .inference_latency import (
     ModelProfiler,
 )
 

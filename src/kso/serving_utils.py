@@ -289,7 +289,7 @@ class MLflowServerManager:
             print(response.text)
 
     def deploy_mlflow_registered_model(
-        self, model_name: str, version: str, port=5000, auto_open=True
+        self, project: Project, model_name: str, version: str, port=5000, auto_open=True
     ):
         """
         deploy your model locally and returns base URL.
@@ -322,13 +322,14 @@ class MLflowServerManager:
 
         # log_dir.mkdir(exist_ok=True)
         # log_file = log_dir / "mlflow_stdout.log"
+        mlflowdb = project.tracking
+        tracking_uri = f"sqlite:///{str(mlflowdb)}"
+        proj_dir = Path(project.project_path) / project.project_name
+        mlflow_artifact = proj_dir / "mlruns"
+        mlflow_artifact_uri = mlflow_artifact.as_uri()
 
-        os.environ["MLFLOW_TRACKING_URI"] = (
-            "sqlite:////Users/ghaith/Desktop/kso/kso/projects/mlflow.db"
-        )
-        os.environ["MLFLOW_ARTIFACT_URI"] = (
-            "file:///Users/ghaith/Desktop/kso/kso/projects/test_project_1/mlruns"
-        )
+        os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
+        os.environ["MLFLOW_ARTIFACT_URI"] = mlflow_artifact_uri
         try:
             process = subprocess.Popen(
                 [
@@ -343,7 +344,7 @@ class MLflowServerManager:
                 ],
                 # stdout=open(log_file, "a"),
                 # stderr=subprocess.STDOUT,
-                cwd="/Users/ghaith/Desktop/kso/kso/projects/test_project_1",
+                cwd=str(proj_dir),
             )
 
             # Wait for server to start

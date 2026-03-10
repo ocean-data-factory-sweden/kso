@@ -355,7 +355,7 @@ class ProjectManager:
 
         self.yaml_data_dump(yaml_path=yaml_path, data=data)
         logging.info(f"Project YAML data path updated at {yaml_path}")
-        return pprint.pp(data)
+        pprint.pp(data)
 
     def add_model(
         self, project: Project, model_path: str = None, model_name: str = None
@@ -416,7 +416,7 @@ class ProjectManager:
         self.yaml_data_dump(yaml_path=yaml_path, data=data)
         logging.info(f"Project YAML model name updated at {yaml_path}")
 
-        return pprint.pp(data)
+        pprint.pp(data)
 
     def add_ultralytics_dataset_yaml(self, data_path: str) -> str:
         path = Path(data_path).expanduser().resolve()

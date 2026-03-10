@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [project]
-name = "kso2"
+name = "kso"
 version = "0.1.0"
 description = "A package for managing and training KSO object detection models with MLflow."
 readme = "README.md"
