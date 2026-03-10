@@ -317,6 +317,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install package
+        shell: bash
+        run: |
+          python3 -m venv --system-site-packages .venv
+          echo "$PWD/.venv/bin" >> $GITHUB_PATH
+          source .venv/bin/activate
+          pip install --no-deps -e .
+          pip install --ignore-installed --no-deps pylint nbqa
+
       - name: Pylint kso_utils
         shell: bash
         run: |
@@ -342,6 +351,15 @@ jobs:
       PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install package
+        shell: bash
+        run: |
+          python3 -m venv --system-site-packages .venv
+          echo "$PWD/.venv/bin" >> $GITHUB_PATH
+          source .venv/bin/activate
+          pip install --no-deps -e .
+          pip install --ignore-installed --no-deps pytest
 
       - name: Pytest
         shell: bash

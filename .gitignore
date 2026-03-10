@@ -34,6 +34,12 @@ data/*
 
 results*.txt
 
+mlruns
+artifacts
+mlflow.db
+projects
+
+
 # Datasets -------------------------------------------------------------------------------------------------------------
 coco/
 coco128/
@@ -139,6 +145,9 @@ celerybeat-schedule
 
 # dotenv
 .env
+
+#vscode folder
+.vscode
 
 # virtualenv
 .venv*
