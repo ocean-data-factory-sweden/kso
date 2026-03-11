@@ -326,6 +326,7 @@ class MLflowServerManager:
         tracking_uri = f"sqlite:///{str(mlflowdb)}"
         proj_dir = Path(project.project_path) / project.project_name
         mlflow_artifact = proj_dir / "mlruns"
+
         mlflow_artifact_uri = mlflow_artifact.as_uri()
 
         os.environ["MLFLOW_TRACKING_URI"] = tracking_uri

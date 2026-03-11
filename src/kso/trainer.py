@@ -11,6 +11,7 @@ import re
 from .project import Project, ProjectManager
 from .data_preprocessing import resolve_up
 import psutil
+from urllib.parse import urlparse
 
 from mlflow_export_import.bulk.export_experiments import export_experiments
 from mlflow_export_import.bulk.import_experiments import import_experiments
@@ -161,7 +162,7 @@ class TrainingManager:
         data_path = project.data_path.get("biigle_path") or project.data_path.get(
             "ultralytics_data_path"
         )
-        print(f"data_path:{data_path}")
+
         if not data_path:
             raise ValueError("No valid data path found in project configuration.")
 
@@ -213,7 +214,7 @@ class TrainingManager:
                 artifacts={"weights": str(best_weight_path)},
                 registered_model_name=model_name,
             )
-
+        mlflow.end_run()
         data["mlflow"] = {
             "path": str(mlflowdb_path),
             "experiment_name": project_name,
@@ -304,3 +305,47 @@ class TrainingManager:
         if not isinstance(pytorch_model, nn.Module):
             raise TypeError(f"model {pytorch_model} is not a pytorch model")
         return pytorch_model
+
+    def model_validation(
+        self, project: Project, model: PyFuncModel = None, data_path: str = None
+    ):
+        """evaluate the model with selected data"""
+        mlflowdb = project.tracking
+        tracking_uri = f"sqlite:///{str(mlflowdb)}"
+        client = mlflow.tracking.MlflowClient(tracking_uri=tracking_uri)
+        model_name = project.model_name
+        if not model:
+            logged_models = client.get_latest_versions(name=model_name)
+            version = logged_models[0].version
+            model_uri = f"models:/{model_name}/{version}"
+            model = model = mlflow.pyfunc.load_model(model_uri)
+        if not data_path:
+            data_path = project.data_path["ultralytics_data_path"]
+        data_path = Path(data_path).expanduser()
+        uri = model.metadata.artifact_path
+        run_id = model.metadata.run_id
+        # Get the run object
+        run = client.get_run(model.metadata.run_id)
+        # Get the experiment ID
+        experiment_id = run.info.experiment_id
+        run_name = run.info.run_name
+        val_run_name = f"validation_{run_name}"
+
+        uri = Path(urlparse(uri).path)
+        model_path = os.path.join(uri, "artifacts/best.pt")
+        model = YOLO(model_path)
+
+        with mlflow.start_run(experiment_id=experiment_id, run_name=val_run_name):
+
+            results = model.val(
+                data=str(data_path),
+                split="val",
+                imgsz=1000,
+                batch=8,
+            )
+
+            metrics = results.results_dict
+            for k, v in metrics.items():
+                clean_name = f"test_{k.replace('metrics/', '').replace('(', '').replace(')', '').replace(' ', '_')}"
+                mlflow.log_metric(clean_name, float(v))
+        return metrics
