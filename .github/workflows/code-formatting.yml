@@ -5,10 +5,12 @@ on:
     branches:
       - master
       - dev
+      - kso2-merge
   pull_request:
     branches:
       - master
       - dev
+      - kso2-merge
 
 jobs:
   black:
