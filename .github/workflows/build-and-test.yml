@@ -364,8 +364,7 @@ jobs:
       - name: Pytest
         shell: bash
         run: |
-          export PYTHONPATH="${GITHUB_WORKSPACE}"
-          pytest -vv .
+          pytest 
         env:
           WANDB_API_KEY: '${{ secrets.WANDB_API_KEY }}'
 
