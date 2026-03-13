@@ -324,7 +324,7 @@ jobs:
           echo "$PWD/.venv/bin" >> $GITHUB_PATH
           source .venv/bin/activate
           pip install --no-deps -e .
-          pip install --ignore-installed --no-deps pylint nbqa
+          pip install pylint nbqa
 
       - name: Pylint kso_utils
         shell: bash
@@ -359,7 +359,7 @@ jobs:
           echo "$PWD/.venv/bin" >> $GITHUB_PATH
           source .venv/bin/activate
           pip install --no-deps -e .
-          pip install --ignore-installed --no-deps pytest
+          pip install pytest
 
       - name: Pytest
         shell: bash
