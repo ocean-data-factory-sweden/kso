@@ -2447,7 +2447,7 @@ wheels = [
 ]
 
 [[package]]
-name = "kso2"
+name = "kso"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -2603,6 +2603,7 @@ dependencies = [
     { name = "nbclient" },
     { name = "nbconvert" },
     { name = "nbformat" },
+    { name = "nbqa" },
     { name = "nest-asyncio" },
     { name = "networkx" },
     { name = "nn-meter" },
@@ -2905,6 +2906,7 @@ requires-dist = [
     { name = "nbclient", specifier = "==0.10.2" },
     { name = "nbconvert", specifier = "==7.16.6" },
     { name = "nbformat", specifier = "==5.10.4" },
+    { name = "nbqa", specifier = ">=1.9.1" },
     { name = "nbqa", marker = "extra == 'dev'", specifier = "==1.9.1" },
     { name = "nest-asyncio", specifier = "==1.6.0" },
     { name = "networkx", specifier = "==3.6.1" },
@@ -2935,7 +2937,7 @@ requires-dist = [
     { name = "pillow", specifier = "==12.0.0" },
     { name = "pillow-avif-plugin", specifier = "==1.5.2" },
     { name = "pims", specifier = "==0.7" },
-    { name = "pip", specifier = "==24.3.1" },
+    { name = "pip", specifier = ">=24.0.0" },
     { name = "platformdirs", specifier = "==4.5.1" },
     { name = "prometheus-client", specifier = "==0.23.1" },
     { name = "prompt-toolkit", specifier = "==3.0.52" },
@@ -3039,7 +3041,7 @@ requires-dist = [
     { name = "webencodings", specifier = "==0.5.1" },
     { name = "websocket-client", specifier = "==1.9.0" },
     { name = "werkzeug", specifier = "==3.1.4" },
-    { name = "wheel", specifier = "==0.45.1" },
+    { name = "wheel", specifier = ">=0.42.0" },
     { name = "whenever", specifier = "==0.7.3" },
     { name = "widgetsnbextension", specifier = "==4.0.15" },
     { name = "xyzservices", specifier = "==2025.11.0" },

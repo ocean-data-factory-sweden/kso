@@ -329,13 +329,13 @@ jobs:
       - name: Pylint kso_utils
         shell: bash
         run: |
-          pylint kso_utils
+          pylint src/kso
 
       - name: Pylint notebooks
         if: success() || failure()
         shell: bash
         run: |
-          nbqa pylint notebooks
+          nbqa pylint notebooks/kso_demo_notebooks
 
   test:
     name: Test
