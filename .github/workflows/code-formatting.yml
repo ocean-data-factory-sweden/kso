@@ -10,7 +10,6 @@ on:
     branches:
       - master
       - dev
-      - kso2-merge
 
 jobs:
   black:
