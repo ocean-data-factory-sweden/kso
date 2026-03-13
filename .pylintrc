@@ -1,7 +1,7 @@
 [MAIN]
 # Add paths to the list of the source roots so that we can import from kso_utils
 source-roots=src
-ignore-paths=kso_utils
+ignore = kso_utils
 
 # Set the output format so it is easy to read
 output-format=colorized
