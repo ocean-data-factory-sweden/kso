@@ -382,8 +382,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      #- name: Increase docker space
-      #  uses: ./.github/actions/increase-docker-space
+      - name: Increase docker space
+        uses: ./.github/actions/increase-docker-space
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
