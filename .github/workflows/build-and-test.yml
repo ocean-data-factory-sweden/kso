@@ -323,7 +323,7 @@ jobs:
           python3 -m venv --system-site-packages .venv
           echo "$PWD/.venv/bin" >> $GITHUB_PATH
           source .venv/bin/activate
-          pip install -e .
+          pip install --no-deps -e .
           pip install pylint nbqa
 
       - name: Pylint src/kso
