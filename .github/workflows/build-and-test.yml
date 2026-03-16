@@ -325,6 +325,7 @@ jobs:
           source .venv/bin/activate
           pip install --no-cache-dir -e .
           pip install --no-cache-dir pylint nbqa
+          
 
       - name: Pylint kso_utils
         shell: bash
