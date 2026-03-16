@@ -323,8 +323,8 @@ jobs:
           python3 -m venv --system-site-packages .venv
           echo "$PWD/.venv/bin" >> $GITHUB_PATH
           source .venv/bin/activate
-          pip install -e .
-          pip install pylint nbqa
+          pip install --no-cache-dir -e .
+          pip install --no-cache-dir pylint nbqa
       - name: Debug mlflow-export-import version
         run: |
           python - << 'PY'
