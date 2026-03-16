@@ -325,7 +325,13 @@ jobs:
           source .venv/bin/activate
           pip install -e .
           pip install pylint nbqa
-
+      - name: Debug mlflow-export-import version
+        run: |
+          python - << 'PY'
+          import inspect
+          from mlflow_export_import.bulk.import_experiments import import_experiments
+          print(inspect.signature(import_experiments))
+          PY
       - name: Pylint kso_utils
         shell: bash
         run: |
