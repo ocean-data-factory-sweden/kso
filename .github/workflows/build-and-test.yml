@@ -328,7 +328,7 @@ jobs:
           pip install --no-cache-dir pylint nbqa
 
 
-      - name: Pylint kso_utils
+      - name: Pylint kso
         shell: bash
         run: |
           pylint src/kso
