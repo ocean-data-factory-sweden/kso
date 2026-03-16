@@ -8,7 +8,7 @@ where = ["src"]
 [project]
 name = "kso"
 version = "0.1.0"
-description = "A package for managing and training KSO object detection models with MLflow."
+description = "A package for managing and training KSO object detection models (yolo for now) with MLflow ."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
