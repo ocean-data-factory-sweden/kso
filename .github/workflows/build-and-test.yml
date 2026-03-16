@@ -358,7 +358,7 @@ jobs:
           python3 -m venv --system-site-packages .venv
           echo "$PWD/.venv/bin" >> $GITHUB_PATH
           source .venv/bin/activate
-          pip install --no-deps -e .
+          pip install -e .
           pip install pytest
 
       - name: Pytest
