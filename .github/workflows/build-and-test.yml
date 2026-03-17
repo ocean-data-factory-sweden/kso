@@ -2,13 +2,7 @@ name: Build and Test
 on:
   push:
     branches:
-<<<<<<< HEAD
       - "*"
-=======
-      - main
-      - dev
-      - kso2-merge
->>>>>>> 5340848 (.)
     tags:
       - "v*.*.*"
   workflow_dispatch:
