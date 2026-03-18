@@ -317,7 +317,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install package
+      - name: Install packages
         shell: bash
         run: |
           python3 -m venv --system-site-packages .venv
