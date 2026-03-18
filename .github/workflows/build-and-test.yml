@@ -2,7 +2,7 @@ name: Build and Test
 on:
   push:
     branches:
-      - "*"
+      - "kso2-merge"
     tags:
       - "v*.*.*"
   workflow_dispatch:
@@ -323,7 +323,6 @@ jobs:
           python3 -m venv --system-site-packages .venv
           echo "$PWD/.venv/bin" >> $GITHUB_PATH
           source .venv/bin/activate
-          pip install --no-cache-dir "mlflow-export-import @ git+https://github.com/mlflow/mlflow-export-import.git@cf626079fc6729b10e34c2fd0fa3cf36fbfb30b2"
           pip install --no-cache-dir -e .
           pip install --no-cache-dir pylint nbqa
 
