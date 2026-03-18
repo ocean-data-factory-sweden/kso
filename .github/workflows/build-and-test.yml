@@ -365,7 +365,7 @@ jobs:
       - name: Pytest
         shell: bash
         run: |
-          pytest 
+          pytest -vv test/
         env:
           WANDB_API_KEY: '${{ secrets.WANDB_API_KEY }}'
 
