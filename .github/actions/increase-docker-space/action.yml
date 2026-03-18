@@ -33,7 +33,7 @@ runs:
         echo "---- Contents of /mnt -------------"
         ls /mnt
         echo "---- Info about /mnt --------------"
-        cat /mnt/DATALOSS_WARNING_README.txt || true
+        cat /mnt/DATALOSS_WARNING_README.txt
         echo "-----------------------------------"
         sudo bash << EOF
         mv /var/lib/docker /mnt/
