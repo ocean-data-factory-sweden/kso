@@ -112,15 +112,9 @@ ARG PIP_NO_CACHE_DIR=1
 
 # Install Python packages
 ARG PYTHON_REQUIREMENTS=requirements.txt
-COPY requirements_cuda12.9.txt /opt/kso/
-COPY requirements_rocm6.4.txt /opt/kso/
-COPY requirements_cpu.txt /opt/kso/
-COPY requirements.txt /opt/kso/
-
-#COPY . /opt/kso
-WORKDIR /opt/kso
-
-RUN pip install --break-system-packages -r /opt/kso/$PYTHON_REQUIREMENTS
+COPY containers/requirements.txt /opt/kso/
+COPY containers/$PYTHON_REQUIREMENTS /opt/kso/
+RUN pip install -r /opt/kso/requirements.txt -r "/opt/kso/$PYTHON_REQUIREMENTS"
 RUN pip install papermill
 
 # Install MIOpen kdb files with ROCm PyTorch wheels, see

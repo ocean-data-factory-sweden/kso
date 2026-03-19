@@ -3,9 +3,7 @@ name: Code formatting
 on:
   push:
     branches:
-      - master
-      - dev
-      - kso2-merge
+      - "*"
   pull_request:
     branches:
       - master
