@@ -3,6 +3,7 @@ FROM ${BASE_IMAGE}
 
 # Copy KSO
 COPY . /opt/kso
+RUN pip install -e ..
 
 # Set the user
 ARG NB_USER=jovyan
