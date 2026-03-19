@@ -164,10 +164,10 @@ jobs:
                 build_base_image=true
               fi
               # Build if python packages have changed
-              if grep -qF 'requirements.txt' changed.txt; then
+              if grep -qF 'containers/requirements.txt' changed.txt; then
                 build_base_image=true
               fi
-              if grep -qF "$python_requirements" changed.txt; then
+              if grep -qF "containers/$python_requirements" changed.txt; then
                 build_base_image=true
               fi
 

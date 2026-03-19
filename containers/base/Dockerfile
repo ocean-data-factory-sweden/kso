@@ -112,8 +112,8 @@ ARG PIP_NO_CACHE_DIR=1
 
 # Install Python packages
 ARG PYTHON_REQUIREMENTS=requirements.txt
-COPY requirements.txt /opt/kso/
-COPY $PYTHON_REQUIREMENTS /opt/kso/
+COPY containers/requirements.txt /opt/kso/
+COPY containers/$PYTHON_REQUIREMENTS /opt/kso/
 RUN pip install -r /opt/kso/requirements.txt -r "/opt/kso/$PYTHON_REQUIREMENTS"
 RUN pip install papermill
 
