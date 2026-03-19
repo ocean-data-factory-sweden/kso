@@ -312,22 +312,13 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install packages
-        shell: bash
-        run: |
-          python3 -m venv --system-site-packages .venv
-          echo "$PWD/.venv/bin" >> $GITHUB_PATH
-          source .venv/bin/activate
-          pip install --no-cache-dir -e .
-          pip install --no-cache-dir pylint nbqa
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD:$PWD/src" >> $GITHUB_ENV
 
-
-      - name: Pylint kso
+      - name: Pylint code
         shell: bash
         run: |
           pylint src/kso
@@ -336,7 +327,7 @@ jobs:
         if: success() || failure()
         shell: bash
         run: |
-          nbqa pylint notebooks/kso_demo_notebooks
+          nbqa pylint notebooks
 
   test:
     name: Test
@@ -348,24 +339,16 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install package
-        shell: bash
-        run: |
-          python3 -m venv --system-site-packages .venv
-          echo "$PWD/.venv/bin" >> $GITHUB_PATH
-          source .venv/bin/activate
-          pip install -e .
-          pip install pytest
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD:$PWD/src" >> $GITHUB_ENV
 
       - name: Pytest
         shell: bash
         run: |
-          pytest -vv test/
+          pytest -vv .
         env:
           WANDB_API_KEY: '${{ secrets.WANDB_API_KEY }}'
 
