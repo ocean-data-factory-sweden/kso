@@ -112,7 +112,10 @@ ARG PIP_NO_CACHE_DIR=1
 
 # Install Python packages
 ARG PYTHON_REQUIREMENTS=requirements.txt
+COPY requirements_cuda12.9.txt /opt/kso/
+COPY requirements_rocm6.4.txt /opt/kso/
 COPY requirements.txt /opt/kso/
+
 #COPY . /opt/kso
 WORKDIR /opt/kso
 
