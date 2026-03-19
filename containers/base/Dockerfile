@@ -114,6 +114,7 @@ ARG PIP_NO_CACHE_DIR=1
 ARG PYTHON_REQUIREMENTS=requirements.txt
 COPY requirements_cuda12.9.txt /opt/kso/
 COPY requirements_rocm6.4.txt /opt/kso/
+COPY requirements_cpu.txt /opt/kso/
 COPY requirements.txt /opt/kso/
 
 #COPY . /opt/kso
