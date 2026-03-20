@@ -66,11 +66,11 @@ class YOLOUltralyticsMLflowModel(PythonModel):
         logger.info(f"Loading YOLO weights from: {model_path}")
         logger.info(f"Context: {context}")
 
-        self.model = YOLO(model_path)
+        self.yolo_model = YOLO(model_path)
 
     def nn_model(self):
         """get the pytorch model from mlflow.pyfunc"""
-        return self.model.model
+        return self.yolo_model.model
 
     def predict(
         self,
@@ -91,7 +91,7 @@ class YOLOUltralyticsMLflowModel(PythonModel):
                     raise FileNotFoundError(f"the provided file {image} was not found")
 
             # Run prediction
-            results = self.model.predict(image)
+            results = self.yolo_model.predict(image)
 
             # Convert to JSON string
 
@@ -191,14 +191,14 @@ class TrainingManager:
 
         mlflow.set_experiment(experiment_name)
 
-        model = YOLO(model_source)
+        yolo_model = YOLO(model_source)
 
         def dict_mapper(yolo_result):
 
             return re.sub(r"[(B)]", "", yolo_result)
 
         with mlflow.start_run():
-            results = model.train(data=data_path, epochs=epochs, imgsz=imgsz, **kwargs)
+            results = yolo_model.train(data=data_path, epochs=epochs, imgsz=imgsz, **kwargs)
             mlflow.log_param("epochs", epochs)
             mlflow.log_metrics(
                 {dict_mapper(k): v for k, v in results.results_dict.items()}
@@ -307,7 +307,7 @@ class TrainingManager:
         return pytorch_model
 
     def model_validation(
-        self, project: Project, model: PyFuncModel = None, data_path: str = None
+        self, project: Project, model: PyFuncModel = None, data_path: str = None, imgsz=1000,batch=8
     ):
         """evaluate the model with selected data"""
         mlflowdb = project.tracking
@@ -316,9 +316,12 @@ class TrainingManager:
         model_name = project.model_name
         if not model:
             logged_models = client.get_latest_versions(name=model_name)
+            if not logged_models:
+                raise ValueError(f"No registered model found with name: {model_name}")
+            
             version = logged_models[0].version
             model_uri = f"models:/{model_name}/{version}"
-            model = model = mlflow.pyfunc.load_model(model_uri)
+            model = mlflow.pyfunc.load_model(model_uri)
         if not data_path:
             data_path = project.data_path["ultralytics_data_path"]
         data_path = Path(data_path).expanduser()
@@ -331,17 +334,17 @@ class TrainingManager:
         run_name = run.info.run_name
         val_run_name = f"validation_{run_name}"
 
-        uri = Path(urlparse(uri).path)
-        model_path = os.path.join(uri, "artifacts/best.pt")
-        model = YOLO(model_path)
+        uri_path = Path(urlparse(uri).path)
+        model_path = os.path.join(uri_path, "artifacts/best.pt")
+        yolo_model = YOLO(model_path)
 
         with mlflow.start_run(experiment_id=experiment_id, run_name=val_run_name):
 
-            results = model.val(
+            results = yolo_model.val(
                 data=str(data_path),
                 split="val",
-                imgsz=1000,
-                batch=8,
+                imgsz=imgsz,
+                batch=batch,
             )
 
             metrics = results.results_dict
