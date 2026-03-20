@@ -198,7 +198,9 @@ class TrainingManager:
             return re.sub(r"[(B)]", "", yolo_result)
 
         with mlflow.start_run():
-            results = yolo_model.train(data=data_path, epochs=epochs, imgsz=imgsz, **kwargs)
+            results = yolo_model.train(
+                data=data_path, epochs=epochs, imgsz=imgsz, **kwargs
+            )
             mlflow.log_param("epochs", epochs)
             mlflow.log_metrics(
                 {dict_mapper(k): v for k, v in results.results_dict.items()}
@@ -307,7 +309,12 @@ class TrainingManager:
         return pytorch_model
 
     def model_validation(
-        self, project: Project, model: PyFuncModel = None, data_path: str = None, imgsz=1000,batch=8
+        self,
+        project: Project,
+        model: PyFuncModel = None,
+        data_path: str = None,
+        imgsz=1000,
+        batch=8,
     ):
         """evaluate the model with selected data"""
         mlflowdb = project.tracking
@@ -318,7 +325,7 @@ class TrainingManager:
             logged_models = client.get_latest_versions(name=model_name)
             if not logged_models:
                 raise ValueError(f"No registered model found with name: {model_name}")
-            
+
             version = logged_models[0].version
             model_uri = f"models:/{model_name}/{version}"
             model = mlflow.pyfunc.load_model(model_uri)
