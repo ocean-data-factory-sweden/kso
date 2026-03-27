@@ -295,6 +295,7 @@ class TrainingManager:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"current device: {device}")
         data_path = Path(data_path).expanduser()
+        data_path = resolve_up(data_path)
         result = model.predict([{"image": str(data_path)}], params={"device": device})
         return result
 
@@ -330,8 +331,12 @@ class TrainingManager:
             model_uri = f"models:/{model_name}/{version}"
             model = mlflow.pyfunc.load_model(model_uri)
         if not data_path:
-            data_path = project.data_path["ultralytics_data_path"]
+            # data_path = project.data_path["ultralytics_data_path"]
+            data_path = project.data_path.get("biigle_path") or project.data_path.get(
+                "ultralytics_data_path"
+            )
         data_path = Path(data_path).expanduser()
+        data_path = resolve_up(data_path)
         uri = model.metadata.artifact_path
         run_id = model.metadata.run_id
         # Get the run object
