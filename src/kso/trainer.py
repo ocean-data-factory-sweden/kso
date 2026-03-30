@@ -313,8 +313,11 @@ class TrainingManager:
         self,
         project: Project,
         model: PyFuncModel = None,
+        model_name: str = None,
+        version: str | int = None,
         data_path: str = None,
-        imgsz=1000,
+        split: str = "test",
+        imgsz=640,
         batch=8,
     ):
         """evaluate the model with selected data"""
@@ -322,7 +325,12 @@ class TrainingManager:
         tracking_uri = f"sqlite:///{str(mlflowdb)}"
         client = mlflow.tracking.MlflowClient(tracking_uri=tracking_uri)
         model_name = project.model_name
-        if not model:
+
+        if not model and model_name:
+            model = self.loading_model(
+                project=project, model_name=model_name, version=int(version)
+            )
+        elif not model and not model_name:
             logged_models = client.get_latest_versions(name=model_name)
             if not logged_models:
                 raise ValueError(f"No registered model found with name: {model_name}")
@@ -347,14 +355,16 @@ class TrainingManager:
         val_run_name = f"validation_{run_name}"
 
         uri_path = Path(urlparse(uri).path)
-        model_path = os.path.join(uri_path, "artifacts/best.pt")
+        model_path = uri_path / "artifacts/best.pt"
+        if not model_path.exists():
+            raise FileNotFoundError(f"Model weights not found: {model_path}")
         yolo_model = YOLO(model_path)
 
         with mlflow.start_run(experiment_id=experiment_id, run_name=val_run_name):
 
             results = yolo_model.val(
                 data=str(data_path),
-                split="val",
+                split=split,
                 imgsz=imgsz,
                 batch=batch,
             )
