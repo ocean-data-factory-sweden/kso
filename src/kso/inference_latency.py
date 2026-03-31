@@ -146,7 +146,7 @@ class ModelProfiler:
     def memory_estimator(self, model, image_path, batch_size=16):
         """estimate the inference latency and the memory usage
         comenpared to the current slurm allocation"""
-        image_path = Path(image_path)
+        image_path = Path(image_path).expanduser()
         if not image_path.is_absolute():
             image_path = resolve_up(relative_path=image_path)
 

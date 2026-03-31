@@ -3,12 +3,12 @@ name: Code formatting
 on:
   push:
     branches:
-      - master
-      - dev
+      - "*"
   pull_request:
     branches:
       - master
       - dev
+      - main
 
 jobs:
   black:

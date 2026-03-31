@@ -11,6 +11,7 @@ import re
 from .project import Project, ProjectManager
 from .data_preprocessing import resolve_up
 import psutil
+from urllib.parse import urlparse
 
 from mlflow_export_import.bulk.export_experiments import export_experiments
 from mlflow_export_import.bulk.import_experiments import import_experiments
@@ -65,11 +66,11 @@ class YOLOUltralyticsMLflowModel(PythonModel):
         logger.info(f"Loading YOLO weights from: {model_path}")
         logger.info(f"Context: {context}")
 
-        self.model = YOLO(model_path)
+        self.yolo_model = YOLO(model_path)
 
     def nn_model(self):
         """get the pytorch model from mlflow.pyfunc"""
-        return self.model.model
+        return self.yolo_model.model
 
     def predict(
         self,
@@ -90,7 +91,7 @@ class YOLOUltralyticsMLflowModel(PythonModel):
                     raise FileNotFoundError(f"the provided file {image} was not found")
 
             # Run prediction
-            results = self.model.predict(image)
+            results = self.yolo_model.predict(image)
 
             # Convert to JSON string
 
@@ -161,7 +162,7 @@ class TrainingManager:
         data_path = project.data_path.get("biigle_path") or project.data_path.get(
             "ultralytics_data_path"
         )
-        print(f"data_path:{data_path}")
+
         if not data_path:
             raise ValueError("No valid data path found in project configuration.")
 
@@ -190,14 +191,16 @@ class TrainingManager:
 
         mlflow.set_experiment(experiment_name)
 
-        model = YOLO(model_source)
+        yolo_model = YOLO(model_source)
 
         def dict_mapper(yolo_result):
 
             return re.sub(r"[(B)]", "", yolo_result)
 
         with mlflow.start_run():
-            results = model.train(data=data_path, epochs=epochs, imgsz=imgsz, **kwargs)
+            results = yolo_model.train(
+                data=data_path, epochs=epochs, imgsz=imgsz, **kwargs
+            )
             mlflow.log_param("epochs", epochs)
             mlflow.log_metrics(
                 {dict_mapper(k): v for k, v in results.results_dict.items()}
@@ -213,7 +216,7 @@ class TrainingManager:
                 artifacts={"weights": str(best_weight_path)},
                 registered_model_name=model_name,
             )
-
+        mlflow.end_run()
         data["mlflow"] = {
             "path": str(mlflowdb_path),
             "experiment_name": project_name,
@@ -292,6 +295,7 @@ class TrainingManager:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         logger.info(f"current device: {device}")
         data_path = Path(data_path).expanduser()
+        data_path = resolve_up(data_path)
         result = model.predict([{"image": str(data_path)}], params={"device": device})
         return result
 
@@ -304,3 +308,69 @@ class TrainingManager:
         if not isinstance(pytorch_model, nn.Module):
             raise TypeError(f"model {pytorch_model} is not a pytorch model")
         return pytorch_model
+
+    def model_validation(
+        self,
+        project: Project,
+        model: PyFuncModel = None,
+        model_name: str = None,
+        version: str | int = None,
+        data_path: str = None,
+        split: str = "test",
+        imgsz=640,
+        batch=8,
+    ):
+        """evaluate the model with selected data"""
+        mlflowdb = project.tracking
+        tracking_uri = f"sqlite:///{str(mlflowdb)}"
+        client = mlflow.tracking.MlflowClient(tracking_uri=tracking_uri)
+        model_name = project.model_name
+
+        if not model and model_name:
+            model = self.loading_model(
+                project=project, model_name=model_name, version=int(version)
+            )
+        elif not model and not model_name:
+            logged_models = client.get_latest_versions(name=model_name)
+            if not logged_models:
+                raise ValueError(f"No registered model found with name: {model_name}")
+
+            version = logged_models[0].version
+            model_uri = f"models:/{model_name}/{version}"
+            model = mlflow.pyfunc.load_model(model_uri)
+        if not data_path:
+            # data_path = project.data_path["ultralytics_data_path"]
+            data_path = project.data_path.get("biigle_path") or project.data_path.get(
+                "ultralytics_data_path"
+            )
+        data_path = Path(data_path).expanduser()
+        data_path = resolve_up(data_path)
+        uri = model.metadata.artifact_path
+        run_id = model.metadata.run_id
+        # Get the run object
+        run = client.get_run(model.metadata.run_id)
+        # Get the experiment ID
+        experiment_id = run.info.experiment_id
+        run_name = run.info.run_name
+        val_run_name = f"validation_{run_name}"
+
+        uri_path = Path(urlparse(uri).path)
+        model_path = uri_path / "artifacts/best.pt"
+        if not model_path.exists():
+            raise FileNotFoundError(f"Model weights not found: {model_path}")
+        yolo_model = YOLO(model_path)
+
+        with mlflow.start_run(experiment_id=experiment_id, run_name=val_run_name):
+
+            results = yolo_model.val(
+                data=str(data_path),
+                split=split,
+                imgsz=imgsz,
+                batch=batch,
+            )
+
+            metrics = results.results_dict
+            for k, v in metrics.items():
+                clean_name = f"test_{k.replace('metrics/', '').replace('(', '').replace(')', '').replace(' ', '_')}"
+                mlflow.log_metric(clean_name, float(v))
+        return metrics

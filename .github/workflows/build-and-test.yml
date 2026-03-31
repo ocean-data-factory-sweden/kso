@@ -164,10 +164,10 @@ jobs:
                 build_base_image=true
               fi
               # Build if python packages have changed
-              if grep -qF 'requirements.txt' changed.txt; then
+              if grep -qF 'containers/requirements.txt' changed.txt; then
                 build_base_image=true
               fi
-              if grep -qF "$python_requirements" changed.txt; then
+              if grep -qF "containers/$python_requirements" changed.txt; then
                 build_base_image=true
               fi
 
@@ -312,24 +312,16 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install package
-        shell: bash
-        run: |
-          python3 -m venv --system-site-packages .venv
-          echo "$PWD/.venv/bin" >> $GITHUB_PATH
-          source .venv/bin/activate
-          pip install --no-deps -e .
-          pip install --ignore-installed --no-deps pylint nbqa
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD:$PWD/src" >> $GITHUB_ENV
 
-      - name: Pylint kso_utils
+      - name: Pylint code
         shell: bash
         run: |
-          pylint kso_utils
+          pylint src/kso
 
       - name: Pylint notebooks
         if: success() || failure()
@@ -347,19 +339,11 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install package
-        shell: bash
-        run: |
-          python3 -m venv --system-site-packages .venv
-          echo "$PWD/.venv/bin" >> $GITHUB_PATH
-          source .venv/bin/activate
-          pip install --no-deps -e .
-          pip install --ignore-installed --no-deps pytest
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD:$PWD/src" >> $GITHUB_ENV
 
       - name: Pytest
         shell: bash

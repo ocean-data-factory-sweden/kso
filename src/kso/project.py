@@ -314,13 +314,14 @@ class ProjectManager:
 
             if data_path:
 
-                candidate = Path(data_path).expanduser()
-                if not candidate.is_absolute():
-                    # data_path = (project_path / candidate).resolve()
+                data_path = Path(data_path).expanduser()
+                if not data_path.is_absolute():
                     data_path = make_abs_path(
-                        relative_path=candidate, startPoint=project_path
+                        relative_path=data_path, startPoint=project_path
                     )
-                    print(f"data_path:{data_path}")
+
+                # Update multiple settings
+                settings.update({"datasets_dir": str(data_path.parent)})
             else:
                 generated_yolo_data = resolve_up(
                     "kso/src/kso/default_dataset/coco8.yaml"
@@ -347,7 +348,7 @@ class ProjectManager:
             )
 
             biigle_yaml_relative_path = make_relative_path(
-                abs_path=biigle_yaml_path, startPoint=project_path.parent
+                abs_path=biigle_yaml_path, startPoint=project_path
             )
             # data["data_path"] = {"biigle_path":str(biigle_yaml_path)}
             data["data_path"].update({"biigle_path": str(biigle_yaml_relative_path)})
@@ -417,102 +418,3 @@ class ProjectManager:
         logging.info(f"Project YAML model name updated at {yaml_path}")
 
         pprint.pp(data)
-
-    def add_ultralytics_dataset_yaml(self, data_path: str) -> str:
-        path = Path(data_path).expanduser().resolve()
-        if path.exists():
-            logging.info(f"Ultralytics data yaml {path} exist")
-        else:
-            data = {
-                "path": "coco8",
-                "train": "images/train",
-                "val": "images/val",
-                "test": "",
-                "names": {
-                    "0": "person",
-                    "1": "bicycle",
-                    "2": "car",
-                    "3": "motorcycle",
-                    "4": "airplane",
-                    "5": "bus",
-                    "6": "train",
-                    "7": "truck",
-                    "8": "boat",
-                    "9": "traffic light",
-                    "10": "fire hydrant",
-                    "11": "stop sign",
-                    "12": "parking meter",
-                    "13": "bench",
-                    "14": "bird",
-                    "15": "cat",
-                    "16": "dog",
-                    "17": "horse",
-                    "18": "sheep",
-                    "19": "cow",
-                    "20": "elephant",
-                    "21": "bear",
-                    "22": "zebra",
-                    "23": "giraffe",
-                    "24": "backpack",
-                    "25": "umbrella",
-                    "26": "handbag",
-                    "27": "tie",
-                    "28": "suitcase",
-                    "29": "frisbee",
-                    "30": "skis",
-                    "31": "snowboard",
-                    "32": "sports ball",
-                    "33": "kite",
-                    "34": "baseball bat",
-                    "35": "baseball glove",
-                    "36": "skateboard",
-                    "37": "surfboard",
-                    "38": "tennis racket",
-                    "39": "bottle",
-                    "40": "wine glass",
-                    "41": "cup",
-                    "42": "fork",
-                    "43": "knife",
-                    "44": "spoon",
-                    "45": "bowl",
-                    "46": "banana",
-                    "47": "apple",
-                    "48": "sandwich",
-                    "49": "orange",
-                    "50": "broccoli",
-                    "51": "carrot",
-                    "52": "hot dog",
-                    "53": "pizza",
-                    "54": "donut",
-                    "55": "cake",
-                    "56": "chair",
-                    "57": "couch",
-                    "58": "potted plant",
-                    "59": "bed",
-                    "60": "dining table",
-                    "61": "toilet",
-                    "62": "tv",
-                    "63": "laptop",
-                    "64": "mouse",
-                    "65": "remote",
-                    "66": "keyboard",
-                    "67": "cell phone",
-                    "68": "microwave",
-                    "69": "oven",
-                    "70": "toaster",
-                    "71": "sink",
-                    "72": "refrigerator",
-                    "73": "book",
-                    "74": "clock",
-                    "75": "vase",
-                    "76": "scissors",
-                    "77": "teddy bear",
-                    "78": "hair drier",
-                    "79": "toothbrush",
-                },
-                "download": "https://github.com/ultralytics/assets/releases/download/v0.0.0/coco8.zip",
-            }
-
-            with open(path, "w", encoding="utf-8") as d:
-                yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
-        return str(path)
