@@ -12,31 +12,46 @@ from mlflow.pyfunc import PyFuncModel
 import psutil
 from pathlib import Path
 from .data_preprocessing import resolve_up
+import math
+import torchvision.transforms as T
 
 train = TrainingManager()
 
 
 class ModelProfiler:
     def __init__(self):
-        pass
+        self.transform = T.Resize((640, 640))
+        self.batch_used = 1
 
     def model_stats(self, model, image_path, batch_size):
+
+        image_path = Path(image_path)
         if not isinstance(model, PyFuncModel):
             raise TypeError(f"model {model} is not PyFuncModel model")
+        # Iterate over the directory and load its contents into tensors
+        if image_path.is_dir():
+            all_videos, all_frames = self.discover_dir(image_path)
+            u = [
+                self.transform(torchvision.io.read_image(path=f).float() / 255.0)
+                for f in all_frames
+            ]
+            x = torch.stack(u)
+            x = x[:batch_size]
+        elif image_path.is_file:
+
+            x = torchvision.io.read_image(path=image_path)
+            x = x.float() / 255.0
+            x = x.unsqueeze(0).expand(1, -1, -1, -1)  # (batch_size, 3, H, W)
+            x = self.transform(x)
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         torch_model = train.internal_model(model).to(device).eval()
         if not isinstance(torch_model, torch.nn.Module):
             raise ValueError(f"model {torch_model} is not a nn.Module")
         torch_model.requires_grad_(False)
 
-        x = torchvision.io.read_image(path=image_path)
-        x = x.float() / 255.0
-        print(f"batch_size: {batch_size}")
-        x = x.unsqueeze(0).expand(batch_size, -1, -1, -1)  # (batch_size, 3, H, W)
-        x = torch.nn.functional.interpolate(
-            x, size=(640, 640), mode="bilinear", align_corners=False
-        )
         x = x.to(device, non_blocking=False)
+        self.batch_used = x.shape[0]
 
         macs, params = profile(torch_model, inputs=(x,), verbose=False)
         print(f"model macs: {macs:.2e}")
@@ -122,7 +137,7 @@ class ModelProfiler:
         my_device = "cuda" if torch.cuda.is_available() else "cpu"
         pytorch_model = train.internal_model(model)
         pytorch_model.eval().to(my_device)
-
+        batch_size = min(self.batch_used, batch_size)
         stats = summary(
             pytorch_model,
             input_size=(batch_size, 3, 640, 640),
@@ -143,12 +158,16 @@ class ModelProfiler:
         # print(f"Inference Memory (MB): {inference_mb:.2f}")
         return inference_mb
 
-    def memory_estimator(self, model, image_path, batch_size=16):
+    def memory_estimator(self, model, image_path, batch_size=1):
         """estimate the inference latency and the memory usage
         comenpared to the current slurm allocation"""
         image_path = Path(image_path).expanduser()
         if not image_path.is_absolute():
             image_path = resolve_up(relative_path=image_path)
+        # count the number of images and videos in a directory
+        if image_path.is_dir():
+            all_videos, all_frames = self.discover_dir(image_path)
+            num_all_videos = len(all_videos)
 
         if "SLURM_JOB_ID" in os.environ:
             ram_gb = int(os.environ["SLURM_MEM_PER_NODE"]) / 1024
@@ -158,6 +177,10 @@ class ModelProfiler:
 
         inference_mb = self.inference_memory(model, batch_size)
         latency_ms = self.model_latency_inference(model, image_path, batch_size)
+
+        # calculate the total_latency of all frames by the batch size
+        # total_latency = latency_ms * math.ceil(num_all_frames / batch_size)
+
         print(
             f"current memory allocation is {ram_gb} and the model inference estimate memory is {inference_mb} mb"
         )
@@ -165,3 +188,20 @@ class ModelProfiler:
             f"the model inference latency for the provided data {image_path} is {latency_ms} ms"
         )
         return latency_ms, inference_mb
+
+    def discover_dir(self, dir: str | Path):
+        vid_extentions = {".wmv", ".mpg", ".mov", ".avi", ".mp4"}
+        pic_extentions = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
+        dir = Path(dir).expanduser()
+        all_frames = [
+            p
+            for p in dir.iterdir()
+            if p.is_file() and p.suffix.lower() in pic_extentions
+        ]
+        all_videos = [
+            p
+            for p in dir.iterdir()
+            if p.is_file() and p.suffix.lower() in vid_extentions
+        ]
+
+        return all_videos, all_frames
