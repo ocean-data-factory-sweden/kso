@@ -14,6 +14,7 @@ from pathlib import Path
 from .data_preprocessing import resolve_up
 import math
 import torchvision.transforms as T
+import cv2
 
 train = TrainingManager()
 
@@ -22,6 +23,17 @@ class ModelProfiler:
     def __init__(self):
         self.transform = T.Resize((640, 640))
         self.batch_used = 1
+        self.vid_extentions = {".wmv", ".mpg", ".mov", ".avi", ".mp4"}
+        self.pic_extentions = {
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".tif",
+            ".tiff",
+            ".bmp",
+            ".webp",
+        }
+        self.num_batch = 1
 
     def model_stats(self, model, image_path, batch_size):
 
@@ -31,17 +43,47 @@ class ModelProfiler:
         # Iterate over the directory and load its contents into tensors
         if image_path.is_dir():
             all_videos, all_frames = self.discover_dir(image_path)
-            u = [
+            all_frames = [
                 self.transform(torchvision.io.read_image(path=f).float() / 255.0)
                 for f in all_frames
             ]
-            x = torch.stack(u)
-            x = x[:batch_size]
-        elif image_path.is_file:
+            all_videos = [
+                self.transform(video.float() / 255.0)
+                for video, _, _ in (
+                    torchvision.io.read_video(f, output_format="TCHW")
+                    for f in all_videos
+                )
+            ]
+            tensors = []
 
-            x = torchvision.io.read_image(path=image_path)
-            x = x.float() / 255.0
-            x = x.unsqueeze(0).expand(1, -1, -1, -1)  # (batch_size, 3, H, W)
+            if len(all_frames) > 0:
+                stacked_images_frames = torch.stack(all_frames)
+                tensors.append(stacked_images_frames)
+
+            if len(all_videos) > 0:
+                stacked_video_frames = torch.cat(all_videos, dim=0)
+                tensors.append(stacked_video_frames)
+
+            if len(tensors) == 0:
+                raise ValueError("No image or video data found.")
+
+            x = torch.cat(tensors, dim=0)
+
+            self.num_batch = len(x) / batch_size
+            x = x[:batch_size]
+
+        elif image_path.is_file:
+            if image_path.suffix.lower() in self.pic_extentions:
+
+                x = torchvision.io.read_image(path=image_path)
+                x = x.float() / 255.0
+                x = x.unsqueeze(0).expand(1, -1, -1, -1)  # (batch_size, 3, H, W)
+
+            elif image_path.suffix.lower() in self.vid_extentions:
+
+                x, _, _ = torchvision.io.read_video(image_path, output_format="TCHW")
+                x = x.float() / 255.0
+
             x = self.transform(x)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -54,10 +96,12 @@ class ModelProfiler:
         self.batch_used = x.shape[0]
 
         macs, params = profile(torch_model, inputs=(x,), verbose=False)
+        total_macs = macs * self.num_batch
+
         print(f"model macs: {macs:.2e}")
         print(f"model flops: {macs * 2:.2e}")
         print(f"model params: {params:.2e}")
-        return macs, params
+        return total_macs, params
 
     def image_num_indir(self, path: str):
         VALID_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
@@ -156,7 +200,7 @@ class ModelProfiler:
 
         inference_mb = inference_bytes / MB
         # print(f"Inference Memory (MB): {inference_mb:.2f}")
-        return inference_mb
+        return inference_mb * self.num_batch
 
     def memory_estimator(self, model, image_path, batch_size=1):
         """estimate the inference latency and the memory usage
@@ -190,18 +234,34 @@ class ModelProfiler:
         return latency_ms, inference_mb
 
     def discover_dir(self, dir: str | Path):
-        vid_extentions = {".wmv", ".mpg", ".mov", ".avi", ".mp4"}
-        pic_extentions = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
+
         dir = Path(dir).expanduser()
         all_frames = [
             p
             for p in dir.iterdir()
-            if p.is_file() and p.suffix.lower() in pic_extentions
+            if p.is_file() and p.suffix.lower() in self.pic_extentions
         ]
         all_videos = [
             p
             for p in dir.iterdir()
-            if p.is_file() and p.suffix.lower() in vid_extentions
+            if p.is_file() and p.suffix.lower() in self.vid_extentions
         ]
 
         return all_videos, all_frames
+
+    def count_frames(self, path, override=False):
+        # read number of frames
+        video = cv2.VideoCapture(path)
+        total = 0
+        # if the override flag is passed in, revert to the manual
+        if override:
+            while True:
+                (grabbed, frame) = video.read()
+                if not grabbed:
+                    break
+                total += 1
+        else:
+            total = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+        # release the video file pointer
+        video.release()
+        return total
