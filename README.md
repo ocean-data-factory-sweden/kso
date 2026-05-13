@@ -117,6 +117,9 @@ For local use without HPC access. Training without a GPU will be slow; smaller m
 
 **Docker**
 
+Note: The instructions below run the notebooks inside the container.
+Any changes you make will be lost when the container stops unless you save them outside the container (e.g., using a mounted volume).
+
 ```bash
 # Pull kso with a suitable backend
 docker pull ghcr.io/ocean-data-factory-sweden/kso:dev-ubuntu24.04             # CPU only
