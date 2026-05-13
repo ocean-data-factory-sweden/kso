@@ -117,13 +117,20 @@ For local use without HPC access. Training without a GPU will be slow; smaller m
 
 **Docker**
 
-> **⚠️ Note:** The Docker image may not be up to date with the current codebase. Verify it works for your use case before relying on it.
-
 ```bash
-docker pull ghcr.io/ocean-data-factory-sweden/kso:dev
-docker run --gpus all -it -p 8888:8888 ghcr.io/ocean-data-factory-sweden/kso:dev
-# Then open http://localhost:8888 in your browser
+# Pull kso with a suitable backend
+docker pull ghcr.io/ocean-data-factory-sweden/kso:dev-ubuntu24.04             # CPU only
+# docker pull ghcr.io/ocean-data-factory-sweden/kso:dev-cuda12.9-ubuntu24.04  # CUDA / NVIDIA GPUs
+# docker pull ghcr.io/ocean-data-factory-sweden/kso:dev-rocm6.4-ubuntu24.04   # ROCm / AMD GPUs
+
+# Run the notebooks
+docker run -it --rm -p 8888:8888 ghcr.io/ocean-data-factory-sweden/kso:dev-ubuntu24.04 notebooks/
+# docker run -it --rm -p 8888:8888 --gpus all ghcr.io/ocean-data-factory-sweden/kso:dev-cuda12.9-ubuntu24.04 notebooks/
+# docker run -it --rm -p 8888:8888 --device /dev/kfd --device /dev/dri ghcr.io/ocean-data-factory-sweden/kso:dev-rocm6.4-ubuntu24.04 notebooks/
+
+# Then open http://localhost:8888 in your browser and use the token printed out
 ```
+
 **pip**
 
 ```bash
