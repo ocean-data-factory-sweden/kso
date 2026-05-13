@@ -1,0 +1,42 @@
+name: Build and Test via pyproject.toml
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        # - windows-latest  # not supported, error: Filename too long during pip install
+        python-version:
+          - 3.11
+          - 3.12
+          - 3.13
+          - 3.14
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: |
+          export WHENEVER_NO_BUILD_RUST_EXT=1  # Fix compilation issues if no binary wheel available
+          pip install -e .[dev] --extra-index-url https://download.pytorch.org/whl/cpu
+
+      - name: Test
+        run: |
+          pytest -vv .
+        env:
+          WANDB_API_KEY: '${{ secrets.WANDB_API_KEY }}'
