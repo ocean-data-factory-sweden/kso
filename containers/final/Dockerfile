@@ -19,3 +19,6 @@ RUN adduser --disabled-password \
 USER ${NB_USER}
 
 WORKDIR /opt/kso
+
+ENTRYPOINT ["/opt/kso/containers/entrypoint.sh"]
+CMD []
