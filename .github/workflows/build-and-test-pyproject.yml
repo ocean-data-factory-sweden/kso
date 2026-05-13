@@ -35,8 +35,12 @@ jobs:
           export WHENEVER_NO_BUILD_RUST_EXT=1  # Fix compilation issues if no binary wheel available
           pip install -e .[dev] --extra-index-url https://download.pytorch.org/whl/cpu
 
+      # Setting PYTHONPATH is needed for kso_utils
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+
       - name: Test
         run: |
-          pytest -vv .
+          pytest -vv
         env:
           WANDB_API_KEY: '${{ secrets.WANDB_API_KEY }}'

@@ -51,7 +51,7 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["test"]
+testpaths = ["tests"]
 
 [project.optional-dependencies]
 dev = [
