@@ -118,7 +118,8 @@ For local use without HPC access. Training without a GPU will be slow; smaller m
 **Docker**
 
 Note: The instructions below run the notebooks inside the container.
-Any changes you make will be lost when the container stops unless you save them outside the container (e.g., using a mounted volume).
+Any changes you make will be lost when the container stops unless you save them outside the container
+(e.g., using a mounted volume: `-v $(pwd):/opt/kso/notebooks`).
 
 ```bash
 # Pull kso with a suitable backend
