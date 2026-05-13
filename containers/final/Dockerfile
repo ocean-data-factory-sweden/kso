@@ -16,6 +16,7 @@ RUN adduser --disabled-password \
 
 # Copy KSO
 COPY --chown=${NB_UID}:${NB_UID} . /opt/kso
+RUN chmod +x /opt/kso/containers/entrypoint.sh
 
 # Set run environment
 USER ${NB_USER}
