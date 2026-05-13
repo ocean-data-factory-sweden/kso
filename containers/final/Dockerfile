@@ -1,9 +1,6 @@
 ARG BASE_IMAGE=ghcr.io/ocean-data-factory-sweden/kso-base:latest
 FROM ${BASE_IMAGE}
 
-# Copy KSO
-COPY . /opt/kso
-
 # Set the user
 ARG NB_USER=jovyan
 ARG NB_UID=1500
@@ -16,9 +13,12 @@ RUN adduser --disabled-password \
     --gecos "Default user" \
     --uid ${NB_UID} \
     ${NB_USER}
+
+# Copy KSO
+COPY --chown=${NB_UID}:${NB_UID} . /opt/kso
+
+# Set run environment
 USER ${NB_USER}
-
 WORKDIR /opt/kso
-
 ENTRYPOINT ["/opt/kso/containers/entrypoint.sh"]
 CMD []
