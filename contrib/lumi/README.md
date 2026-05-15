@@ -37,7 +37,7 @@ The KSO Singularity container has all dependencies pre-installed. It is availabl
 /projappl/project_.../containers/kso_dev-rocm6.4-ubuntu24.04.sif
 ```
 
-> **DTO-BioFlow project users:** the container is already pulled for you, skip any container pull step.
+> **DTO-BioFlow project users:** the container is already pulled for you; skip any container pull step.
 
 If you need to pull a fresh copy yourself (change the tag if needed):
 
