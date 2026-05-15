@@ -37,7 +37,7 @@ The KSO Singularity container has all dependencies pre-installed. It is availabl
 /projappl/project_.../containers/kso_dev-rocm6.4-ubuntu24.04.sif
 ```
 
-> **DTO-BioFlow project users:** the container is already pulled for you — skip any container pull step.
+> **DTO-BioFlow project users:** the container is already pulled for you, skip any container pull step.
 
 If you need to pull a fresh copy yourself (change the tag if needed):
 
@@ -46,6 +46,25 @@ cd /scratch/project_.../$USER
 singularity pull --disable-cache \
   docker://ghcr.io/ocean-data-factory-sweden/kso:dev-rocm6.4-ubuntu24.04
 ```
+
+---
+
+## Install the kso package
+
+Run once from a LUMI terminal (SSH or the LUMI dashboard's "Compute node shell"):
+
+```bash
+export PROJECT=project_<your-id>
+export PYTHONUSERBASE="/scratch/$PROJECT/$USER/venv"
+export CONTAINER="/projappl/$PROJECT/containers/kso_dev-rocm6.4-ubuntu24.04.sif"
+export SINGULARITY_BIND="/pfs,/scratch,/projappl,/project,/flash,/appl"
+
+singularity exec $CONTAINER pip install --user --break-system-packages \
+  -e /scratch/$PROJECT/$USER/kso
+```
+
+You only run this once. Future `git pull`s in `/scratch/$PROJECT/$USER/kso` are picked up automatically thanks to the editable install (`-e`).
+After install, restart your Jupyter kernel.
 
 ---
 
@@ -61,7 +80,7 @@ Configure the following settings:
 |---------|-------|
 | Project | `project_...` |
 | Partition | `small-g` |
-| CPU cores | `1` (≤8 when using a single GPU — see [billing](https://docs.lumi-supercomputer.eu/runjobs/lumi_env/billing/#gpu-billing)) |
+| CPU cores | `1` (≤8 when using a single GPU, see [billing](https://docs.lumi-supercomputer.eu/runjobs/lumi_env/billing/#gpu-billing)) |
 | Memory (GB) | `32` (≤64 GB when using a single GPU) |
 | GPUs (MI250 GCDs) | `1` |
 | Time | `2:00:00` (adjust as needed) |
