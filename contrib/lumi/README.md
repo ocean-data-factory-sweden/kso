@@ -54,7 +54,7 @@ singularity pull --disable-cache \
 Run once from a LUMI terminal (SSH or the LUMI dashboard's "Compute node shell"):
 
 ```bash
-export PROJECT=project_<your-id>
+export PROJECT=project_...
 export PYTHONUSERBASE="/scratch/$PROJECT/$USER/venv"
 export CONTAINER="/projappl/$PROJECT/containers/kso_dev-rocm6.4-ubuntu24.04.sif"
 export SINGULARITY_BIND="/pfs,/scratch,/projappl,/project,/flash,/appl"
