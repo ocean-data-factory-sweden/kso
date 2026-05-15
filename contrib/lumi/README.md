@@ -59,7 +59,7 @@ export PYTHONUSERBASE="/scratch/$PROJECT/$USER/venv"
 export CONTAINER="/projappl/project_.../containers/kso_dev-rocm6.4-ubuntu24.04.sif"
 export SINGULARITY_BIND="/pfs,/scratch,/projappl,/project,/flash,/appl"
 
-singularity exec $CONTAINER pip install --user --break-system-packages \
+singularity exec $CONTAINER python3 -m pip install --user --break-system-packages \
   -e /scratch/$PROJECT/$USER/kso
 ```
 
