@@ -56,7 +56,7 @@ Run once from a LUMI terminal (SSH or the LUMI dashboard's "Compute node shell")
 ```bash
 export PROJECT=project_...
 export PYTHONUSERBASE="/scratch/$PROJECT/$USER/venv"
-export CONTAINER="/projappl/$PROJECT/containers/kso_dev-rocm6.4-ubuntu24.04.sif"
+export CONTAINER="/projappl/project_.../containers/kso_dev-rocm6.4-ubuntu24.04.sif"
 export SINGULARITY_BIND="/pfs,/scratch,/projappl,/project,/flash,/appl"
 
 singularity exec $CONTAINER pip install --user --break-system-packages \
