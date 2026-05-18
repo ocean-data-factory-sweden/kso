@@ -76,10 +76,12 @@ class YOLOUltralyticsMLflowModel(PythonModel):
         self,
         context,
         model_input: List[Union[pd.DataFrame, np.ndarray, List[Any], Dict[str, Any]]],
-        params: dict[str, Any] | None = None
+        params: dict[str, Any] | None = None,
     ):
-        params = params or {} #if params is None it defaults to empty dict and dideo stride default to 1.
-        vid_stride=params.pop("vid_stride",1)
+        params = (
+            params or {}
+        )  # if params is None it defaults to empty dict and dideo stride default to 1.
+        vid_stride = params.pop("vid_stride", 1)
         output = []
         for item in model_input:
 
@@ -96,12 +98,8 @@ class YOLOUltralyticsMLflowModel(PythonModel):
 
             # Run prediction
 
-            results = self.yolo_model.predict(
-                image,
-                vid_stride=vid_stride,
-                **params
-                )
-            
+            results = self.yolo_model.predict(image, vid_stride=vid_stride, **params)
+
             # logger.info(f"predict vid_stride: {vid_stride}")
             # logger.info(f"predict results: {len(results)}")
             # logger.info(f"predict paramter: {params}")
@@ -110,7 +108,7 @@ class YOLOUltralyticsMLflowModel(PythonModel):
 
             for idx, result in enumerate(results):
                 result_dict = {
-                    "frame_number":idx * vid_stride,
+                    "frame_number": idx * vid_stride,
                     "boxes": (
                         result.boxes.xyxy.cpu().numpy().tolist()
                         if result.boxes is not None and result.boxes.xyxy is not None
@@ -226,24 +224,27 @@ class TrainingManager:
 
             # Mock input, output, and parameters
             sample_input = [{"image": "path/to/sample_video_or_image.mp4"}]
-            
+
             # This matches the exact format your predict() method returns
-            sample_output = [{
-                "frame_number": 0,
-                "boxes": [[0.0, 0.0, 100.0, 100.0]],
-                "plot": [],
-                "scores": [0.95],
-                "classes": [0],
-                "names": {0: "person"},
-                "shape": [640, 640]
-            }]
-            sample_params = {"vid_stride": 10, "device": "cpu"}                 
-            
+            sample_output = [
+                {
+                    "frame_number": 0,
+                    "boxes": [[0.0, 0.0, 100.0, 100.0]],
+                    "plot": [],
+                    "scores": [0.95],
+                    "classes": [0],
+                    "names": {0: "person"},
+                    "shape": [640, 640],
+                }
+            ]
+            sample_params = {"vid_stride": 10, "device": "cpu"}
+
             from mlflow.models.signature import infer_signature
+
             signature = infer_signature(
-                model_input=sample_input, 
-                model_output=sample_output, 
-                params=sample_params
+                model_input=sample_input,
+                model_output=sample_output,
+                params=sample_params,
             )
 
             mlflow.pyfunc.log_model(
@@ -252,7 +253,7 @@ class TrainingManager:
                 artifacts={"weights": str(best_weight_path)},
                 registered_model_name=model_name,
                 input_example=(sample_input, sample_params),
-                signature=signature
+                signature=signature,
             )
         mlflow.end_run()
         data["mlflow"] = {
@@ -325,7 +326,7 @@ class TrainingManager:
         model = mlflow.pyfunc.load_model(model_uri)
         return model
 
-    def model_inference(self, model: PyFuncModel, data_path: str, vid_stride:int):
+    def model_inference(self, model: PyFuncModel, data_path: str, vid_stride: int):
         if not isinstance(model, PyFuncModel):
             raise TypeError(f"model {model} must be an mlflow pyfunc model.")
         if not isinstance(data_path, str):
@@ -334,7 +335,10 @@ class TrainingManager:
         logger.info(f"current device: {device}")
         data_path = Path(data_path).expanduser()
         data_path = resolve_up(data_path)
-        result = model.predict([{"image": str(data_path)}], params={"device": str(device), "vid_stride":vid_stride})
+        result = model.predict(
+            [{"image": str(data_path)}],
+            params={"device": str(device), "vid_stride": vid_stride},
+        )
         return result
 
     def internal_model(self, model: PyFuncModel):
