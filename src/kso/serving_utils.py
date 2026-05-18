@@ -400,7 +400,7 @@ class MLflowServerManager:
         return img
 
     def save_predictions(
-        self, project: Project, predictions: List, save_dir: str = None
+        self, project: Project, predictions: List, save_dir: str = None, output_format= "frames" # or "csv"
     ) -> Path:
         """
         save the predictions created by the model inference
@@ -427,8 +427,27 @@ class MLflowServerManager:
                 break
             idx += 1
 
-        for i, pred in enumerate(predictions):
-            cv2.imwrite(f"{new_dir}/annotated_{i}.jpg", pred["plot"])
+        if output_format=="frames":
+            for i, pred in enumerate(predictions):
+                cv2.imwrite(f"{new_dir}/annotated_{i}.jpg", pred["plot"])
+        elif output_format=="csv":
+            detections=[]
+            for prediction in predictions:
+                for b, cf, c ,fr in zip(prediction["boxes"], prediction["scores"], prediction["classes"],prediction["frame_number"]):
+                    detections.append(
+                        {
+                            "frame": fr,
+                            "class_name": prediction[0]["names"][c],
+                            "confidence": round(float(cf), 4),
+                            "x1": round(float(b[0]), 1),
+                            "y1": round(float(b[1]), 1),
+                            "x2": round(float(b[2]), 1),
+                            "y2": round(float(b[3]), 1),
+                        }
+                    )
+            pd.DataFrame(detections).to_csv(
+                new_dir, index=False
+            )
         logging.info(f"Saving inference results to: {new_dir}")
 
     def get_registered_models(self, project: Project) -> pd.DataFrame:
