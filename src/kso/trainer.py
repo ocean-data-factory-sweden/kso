@@ -64,7 +64,7 @@ class YOLOUltralyticsMLflowModel(PythonModel):
         model_path = context.artifacts["weights"]
 
         logger.info(f"Loading YOLO weights from: {model_path}")
-        logger.info(f"Context: {context}")
+        # logger.info(f"Context: {context}")
 
         self.yolo_model = YOLO(model_path)
 
