@@ -437,6 +437,11 @@ class MLflowServerManager:
         elif output_format == "csv":
             detections = []
             for prediction in predictions:
+                # get the fps of the current video
+                cap = cv2.VideoCapture(prediction["file_name"])
+                fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+                ts = int(prediction["frame_number"]) / fps
+
                 for b, cf, c in zip(
                     prediction["boxes"],
                     prediction["scores"],
@@ -444,8 +449,13 @@ class MLflowServerManager:
                 ):
                     detections.append(
                         {
-                            "file_name": prediction["file_name"],
+                            "file_name": (
+                                Path(prediction["file_name"]).name
+                                if prediction["file_name"]
+                                else ""
+                            ),
                             "frame": prediction["frame_number"],
+                            "timestamp_s": round(ts, 3),
                             "class_name": prediction["names"][c],
                             "confidence": round(float(cf), 4),
                             "x1": round(float(b[0]), 1),

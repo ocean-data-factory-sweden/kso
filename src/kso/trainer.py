@@ -109,7 +109,7 @@ class YOLOUltralyticsMLflowModel(PythonModel):
             for idx, result in enumerate(results):
                 result_dict = {
                     "frame_number": idx * vid_stride,
-                    "file_name": Path(result.path).name if result.path else "",
+                    "file_name": result.path or "",
                     "boxes": (
                         result.boxes.xyxy.cpu().numpy().tolist()
                         if result.boxes is not None and result.boxes.xyxy is not None
