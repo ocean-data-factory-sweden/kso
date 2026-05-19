@@ -444,6 +444,7 @@ class MLflowServerManager:
                 ):
                     detections.append(
                         {
+                            "file_name": prediction["file_name"],
                             "frame": prediction["frame_number"],
                             "class_name": prediction["names"][c],
                             "confidence": round(float(cf), 4),

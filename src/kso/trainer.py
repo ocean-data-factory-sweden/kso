@@ -12,7 +12,7 @@ from .project import Project, ProjectManager
 from .data_preprocessing import resolve_up
 import psutil
 from urllib.parse import urlparse
-
+from mlflow.models.signature import infer_signature
 from mlflow_export_import.bulk.export_experiments import export_experiments
 from mlflow_export_import.bulk.import_experiments import import_experiments
 
@@ -109,6 +109,7 @@ class YOLOUltralyticsMLflowModel(PythonModel):
             for idx, result in enumerate(results):
                 result_dict = {
                     "frame_number": idx * vid_stride,
+                    "file_name": Path(result.path).name if result.path else "",
                     "boxes": (
                         result.boxes.xyxy.cpu().numpy().tolist()
                         if result.boxes is not None and result.boxes.xyxy is not None
@@ -229,6 +230,7 @@ class TrainingManager:
             sample_output = [
                 {
                     "frame_number": 0,
+                    "file_name": "name",
                     "boxes": [[0.0, 0.0, 100.0, 100.0]],
                     "plot": [],
                     "scores": [0.95],
@@ -238,8 +240,6 @@ class TrainingManager:
                 }
             ]
             sample_params = {"vid_stride": 10, "device": "cpu"}
-
-            from mlflow.models.signature import infer_signature
 
             signature = infer_signature(
                 model_input=sample_input,
