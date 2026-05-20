@@ -22,7 +22,7 @@ from collections import defaultdict
 import json
 import shutil
 
-
+settings.reset()
 os.environ["MLFLOW_TRACKING_URI"] = "http://your-server:5000"
 os.environ["MIOPEN_DEBUG_DISABLE_FIND_DB"] = "1"
 os.environ["MIOPEN_DISABLE_CACHE"] = "1"
@@ -307,8 +307,8 @@ class ProjectManager:
             if not dataset_dir.exists():
                 raise FileNotFoundError(f"{dataset_dir} not found")
         if not dataset_dir:
-            dataset_dir = project_path / "Dataset"
-            dataset_dir.mkdir(parents=True, exist_ok=True)
+            dataset_dir = project_path
+            # dataset_dir.mkdir(parents=True, exist_ok=True)
 
         if data_type == "yolo_dataset":
 
@@ -319,7 +319,7 @@ class ProjectManager:
                     data_path = make_abs_path(
                         relative_path=data_path, startPoint=project_path
                     )
-
+                    data_path = Path(data_path)
                 # Update multiple settings
                 settings.update({"datasets_dir": str(data_path.parent)})
             else:
@@ -387,16 +387,23 @@ class ProjectManager:
         if model_path and model_path.endswith(".pt"):
             candidate = Path(model_path).expanduser()
             if candidate.is_absolute():
-                model_trail = candidate
+                model_trail = make_relative_path(
+                    abs_path=candidate, startPoint=project_path
+                )
                 """update project instance with provided model or last added model"""
                 project.model_path = model_trail
             else:
-                model_trail_path = (project_path / project_name / candidate).resolve()
-                model_trail = make_relative_path(
-                    abs_path=model_trail_path, startPoint=project_path
-                )
+                if candidate.name == str(candidate):
+                    model_trail_path = (
+                        project_path / project_name / candidate
+                    ).resolve()
+                    model_trail = make_relative_path(
+                        abs_path=model_trail_path, startPoint=project_path
+                    )
+                else:
+                    model_trail = candidate
                 """update project instance with provided model or last added model"""
-                project.model_path = model_trail_path
+                project.model_path = model_trail
 
             """CHECK IF THE MODEL ALREADY ADDED"""
             if str(model_trail) in model_paths:
