@@ -22,7 +22,7 @@ from collections import defaultdict
 import json
 import shutil
 
-settings.reset()
+# settings.reset()
 os.environ["MLFLOW_TRACKING_URI"] = "http://your-server:5000"
 os.environ["MIOPEN_DEBUG_DISABLE_FIND_DB"] = "1"
 os.environ["MIOPEN_DISABLE_CACHE"] = "1"
@@ -68,6 +68,7 @@ class ProjectManager:
         metadata: str = None,
     ) -> Project:
         """Create a YAML file describing a KSO project."""
+        settings.reset()
         # user mistakes.
         if not project_name or not isinstance(project_name, str):
             raise ValueError(f"{project_name} must be a non-empty string.")
@@ -170,7 +171,6 @@ class ProjectManager:
         model_path: str = None,
     ):
         """load an existing project"""
-
         if not yaml_path or not isinstance(yaml_path, (str, Path)):
             raise ValueError(f"{yaml_path} must be non-empty string or Path")
         if model_name and not isinstance(model_name, str):
