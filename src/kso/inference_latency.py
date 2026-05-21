@@ -43,34 +43,37 @@ class ModelProfiler:
         # Iterate over the directory and load its contents into tensors
         if image_path.is_dir():
             all_videos, all_frames = self.discover_dir(image_path)
-            all_frames = [
-                self.transform(torchvision.io.read_image(path=f).float() / 255.0)
-                for f in all_frames
-            ]
-            all_videos = [
-                self.transform(video.float() / 255.0)
-                for video, _, _ in (
-                    torchvision.io.read_video(f, output_format="TCHW")
-                    for f in all_videos
-                )
-            ]
+            num_frames_all_videos = sum(
+                [self.count_frames(i) for i in all_videos]
+            )  # get the number of frames from all the videos provided
+            self.num_batch = (num_frames_all_videos + len(all_frames)) / batch_size
+
             tensors = []
+            for i in all_frames:
+                img = torchvision.io.read_image(path=i).float() / 255.0
+                img = self.transform(img)
+                tensors.append(img)
 
-            if len(all_frames) > 0:
-                stacked_images_frames = torch.stack(all_frames)
-                tensors.append(stacked_images_frames)
+                if len(tensors) >= batch_size:
+                    break
+            if len(tensors) < batch_size:
 
-            if len(all_videos) > 0:
-                stacked_video_frames = torch.cat(all_videos, dim=0)
-                tensors.append(stacked_video_frames)
+                for i in all_videos:
+                    video, _, _ = torchvision.io.read_video(i, output_format="TCHW")
+                    video = video.float() / 255.0
+                    for frame in video:
 
-            if len(tensors) == 0:
-                raise ValueError("No image or video data found.")
+                        frame = self.transform(frame)
 
-            x = torch.cat(tensors, dim=0)
+                        tensors.append(frame)
 
-            self.num_batch = len(x) / batch_size
-            x = x[:batch_size]
+                        if len(tensors) >= batch_size:
+                            break
+
+                    if len(tensors) >= batch_size:
+                        break
+
+            x = torch.stack(tensors)
 
         elif image_path.is_file:
             if image_path.suffix.lower() in self.pic_extentions:
