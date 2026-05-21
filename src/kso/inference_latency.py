@@ -75,7 +75,7 @@ class ModelProfiler:
 
             x = torch.stack(tensors)
 
-        elif image_path.is_file:
+        elif image_path.is_file():
             if image_path.suffix.lower() in self.pic_extentions:
 
                 x = torchvision.io.read_image(path=image_path)
