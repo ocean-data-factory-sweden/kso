@@ -203,7 +203,7 @@ class ModelProfiler:
 
         inference_mb = inference_bytes / MB
         # print(f"Inference Memory (MB): {inference_mb:.2f}")
-        return inference_mb * self.num_batch
+        return inference_mb
 
     def memory_estimator(self, model, image_path, batch_size=1):
         """estimate the inference latency and the memory usage
