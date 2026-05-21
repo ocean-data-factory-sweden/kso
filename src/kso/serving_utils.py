@@ -435,13 +435,21 @@ class MLflowServerManager:
             for i, pred in enumerate(predictions):
                 cv2.imwrite(f"{new_dir}/annotated_{i}.jpg", pred["plot"])
         elif output_format == "csv":
+            #caching the FPS for each unique file_name
+            fps_cache = {}
             detections = []
             for prediction in predictions:
                 # get the fps of the current video
-                cap = cv2.VideoCapture(prediction["file_name"])
-                fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-                ts = int(prediction["frame_number"]) / fps
+                file_name = prediction["file_name"]
+                if file_name not in fps_cache:
+                        
+                    cap = cv2.VideoCapture(file_name)
+                    fps_cache[file_name] = cap.get(cv2.CAP_PROP_FPS) or 30.0
+                    cap.release()
 
+                fps = fps_cache[file_name]
+                ts = int(prediction["frame_number"]) / fps
+                    
                 for b, cf, c in zip(
                     prediction["boxes"],
                     prediction["scores"],
