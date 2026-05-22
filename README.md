@@ -17,25 +17,11 @@ The KSO System is an open-source machine learning framework for underwater video
 
 ## Quick Start
 
-### 1) Clone the repository
+### 1) Choose your environment
 
-```bash
-git clone -b dev https://github.com/ocean-data-factory-sweden/kso.git
-cd kso
-```
+See [installation](#installation).
 
-### 2) Choose your environment
-
-**LUMI** (recommended): see [`contrib/lumi/README.md`](./contrib/lumi/README.md) for container setup and Jupyter session configuration.
-
-OR **Local development** (best effort)
-
-```bash
-pip install -r requirements.txt
-jupyter lab
-```
-
-### 3) Run the notebooks
+### 2) Run the notebooks
 
 Use the table below to choose the first stage that matches what you already have.
 
@@ -91,7 +77,7 @@ Practical guidance:
 
 ### System requirements
 
-- **Minimum**: Python 3.12, 16 GB RAM, ≈10 GB free disk space.
+- **Minimum**: Python 3.11, 16 GB RAM, ≈10 GB free disk space.
 - **Recommended**: CUDA/ROCm-capable GPU (≥8 GB VRAM) and access to an HPC system (e.g. LUMI).
 
 ### Option 1 — LUMI (recommended)
@@ -135,13 +121,24 @@ docker run -it --rm -p 8888:8888 ghcr.io/ocean-data-factory-sweden/kso:dev-ubunt
 # Then open http://localhost:8888 in your browser and use the token printed out
 ```
 
-**pip**
+**pip in venv**
 
 ```bash
+# Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Fetch the repository
 git clone -b dev https://github.com/ocean-data-factory-sweden/kso.git
 cd kso
-pip install -r requirements.txt
-jupyter lab
+
+# Install kso with a suitable backend
+pip install -e .[dev] --extra-index-url https://download.pytorch.org/whl/cpu        # CPU only
+# pip install -e .[dev] --extra-index-url https://download.pytorch.org/whl/cu129    # CUDA / NVIDIA GPUs
+# pip install -e .[dev] --extra-index-url https://download.pytorch.org/whl/rocm6.4  # ROCm / AMD GPUs
+
+# Run the notebooks
+jupyter lab notebooks/
 ```
 
 ## Developer Instructions
