@@ -27,18 +27,20 @@ def test_train_models(needs_wandb):
     output_dir = Path(mlp.last_train_dir)
 
     # Test if the folder is created and contains the files is should have after training
-    assert output_dir.is_dir(), (
-        f"Successful training should create output dir '{output_dir}', but it is missing."
-    )
-    assert output_dir.joinpath("weights").is_dir(), (
-        f"Successful training should create '{output_dir / 'weights'}', but it is missing."
-    )
-    assert output_dir.joinpath("weights", "best.pt").is_file(), (
+    assert (
+        output_dir.is_dir()
+    ), f"Successful training should create output dir '{output_dir}', but it is missing."
+    assert output_dir.joinpath(
+        "weights"
+    ).is_dir(), f"Successful training should create '{output_dir / 'weights'}', but it is missing."
+    assert output_dir.joinpath(
+        "weights", "best.pt"
+    ).is_file(), (
         f"Missing trained model weights at '{output_dir / 'weights' / 'best.pt'}'."
     )
-    assert output_dir.joinpath("results.csv").is_file(), (
-        f"Missing training metrics file at '{output_dir / 'results.csv'}'."
-    )
+    assert output_dir.joinpath(
+        "results.csv"
+    ).is_file(), f"Missing training metrics file at '{output_dir / 'results.csv'}'."
 
     # Remove the training results so that we start with a clean slate next time.
     shutil.rmtree(output_dir)
