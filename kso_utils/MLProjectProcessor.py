@@ -154,6 +154,9 @@ class MLProjectProcessor(ProjectProcessor):
                 batch=int(batch_size),
                 imgsz=img_size,
             )
+            # Keep the resolved training output directory because Ultralytics may
+            # place runs under a configured runs_dir on CI runners.
+            self.last_train_dir = Path(model.trainer.save_dir)
         except Exception as e:
             self.registry_utils.close_run()
             raise AssertionError(f"Training failed due to: {e}")
