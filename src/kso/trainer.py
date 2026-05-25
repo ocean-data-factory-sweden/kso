@@ -78,9 +78,7 @@ class YOLOUltralyticsMLflowModel(PythonModel):
         model_input: List[Union[pd.DataFrame, np.ndarray, List[Any], Dict[str, Any]]],
         params: dict[str, Any] | None = None,
     ):
-        params = (
-            params or {}
-        )  # if params is None it defaults to empty dict and dideo stride default to 1.
+        params = dict(params) if params else {} # if params is None it defaults to empty dict and stride default to 1.
         vid_stride = params.pop("vid_stride", 1)
         output = []
         for item in model_input:
