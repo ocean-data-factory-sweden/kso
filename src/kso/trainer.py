@@ -252,7 +252,7 @@ class TrainingManager:
                 python_model=YOLOUltralyticsMLflowModel(),
                 artifacts={"weights": str(best_weight_path)},
                 registered_model_name=model_name,
-                input_example=(sample_input, sample_params),
+                input_example=sample_input,
                 signature=signature,
             )
         mlflow.end_run()
