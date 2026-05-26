@@ -397,7 +397,7 @@ class ProjectManager:
                 abs_path=candidate, startPoint=project_path
             )
             """update project instance with provided model or last added model"""
-            project.model_path = model_trail
+            project.model_path = str(model_trail)
 
             """CHECK IF THE MODEL ALREADY ADDED"""
             if str(model_trail) in model_paths:
