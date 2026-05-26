@@ -46,8 +46,9 @@ class ModelProfiler:
             num_frames_all_videos = sum(
                 [self.count_frames(i) for i in all_videos]
             )  # get the number of frames from all the videos provided
-            self.num_batch = (num_frames_all_videos + len(all_frames)) / batch_size
-
+            self.num_batch = math.ceil(
+                (num_frames_all_videos + len(all_frames)) / batch_size
+            )
             tensors = []
             for i in all_frames:
                 img = torchvision.io.read_image(path=i).float() / 255.0
