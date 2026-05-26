@@ -386,24 +386,18 @@ class ProjectManager:
         model_paths = [m["model_path"] for m in data["models"]]
         if model_path and model_path.endswith(".pt"):
             candidate = Path(model_path).expanduser()
-            if candidate.is_absolute():
-                model_trail = make_relative_path(
-                    abs_path=candidate, startPoint=project_path
-                )
-                """update project instance with provided model or last added model"""
-                project.model_path = model_trail
-            else:
+
+            if not candidate.is_absolute():
                 if candidate.name == str(candidate):
-                    model_trail_path = (
-                        project_path / project_name / candidate
-                    ).resolve()
-                    model_trail = make_relative_path(
-                        abs_path=model_trail_path, startPoint=project_path
-                    )
+                    candidate = (project_path / project_name / candidate).resolve()
                 else:
                     model_trail = candidate
-                """update project instance with provided model or last added model"""
-                project.model_path = model_trail
+
+            model_trail = make_relative_path(
+                abs_path=candidate, startPoint=project_path
+            )
+            """update project instance with provided model or last added model"""
+            project.model_path = model_trail
 
             """CHECK IF THE MODEL ALREADY ADDED"""
             if str(model_trail) in model_paths:
