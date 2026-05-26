@@ -99,9 +99,10 @@ class publish_zenodo:
                 "creators": [{"name": creators_name, "affiliation": affiliation}],
             }
         }
+        deposition_id = id if id else self.id
 
         r = requests.put(
-            f"https://zenodo.org/api/deposit/depositions/{self.id}",
+            f"https://zenodo.org/api/deposit/depositions/{deposition_id}",
             json=metadata,
             headers={"Authorization": f"Bearer {self.ACCESS_TOKEN}"},
         )
