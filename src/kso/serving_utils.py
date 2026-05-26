@@ -400,7 +400,11 @@ class MLflowServerManager:
         return img
 
     def save_predictions(
-        self, project: Project, predictions: List, save_dir: str = None
+        self,
+        project: Project,
+        predictions: List,
+        save_dir: str = None,
+        output_format="frames",  # or "csv"
     ) -> Path:
         """
         save the predictions created by the model inference
@@ -427,9 +431,55 @@ class MLflowServerManager:
                 break
             idx += 1
 
-        for i, pred in enumerate(predictions):
-            cv2.imwrite(f"{new_dir}/annotated_{i}.jpg", pred["plot"])
+        if output_format == "frames":
+            for i, pred in enumerate(predictions):
+                cv2.imwrite(f"{new_dir}/annotated_{i}.jpg", pred["plot"])
+        elif output_format == "csv":
+            # caching the FPS for each unique file_name
+            fps_cache = {}
+            detections = []
+            for prediction in predictions:
+                # get the fps of the current video
+                file_name = prediction["file_name"]
+                if file_name not in fps_cache:
+
+                    cap = cv2.VideoCapture(file_name)
+                    fps_cache[file_name] = cap.get(cv2.CAP_PROP_FPS) or 30.0
+                    cap.release()
+
+                fps = fps_cache[file_name]
+                ts = int(prediction["frame_number"]) / fps
+
+                for b, cf, c in zip(
+                    prediction["boxes"],
+                    prediction["scores"],
+                    prediction["classes"],
+                ):
+                    detections.append(
+                        {
+                            "file_name": (
+                                Path(prediction["file_name"]).name
+                                if prediction["file_name"]
+                                else ""
+                            ),
+                            "frame": prediction["frame_number"],
+                            "timestamp_s": round(ts, 3),
+                            "class_name": prediction["names"][c],
+                            "confidence": round(float(cf), 4),
+                            "x1": round(float(b[0]), 1),
+                            "y1": round(float(b[1]), 1),
+                            "x2": round(float(b[2]), 1),
+                            "y2": round(float(b[3]), 1),
+                        }
+                    )
+            pd.DataFrame(detections).to_csv(f"{new_dir}/annotations.csv", index=False)
+        else:
+            raise ValueError(
+                f"Unsupported output_format: {output_format}. Expected 'frames' or 'csv'."
+            )
+
         logging.info(f"Saving inference results to: {new_dir}")
+        return new_dir
 
     def get_registered_models(self, project: Project) -> pd.DataFrame:
         """

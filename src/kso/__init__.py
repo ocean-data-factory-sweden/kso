@@ -16,7 +16,10 @@ from .inference_latency import (
     ModelProfiler,
 )
 
+from .publish_model_zenodo import publish_zenodo
+
 __all__ = [
+    "publish_zenodo",
     "ProjectManager",
     "TrainingManager",
     "MLflowServerManager",

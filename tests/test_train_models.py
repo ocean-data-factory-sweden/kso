@@ -13,12 +13,7 @@ def test_train_models(needs_wandb):
     This test runs train_models to see if it runs. It also checks if the correct files are created.
     The WandB logging is not tested, this is partly done in the test of the registry.
     """
-    # Make sure that the results folder does not exist yet before this test
-    assert not Path(
-        "template_project/test_template"
-    ).is_dir(), "The folder 'template_project/test_template' already exits. This must not exist at the beginning of the test. Delete it."
-
-    _ = train_models(
+    mlp = train_models(
         project_name="Template project",
         data_path="ml-template-data",
         exp_name="test_template",
@@ -29,19 +24,23 @@ def test_train_models(needs_wandb):
         img_h=128,
     )
 
+    output_dir = Path(mlp.last_train_dir)
+
     # Test if the folder is created and contains the files is should have after training
-    assert Path(
-        "template_project/test_template"
-    ).is_dir(), "Successfull training creates the folder 'template_project/test_template'. This is missing, so training failed."
-    assert Path(
-        "template_project/test_template/weights"
-    ).is_dir(), "Successfull training saves the models in the folder 'template_project/test_template/weight'. This is missing, so training failed."
-    assert Path(
-        "template_project/test_template/weights/best.pt"
-    ).is_file(), "The file 'template_project/test_template/weight/best.pt' is missing. Something must have gone wrong."
-    assert Path(
-        "template_project/test_template/results.csv"
-    ).is_file(), "The file 'template_project/test_template/results.csv' is missing. Something must have gone wrong."
+    assert (
+        output_dir.is_dir()
+    ), f"Successful training should create output dir '{output_dir}', but it is missing."
+    assert output_dir.joinpath(
+        "weights"
+    ).is_dir(), f"Successful training should create '{output_dir / 'weights'}', but it is missing."
+    assert output_dir.joinpath(
+        "weights", "best.pt"
+    ).is_file(), (
+        f"Missing trained model weights at '{output_dir / 'weights' / 'best.pt'}'."
+    )
+    assert output_dir.joinpath(
+        "results.csv"
+    ).is_file(), f"Missing training metrics file at '{output_dir / 'results.csv'}'."
 
     # Remove the training results so that we start with a clean slate next time.
-    shutil.rmtree("template_project/test_template")
+    shutil.rmtree(output_dir)
