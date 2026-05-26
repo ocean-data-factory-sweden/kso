@@ -70,6 +70,11 @@ class publish_zenodo:
             # headers=headers,
             headers=headers,
         )
+        status_code = r.status_code
+        # handling API failure
+        if not (200 <= status_code < 300):
+            raise Exception(f"draft didn't start, status_code :{status_code}")
+
         response = r.json()
         return response["id"], response["links"]["bucket"]
 
