@@ -473,7 +473,13 @@ class MLflowServerManager:
                         }
                     )
             pd.DataFrame(detections).to_csv(f"{new_dir}/annotations.csv", index=False)
+        else:
+            raise ValueError(
+                f"Unsupported output_format: {output_format}. Expected 'frames' or 'csv'."
+            )
+
         logging.info(f"Saving inference results to: {new_dir}")
+        return new_dir
 
     def get_registered_models(self, project: Project) -> pd.DataFrame:
         """
