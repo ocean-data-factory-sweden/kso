@@ -80,12 +80,12 @@ class ModelProfiler:
 
                 x = torchvision.io.read_image(path=image_path)
                 x = x.float() / 255.0
-                x = x.unsqueeze(0).expand(1, -1, -1, -1)  # (batch_size, 3, H, W)
+                x = x.unsqueeze(0)  # (batch_size, 3, H, W)
 
             elif image_path.suffix.lower() in self.vid_extentions:
 
                 x, _, _ = torchvision.io.read_video(image_path, output_format="TCHW")
-                x = x.float() / 255.0
+                x = x[:batch_size].float() / 255.0  # control batch size for videos
 
             x = self.transform(x)
 
