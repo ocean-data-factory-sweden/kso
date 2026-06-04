@@ -212,7 +212,7 @@ class TrainingManager:
 
         with mlflow.start_run():
             results = yolo_model.train(
-                data=data_path, epochs=epochs, imgsz=imgsz, **kwargs
+                data=data_path, name=model_name, epochs=epochs, imgsz=imgsz, **kwargs
             )
             mlflow.log_param("epochs", epochs)
             mlflow.log_metrics(

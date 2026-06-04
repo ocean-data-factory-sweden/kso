@@ -472,7 +472,7 @@ class MLflowServerManager:
                             "y2": round(float(b[3]), 1),
                         }
                     )
-            pd.DataFrame(detections).to_csv(f"{new_dir}/annotations.csv", index=False)
+            pd.DataFrame(detections).to_csv(f"{new_dir}/detections.csv", index=False)
         else:
             raise ValueError(
                 f"Unsupported output_format: {output_format}. Expected 'frames' or 'csv'."
