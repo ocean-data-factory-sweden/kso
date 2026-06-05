@@ -158,6 +158,9 @@ class TrainingManager:
         if change_umask:
             set_group_writable_umask()
 
+        # ensure Ultralytics MLflow Callbacks are False
+        settings.update({"mlflow": False})
+
         project_name = project.project_name
         model_name = project.model_name
         model_source = project.model_path
@@ -247,7 +250,7 @@ class TrainingManager:
                 params=sample_params,
             )
 
-            mlflow.pyfunc.log_model(
+            model_info = mlflow.pyfunc.log_model(
                 artifact_path="model",
                 python_model=YOLOUltralyticsMLflowModel(),
                 artifacts={"weights": str(best_weight_path)},
@@ -255,6 +258,12 @@ class TrainingManager:
                 input_example=sample_input,
                 signature=signature,
             )
+            # copy model into run artifacts
+            local_model_dir = mlflow.artifacts.download_artifacts(
+                artifact_uri=model_info.model_uri
+            )
+
+            mlflow.log_artifacts(local_model_dir, artifact_path="model")
         mlflow.end_run()
         data["mlflow"] = {
             "path": str(mlflowdb_path),
