@@ -48,7 +48,7 @@ class Project:
 class ProjectManager:
 
     def __init__(self):
-        pass
+        self.lumi = self.is_lumi()
 
     def sanitized_name(self, project_name: str):
         sanitized = "".join(
@@ -277,7 +277,7 @@ class ProjectManager:
     def add_data(
         self,
         project: Project,
-        data_type: str,
+        data_type: str = "yolo_dataset",
         data_path: str = None,
         images_root: str = None,
         dataset_dir: str | None = None,
@@ -358,6 +358,44 @@ class ProjectManager:
         logging.info(f"Project YAML data path updated at {yaml_path}")
         pprint.pp(data)
 
+    def is_lumi(self):
+        return os.environ.get("SLURM_CLUSTER_NAME") == "lumi"
+
+    def home_path_synthesizer(self):
+        if self.is_lumi():
+            self.home_path = (
+                Path("/scratch") / os.environ["PROJECT"] / os.environ["USER"]
+            )
+        else:
+            self.home_path = Path.cwd().parents[2]
+        return self.home_path
+
+    def preprocess_Biigle(self, images_root, data_path, dataset_dir=None):
+
+        if not images_root or not isinstance(images_root, str):
+            raise ValueError(f"{images_root} must be a non empty string")
+        if not data_path or not isinstance(data_path, str):
+            raise ValueError(f"{data_path} must be a non empty string")
+        if not dataset_dir:
+            home_path = self.home_path_synthesizer()
+            dataset_dir = home_path / "datasets"
+
+            idx = 0
+            while True:
+                suffix = "" if idx == 0 else f"_{idx}"
+                new_dir = dataset_dir / f"ifremer_sled_2026{suffix}"
+                if not new_dir.exists():
+                    new_dir.mkdir(parents=True)
+                    break
+                idx += 1
+
+        biigle_yaml_path = preprocess_biigle_csv(
+            biigle_csv_path=data_path,
+            images_root=images_root,
+            dataset_dir=str(new_dir),
+        )
+        return biigle_yaml_path
+
     def add_model(
         self, project: Project, model_path: str = None, model_name: str = None
     ):
@@ -376,6 +414,9 @@ class ProjectManager:
         project_name = project.project_name
         yaml_path = Path(project.Config_file_path)
         project_path = Path(project.project_path)
+
+        models_dir = self.home_path_synthesizer() / "models"
+        os.makedirs(models_dir, exist_ok=True)
         # Get the yaml path
         if not yaml_path.exists():
             raise FileExistsError(f"{yaml_path} does not exist.")
@@ -389,7 +430,7 @@ class ProjectManager:
 
             if not candidate.is_absolute():
                 if candidate.name == str(candidate):
-                    candidate = (project_path / project_name / candidate).resolve()
+                    candidate = (models_dir / candidate).resolve()
                 else:
                     model_trail = candidate
 
