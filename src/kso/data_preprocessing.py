@@ -107,14 +107,14 @@ def run_augmentation(data_yaml_path: str, augment_factor=0.5, random_seed=42):
     cfg = yaml.safe_load(data_yaml_path.read_text())
 
     # If 'path' missing (e.g. Roboflow), fall back to directory of data.yaml
-    base = Path(cfg.get("path", data_yaml_path.parent))
+    base = Path(cfg.get("path") or data_yaml_path.parent)
 
-    train_rel = cfg.get("train", "train/images")
+    train_rel = cfg.get("train", "images/train")
     if isinstance(train_rel, list):
         train_rel = train_rel
 
-    train_img_dir = (base / train_rel).resolve()
-    train_lbl_dir = train_img_dir.parent / "labels"
+    train_img_dir = base / train_rel
+    train_lbl_dir = base / "labels" / "train"
 
     print(f"Using train images: {train_img_dir}")
     print(f"Using train labels: {train_lbl_dir}")
