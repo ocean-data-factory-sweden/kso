@@ -660,7 +660,7 @@ class auto_dataset_generator:
         if not base_path.exists():
             raise FileNotFoundError(f"Base path not found: {base_path}")
         if not output_path:
-            output_path = base_path / f"{base.name}_AutoDataset"
+            output_path = base_path / f"{base_path.name}_AutoDataset"
         rng = random.Random(seed)
 
         # Catalog all subfolders that contain frames. Defensive: skip any folder
