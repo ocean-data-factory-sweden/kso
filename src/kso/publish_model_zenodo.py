@@ -5,6 +5,7 @@ import zipfile
 import tarfile
 import logging
 from pathlib import Path
+import pprint
 
 # Logging
 logging.basicConfig()
@@ -47,13 +48,16 @@ class publish_zenodo:
         return r.json()
 
     def _zip_folder(self, folder_path):
-        folder_path = Path(folder_path)
-        zip_file_name = folder_path.with_suffix(".zip")
+        folder_path = Path(folder_path).expanduser()
+        if folder_path.stem != ("zip"):
+            zip_file_name = folder_path.with_suffix(".zip")
 
-        with zipfile.ZipFile(zip_file_name, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for file_path in folder_path.glob("**/*"):
-                if file_path.is_file():
-                    zipf.write(file_path, file_path.relative_to(folder_path))
+            with zipfile.ZipFile(zip_file_name, "w", zipfile.ZIP_DEFLATED) as zipf:
+                for file_path in folder_path.glob("**/*"):
+                    if file_path.is_file():
+                        zipf.write(file_path, file_path.relative_to(folder_path))
+        else:
+            zip_file_name = folder_path
 
         return zip_file_name
 
@@ -132,3 +136,105 @@ class publish_zenodo:
             )
         else:
             print("publishing has not been successful ")
+
+    def record_search(
+        self,
+        query: str | None = None,
+        author: str | None = None,
+        doi: str | None = None,
+        title: str | None = None,
+        all_versions: bool = True,
+        sort: str = "-mostrecent",
+    ):
+
+        if query and not isinstance(query, str):
+            raise TypeError(f"{query} must be a non empty string.")
+
+        if author and not isinstance(author, str):
+            raise TypeError(f"{author} must be a non empty string.")
+
+        if doi and not isinstance(doi, str):
+            raise TypeError(f"{doi} must be a non empty string.")
+
+        if title and not isinstance(title, str):
+            raise TypeError(f"{title} must be a non empty string.")
+
+        if all_versions and not isinstance(all_versions, int):
+            raise TypeError(f"{all_versions} must be a integer.")
+
+        if sort and not isinstance(sort, str):
+            raise TypeError(f"{sort} must be a non empty string.")
+
+        params = {}
+        if query:
+            params["q"] = query
+        elif doi:
+            params["q"] = f"doi:{doi}"
+        elif title:
+            params["q"] = f"title:{title}"
+            params["all_versions"] = all_versions
+            params["sort"] = sort
+        elif author:
+            params["q"] = f"creators.name:{author}"
+
+        response = requests.get(
+            "https://zenodo.org/api/records",
+            params=params,
+            headers={"Authorization": f"Bearer {self.ACCESS_TOKEN}"},
+        )
+        status_code = response.status_code
+        # handling API failure
+        if not (200 <= status_code < 300):
+            raise Exception(f"draft didn't start, status_code :{status_code}")
+
+        records = response.json()
+
+        results = []
+        for i in records["hits"]["hits"]:
+            results.append(
+                {
+                    "title": i["metadata"]["title"],
+                    "id": i["id"],
+                    "authors": [
+                        authors["name"] for authors in i["metadata"]["creators"]
+                    ],
+                    "publication date": i["metadata"]["publication_date"],
+                }
+            )
+        return pprint.pp(results)
+
+    def download_record(
+        self,
+        id: int,
+        dir: str,
+    ):
+        if not id or not isinstance(id, int):
+            raise TypeError(f"id must be integer")
+        if not dir or not isinstance(dir, str):
+            raise TypeError(f"id must be non empty string")
+
+        dir = Path(dir).expanduser()
+        r = requests.get(f"https://zenodo.org/api/records/{id}")
+        status_code = r.status_code
+        # handling API failure
+        if not (200 <= status_code < 300):
+            raise Exception(f"draft didn't start, status_code :{status_code}")
+
+        records = r.json()
+
+        for record in records["files"]:
+            print(f"{record["key"]} : {record["links"]["self"]}")
+            url = record["links"]["self"]
+            r = requests.get(url, stream=True)
+
+            down_dir = dir / record["key"]
+            with open(down_dir, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+        down_meta = dir / "record_metadata.json"
+
+        with open(down_meta, "w", encoding="utf-8") as f:
+            json.dump(records, f, indent=4)
+
+        return f"save folder:{dir}"
