@@ -61,7 +61,6 @@ class ProjectManager:
         project_name: str,
         project_path: str | Path = None,
         ultralytics_data: Optional[Dict[str, Any]] = None,
-        biigle_path: Optional[Dict[str, Any]] = None,
         tracking: Optional[Dict[str, Any]] = None,
         weights_path: str = None,
         model_name: str = None,
@@ -97,52 +96,34 @@ class ProjectManager:
             yaml_path = project / f"{sanitized}.project.yaml"
             mlflow_path = project / "mlflow.db"
 
-            # get the relative paths
-            ultralytics_relative_data = None
-            biigle_relative_path = None
-            weights_relative_path = None
+            weights_path = Path(weights_path).expanduser()
+            if not weights_path.is_absolute():
+                if weights_path.name == str(weights_path):
+                    weights_path = project / weights_path
+                weights_path = resolve_up(relative_path=weights_path)
 
-            yaml_relative_path = make_relative_path(
-                abs_path=yaml_path, startPoint=project_path
-            )
-            mlflow_relative_path = make_relative_path(
-                abs_path=mlflow_path, startPoint=project_path
-            )
-            if weights_path and not Path(weights_path).is_absolute():
-                weights_path = Path(weights_path).expanduser()
-                weights_relative_path = project / weights_path
-                weights_relative_path = make_relative_path(
-                    abs_path=weights_relative_path, startPoint=project_path
-                )
-            else:
-                weights_relative_path = weights_path
+            if ultralytics_data:
 
-            ultralytics_data = (
-                str(ultralytics_data) if ultralytics_data else ultralytics_data
-            )
-            biigle_path = str(biigle_path) if biigle_path else biigle_path
+                ultralytics_data = Path(ultralytics_data).expanduser()
+                if not ultralytics_data.is_absolute():
+                    ultralytics_data = resolve_up(relative_path=ultralytics_data)
 
             # Assemble the YAML structure.
             yaml_dict: Dict[str, Any] = {
                 "project_name": sanitized,
-                "Config_file_path": str(yaml_relative_path),
+                "Config_file_path": str(yaml_path),
                 "data_path": {
-                    "ultralytics_data_path": ultralytics_data,
-                    "biigle_path": biigle_path,
+                    "ultralytics_data_path": str(ultralytics_data),
                 },
-                "models": [
-                    {"model_path": str(weights_relative_path), "model_name": model_name}
-                ],
+                "models": [{"model_path": str(weights_path), "model_name": model_name}],
                 "tracking": {
                     "mlflow": {
-                        "path": None,
                         "experiment_name": None,
-                        "mlflow.db": str(mlflow_relative_path),
+                        "mlflow.db": str(mlflow_path),
                     },
                 },
                 "metadata": metadata,
             }
-
             yaml_dict = self.yaml_data_dump(yaml_path, yaml_dict)
 
         runs_dir = str(project / "runs")
@@ -158,7 +139,7 @@ class ProjectManager:
             Config_file_path=str(yaml_path),
             data_path=yaml_dict["data_path"],
             tracking=str(mlflow_path),
-            model_path=str(weights_relative_path),
+            model_path=str(weights_path),
             model_name=model_name,
         )
         pprint.pp(yaml_dict)
@@ -179,60 +160,38 @@ class ProjectManager:
             raise ValueError("'model_path' must be a non-empty string.")
 
         yaml_path = Path(yaml_path).expanduser()
+
         if not yaml_path.is_absolute():
             yaml_path = resolve_up(relative_path=yaml_path)
-
         project_abs_path = yaml_path.parents[1]  # project cfg file path
+        yaml_dict = self.yaml_data_retrieve(yaml_path=yaml_path)
 
-        if yaml_path.exists():
-            yaml_dict = self.yaml_data_retrieve(yaml_path=yaml_path)
+        """index the last model added if none is provided"""
+        index = -1
 
-            """index the last model added if none is provided"""
-            index = -1
+        if model_name or model_path:
+            model_paths = [m["model_path"] for m in yaml_dict["models"]]
+            model_names = [m["model_name"] for m in yaml_dict["models"]]
+            if model_name in model_names:
+                index = model_names.index(model_name)
+            elif model_path in model_paths:
+                index = model_paths.index(model_path)
 
-            if model_name or model_path:
-                model_paths = [m["model_path"] for m in yaml_dict["models"]]
-                model_names = [m["model_name"] for m in yaml_dict["models"]]
-                if model_name in model_names:
-                    index = model_names.index(model_name)
-                elif model_path in model_paths:
-                    index = model_paths.index(model_path)
+        logging.info(f"{yaml_path} loaded successfully")
 
-            logging.info(f"{yaml_path} loaded successfully")
-        else:
-            raise FileNotFoundError(f"project {yaml_path} was not found")
         """get the absolute path from the cfg yaml file"""
-        # project_path=make_abs_path(relative_path=yaml_path,startPoint=project_abs_path)
-        Config_file_abs_path = make_abs_path(
-            relative_path=yaml_dict["Config_file_path"], startPoint=project_abs_path
-        )
+
         mlflow_db_path = yaml_dict["tracking"]["mlflow"]["mlflow.db"]
-        data_path = {
-            u: (
-                make_abs_path(relative_path=v, startPoint=project_abs_path)
-                if v is not None
-                else None
-            )
-            for u, v in yaml_dict["data_path"].items()
-        }
-        mlflow_db_abs_path = make_abs_path(
-            relative_path=mlflow_db_path, startPoint=project_abs_path
-        )
-
+        data_path = yaml_dict["data_path"]
         model_path = yaml_dict["models"][index]["model_path"]
-
-        if model_path and not Path(model_path).is_absolute():
-            model_path = make_abs_path(
-                relative_path=model_path, startPoint=project_abs_path
-            )
 
         # Convert yaml into a project instance
         project = Project(
             project_name=yaml_dict["project_name"],
             project_path=str(project_abs_path),
-            Config_file_path=Config_file_abs_path,
+            Config_file_path=str(yaml_path),
             data_path=data_path,
-            tracking=mlflow_db_abs_path,
+            tracking=mlflow_db_path,
             model_path=model_path,
             model_name=yaml_dict["models"][index]["model_name"],
         )
@@ -277,9 +236,7 @@ class ProjectManager:
     def add_data(
         self,
         project: Project,
-        data_type: str = "yolo_dataset",
         data_path: str = None,
-        images_root: str = None,
         dataset_dir: str | None = None,
     ):
 
@@ -287,8 +244,7 @@ class ProjectManager:
             raise ValueError("'Project_path' must be a project instance.")
         if data_path and not isinstance(data_path, str):
             raise ValueError("'data_path' must be a non-empty string.")
-        if not data_type or not isinstance(data_type, str):
-            raise ValueError("'data_type' must be a non-empty string .")
+
         project_path = Path(project.project_path)
         Config_file_path = project.Config_file_path
         yaml_path = Path(Config_file_path)
@@ -310,49 +266,18 @@ class ProjectManager:
             dataset_dir = project_path
             # dataset_dir.mkdir(parents=True, exist_ok=True)
 
-        if data_type == "yolo_dataset":
+        if data_path:
+            data_path = Path(data_path).expanduser()
+            if not data_path.is_absolute():
+                data_path = resolve_up(relative_path=data_path)
 
-            if data_path:
+            settings.update({"datasets_dir": str(data_path.parent)})
+        else:
+            generated_yolo_data = resolve_up("kso/src/kso/default_dataset/coco8.yaml")
+            data_path = Path(generated_yolo_data).expanduser()
 
-                data_path = Path(data_path).expanduser()
-                if not data_path.is_absolute():
-                    data_path = make_abs_path(
-                        relative_path=data_path, startPoint=project_path
-                    )
-                    data_path = Path(data_path)
-                # Update multiple settings
-                settings.update({"datasets_dir": str(data_path.parent)})
-            else:
-                generated_yolo_data = resolve_up(
-                    "kso/src/kso/default_dataset/coco8.yaml"
-                )
-                data_path = Path(generated_yolo_data).expanduser()
-            if data_path.exists():
-                data_relative_path = make_relative_path(
-                    abs_path=data_path, startPoint=project_path
-                )
-
-            else:
-                raise FileNotFoundError(f"Dataset file not found: {data_path}")
-            data["data_path"]["ultralytics_data_path"] = str(data_relative_path)
-            project.data_path["ultralytics_data_path"] = str(data_path)
-
-        elif data_type == "Biigle_dataset":
-            if not images_root or not isinstance(images_root, str):
-                raise ValueError(f"images_root must be a non empty string")
-
-            biigle_yaml_path = preprocess_biigle_csv(
-                biigle_csv_path=data_path,
-                images_root=images_root,
-                dataset_dir=str(dataset_dir),
-            )
-
-            biigle_yaml_relative_path = make_relative_path(
-                abs_path=biigle_yaml_path, startPoint=project_path
-            )
-            # data["data_path"] = {"biigle_path":str(biigle_yaml_path)}
-            data["data_path"].update({"biigle_path": str(biigle_yaml_relative_path)})
-            project.data_path["biigle_path"] = str(biigle_yaml_path)
+        data["data_path"]["ultralytics_data_path"] = str(data_path)
+        project.data_path["ultralytics_data_path"] = str(data_path)
 
         self.yaml_data_dump(yaml_path=yaml_path, data=data)
         logging.info(f"Project YAML data path updated at {yaml_path}")
@@ -430,13 +355,10 @@ class ProjectManager:
 
             if not candidate.is_absolute():
                 if candidate.name == str(candidate):
-                    candidate = (models_dir / candidate).resolve()
+                    model_trail = (models_dir / candidate).resolve()
                 else:
                     model_trail = candidate
 
-            model_trail = make_relative_path(
-                abs_path=candidate, startPoint=project_path
-            )
             """update project instance with provided model or last added model"""
             project.model_path = str(model_trail)
 

@@ -414,6 +414,7 @@ class MLflowServerManager:
             save_dir = Path(save_dir).expanduser()
             if not save_dir.is_absolute():
                 save_dir = resolve_up(relative_path=save_dir)
+
         else:
             project_name = project.Project_name
             base_dir = Path(project.project_path).expanduser()
