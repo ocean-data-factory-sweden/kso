@@ -358,7 +358,8 @@ class ProjectManager:
                     model_trail = (models_dir / candidate).resolve()
                 else:
                     model_trail = candidate
-
+            else:
+                model_trail = candidate
             """update project instance with provided model or last added model"""
             project.model_path = str(model_trail)
 
