@@ -223,7 +223,7 @@ class publish_zenodo:
         records = r.json()
 
         for record in records["files"]:
-            print(f"{record["key"]} : {record["links"]["self"]}")
+            print(f"{record['key']} : {record['links']['self']}")
             url = record["links"]["self"]
             r = requests.get(url, stream=True)
 
