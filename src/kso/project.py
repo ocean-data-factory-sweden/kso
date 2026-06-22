@@ -73,19 +73,17 @@ class ProjectManager:
             raise ValueError(f"{project_name} must be a non-empty string.")
 
         sanitized = self.sanitized_name(project_name)
-
+        base_dir = Path(__file__).resolve().parents[3]
         if project_path:
             project_path = Path(project_path).expanduser()
             if not project_path.is_absolute():
                 project_path = resolve_up(relative_path=project_path)
             project = project_path / sanitized
         else:
-            base_dir = Path(__file__).resolve().parents[2]
             project_path = base_dir / "projects"
             project = project_path / sanitized
-
-        """index the last model added if none is provided"""
-        index = -1
+            # print(f"project:{project} and project_path : {project_path}")
+            # print(f"base_dir : {base_dir}")
 
         if project.exists():
             raise FileExistsError(f"the project {str(project)} already exist.")
@@ -96,10 +94,14 @@ class ProjectManager:
             yaml_path = project / f"{sanitized}.project.yaml"
             mlflow_path = project / "mlflow.db"
 
+            mlflow_relative_path = make_relative_path(abs_path=mlflow_path)
+
+            yaml_path_relative = make_relative_path(abs_path=yaml_path)
+
             weights_path = Path(weights_path).expanduser()
             if not weights_path.is_absolute():
                 if weights_path.name == str(weights_path):
-                    weights_path = project / weights_path
+                    weights_path = base_dir / "models" / weights_path
                 weights_path = resolve_up(relative_path=weights_path)
 
             if ultralytics_data:
@@ -111,7 +113,7 @@ class ProjectManager:
             # Assemble the YAML structure.
             yaml_dict: Dict[str, Any] = {
                 "project_name": sanitized,
-                "Config_file_path": str(yaml_path),
+                "Config_file_path": str(yaml_path_relative),
                 "data_path": {
                     "ultralytics_data_path": str(ultralytics_data),
                 },
@@ -119,7 +121,7 @@ class ProjectManager:
                 "tracking": {
                     "mlflow": {
                         "experiment_name": None,
-                        "mlflow.db": str(mlflow_path),
+                        "mlflow.db": str(mlflow_relative_path),
                     },
                 },
                 "metadata": metadata,
@@ -185,13 +187,15 @@ class ProjectManager:
         data_path = yaml_dict["data_path"]
         model_path = yaml_dict["models"][index]["model_path"]
 
+        mlflow_abs_path = make_abs_path(relative_path=mlflow_db_path)
+
         # Convert yaml into a project instance
         project = Project(
             project_name=yaml_dict["project_name"],
             project_path=str(project_abs_path),
             Config_file_path=str(yaml_path),
             data_path=data_path,
-            tracking=mlflow_db_path,
+            tracking=mlflow_abs_path,
             model_path=model_path,
             model_name=yaml_dict["models"][index]["model_name"],
         )
@@ -292,7 +296,7 @@ class ProjectManager:
                 Path("/scratch") / os.environ["PROJECT"] / os.environ["USER"]
             )
         else:
-            self.home_path = Path.cwd().parents[2]
+            self.home_path = Path(__file__).resolve().parents[3]
         return self.home_path
 
     def preprocess_Biigle(self, images_root, data_path, dataset_dir=None):
@@ -357,7 +361,7 @@ class ProjectManager:
                 if candidate.name == str(candidate):
                     model_trail = (models_dir / candidate).resolve()
                 else:
-                    model_trail = candidate
+                    model_trail = make_abs_path(relative_path=candidate)
             else:
                 model_trail = candidate
             """update project instance with provided model or last added model"""

@@ -42,30 +42,29 @@ def resolve_up(relative_path: str | Path) -> Path:
     )
 
 
-def make_relative_path(abs_path: Path = None, startPoint: Path = None):
+def make_relative_path(abs_path: Path = None):
     """turn absolut path to relative path based on a start point"""
     if not abs_path or not isinstance(abs_path, Path):
         raise TypeError(f"{abs_path} must be non-empty path")
-    if not startPoint or not isinstance(startPoint, Path):
-        raise TypeError(f"{startPoint} must be non-empty path")
 
-    if abs_path.is_relative_to(startPoint):
-        relative_path = abs_path.relative_to(startPoint.parents[1])
+    base_dir = Path(__file__).resolve().parents[3]
+
+    if abs_path.is_relative_to(base_dir):
+        relative_path = abs_path.relative_to(base_dir)
     else:
         relative_path = abs_path
 
     return relative_path
 
 
-def make_abs_path(relative_path: str | Path, startPoint: str | Path):
+def make_abs_path(relative_path: str | Path):
     """turn relative path to absolut path based on a start point"""
     if not relative_path or not isinstance(relative_path, (Path, str)):
         raise TypeError(f"{relative_path} must be non-empty path or string")
-    if not startPoint or not isinstance(startPoint, (Path, str)):
-        raise TypeError(f"{startPoint} must be non-empty path or string")
-    startPoint = Path(startPoint).expanduser()
+
+    startPoint = Path(__file__).resolve().parents[3]
     relative_path = Path(relative_path).expanduser()
-    abs_path = os.path.join(startPoint.parents[1], relative_path)
+    abs_path = os.path.join(startPoint, relative_path)
     return abs_path
 
 
@@ -1006,7 +1005,7 @@ class video_frame_extractor:
         video_progress_callback: called with (video_index, num_videos, video_name)
             when each new video starts. Lets the GUI show "Video 2/5: foo.mp4".
         """
-        input_dir = Path(input_dir)
+        input_dir = Path(input_dir).expanduser()
         videos = sorted(
             f
             for f in input_dir.iterdir()
