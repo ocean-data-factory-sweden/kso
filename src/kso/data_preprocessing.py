@@ -42,18 +42,15 @@ def resolve_up(relative_path: str | Path) -> Path:
     )
 
 
-def make_relative_path(abs_path: Path = None):
+def make_relative_path(abs_path: Path | str = None):
     """turn absolut path to relative path based on a start point"""
     if not abs_path or not isinstance(abs_path, Path):
         raise TypeError(f"{abs_path} must be non-empty path")
 
-    base_dir = Path(__file__).resolve().parents[3]
-
-    if abs_path.is_relative_to(base_dir):
-        relative_path = abs_path.relative_to(base_dir)
-    else:
-        relative_path = abs_path
-
+    startPoint = Path(__file__).resolve().parents[3]
+    abs_path = Path(abs_path).expanduser()
+    base_dir = startPoint / "projects"
+    relative_path = os.path.relpath(abs_path, start=base_dir)
     return relative_path
 
 
@@ -63,8 +60,9 @@ def make_abs_path(relative_path: str | Path):
         raise TypeError(f"{relative_path} must be non-empty path or string")
 
     startPoint = Path(__file__).resolve().parents[3]
+    base_dir = startPoint / "projects"
     relative_path = Path(relative_path).expanduser()
-    abs_path = os.path.join(startPoint, relative_path)
+    abs_path = (base_dir / relative_path).resolve()
     return abs_path
 
 
@@ -655,9 +653,11 @@ class auto_dataset_generator:
             raise ValueError("strategy must be 'stratified' or 'random'")
 
         base_path = Path(base_path).expanduser()
-        output_path = Path(output_path).expanduser()
-        if not base_path.exists():
-            raise FileNotFoundError(f"Base path not found: {base_path}")
+        if not base_path.is_absolute():
+            base_path = resolve_up(relative_path=base_path)
+
+        if output_path:
+            output_path = Path(output_path).expanduser()
         if not output_path:
             output_path = base_path / f"{base_path.name}_AutoDataset"
         rng = random.Random(seed)
@@ -1068,13 +1068,24 @@ class video_frame_extractor:
                 log(f"      \u00b7 {name}")
         return total_extracted, len(videos)
 
-    def video_frames(self, input_path: str, output_dir: str, **kwags):
+    def video_frames(self, input_path: str, output_dir: str | None = None, **kwags):
 
-        if not input_path or not output_dir:
-            raise TypeError(f"{input_path} and {output_dir} must be non-empty string")
+        if not input_path or not isinstance(input_path, str):
+            raise TypeError(f"{input_path} must be non-empty string")
+        if output_dir and not isinstance(output_dir, str):
+            raise TypeError(f"{output_dir} must be non-empty string")
 
         input_path = Path(input_path).expanduser()
-        output_dir = Path(output_dir).expanduser()
+
+        if not input_path.is_absolute():
+            input_path = resolve_up(relative_path=input_path)
+        if output_dir:
+            if not output_dir.is_absolute():
+                output_dir = resolve_up(relative_path=output_dir)
+        if not output_dir:
+            startPoint = Path(__file__).resolve().parents[3]
+            output_dir = startPoint / "datasets"
+            os.makedirs(output_dir, exist_ok=True)
 
         common = dict(
             every_nth_frame=10,

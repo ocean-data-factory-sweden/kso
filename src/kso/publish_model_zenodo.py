@@ -6,6 +6,7 @@ import tarfile
 import logging
 from pathlib import Path
 import pprint
+from .data_preprocessing import resolve_up
 
 # Logging
 logging.basicConfig()
@@ -49,6 +50,8 @@ class publish_zenodo:
 
     def _zip_folder(self, folder_path):
         folder_path = Path(folder_path).expanduser()
+        if not folder_path.is_absolute():
+            folder_path = resolve_up(relative_path=folder_path)
         if folder_path.stem != ("zip"):
             zip_file_name = folder_path.with_suffix(".zip")
 

@@ -241,7 +241,6 @@ class ProjectManager:
         self,
         project: Project,
         data_path: str = None,
-        dataset_dir: str | None = None,
     ):
 
         if not project or not isinstance(project, Project):
@@ -249,26 +248,12 @@ class ProjectManager:
         if data_path and not isinstance(data_path, str):
             raise ValueError("'data_path' must be a non-empty string.")
 
-        project_path = Path(project.project_path)
         Config_file_path = project.Config_file_path
         yaml_path = Path(Config_file_path)
         if not yaml_path.exists():
             raise FileNotFoundError(f"{yaml_path} not found.")
 
         data = self.yaml_data_retrieve(yaml_path=yaml_path)
-
-        if dataset_dir and not isinstance(dataset_dir, str):
-            raise ValueError(f"dataset_dir must be a non empty string")
-        if dataset_dir:
-            dataset_dir = Path(dataset_dir).expanduser()
-            if not dataset_dir.is_absolute():
-                dataset_dir = resolve_up(relative_path=dataset_dir)
-                print(f"dataset_dir:{dataset_dir}")
-            if not dataset_dir.exists():
-                raise FileNotFoundError(f"{dataset_dir} not found")
-        if not dataset_dir:
-            dataset_dir = project_path
-            # dataset_dir.mkdir(parents=True, exist_ok=True)
 
         if data_path:
             data_path = Path(data_path).expanduser()
@@ -343,8 +328,9 @@ class ProjectManager:
         project_name = project.project_name
         yaml_path = Path(project.Config_file_path)
         project_path = Path(project.project_path)
-
-        models_dir = self.home_path_synthesizer() / "models"
+        home_dir = self.home_path_synthesizer()
+        models_dir = home_dir / "models"
+        # print(f"models_dir:{models_dir}")
         os.makedirs(models_dir, exist_ok=True)
         # Get the yaml path
         if not yaml_path.exists():
@@ -361,7 +347,7 @@ class ProjectManager:
                 if candidate.name == str(candidate):
                     model_trail = (models_dir / candidate).resolve()
                 else:
-                    model_trail = make_abs_path(relative_path=candidate)
+                    model_trail = (home_dir / candidate).resolve()
             else:
                 model_trail = candidate
             """update project instance with provided model or last added model"""

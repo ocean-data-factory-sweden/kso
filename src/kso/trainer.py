@@ -265,13 +265,6 @@ class TrainingManager:
 
             mlflow.log_artifacts(local_model_dir, artifact_path="model")
         mlflow.end_run()
-        data["mlflow"] = {
-            "path": str(mlflowdb_path),
-            "experiment_name": project_name,
-            "mlflow.db": str(mlflowdb_path),
-        }
-
-        proj.yaml_data_dump(yaml_path=yaml_path, data=data)
 
         # Examine the deleted experiment details.
         experiment = mlflow.get_experiment(experiment_id)
