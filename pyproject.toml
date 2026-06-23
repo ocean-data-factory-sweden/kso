@@ -29,6 +29,7 @@ dependencies = [
     "mlflow==3.7.0",
     "mlflow-export-import @ git+https://github.com/mlflow/mlflow-export-import.git@cf626079fc6729b10e34c2fd0fa3cf36fbfb30b2",
     "natsort>=8.3",
+    "nbqa==1.9.1",
     "notebook==7.4.4",
     "numpy>=2.0",
     "opencv-python-headless==4.10.0.84",
@@ -38,7 +39,7 @@ dependencies = [
     "psutil>=7.0",
     "pyyaml>=6.0",
     "requests>=2.31",
-    "setuptools<81",  # required by yolov5, but not defined in its dependencies
+    "setuptools<81", # required by yolov5, but not defined in its dependencies
     "thop==0.1.1.post2209072238",
     "threadpoolctl==3.6.0",
     "tifffile==2025.12.12",
