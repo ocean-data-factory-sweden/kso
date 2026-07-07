@@ -362,6 +362,13 @@ class ProjectManager:
                 project.model_name = data["models"][index]["model_name"]
                 logging.info(f"model {str(model_trail)} already exists")
             else:
+                # filter None values out before appending or before saving to config
+                data["models"] = [
+                    model
+                    for model in data["models"]
+                    if model["model_name"] is not None
+                    and model["model_path"] is not None
+                ]
                 data["models"].append(
                     {"model_name": model_name, "model_path": str(model_trail)}
                 )
