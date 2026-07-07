@@ -218,6 +218,9 @@ class publish_zenodo:
             raise TypeError(f"id must be non empty string")
 
         dir = Path(dir).expanduser()
+        "ensure the directory is created before downloading files."
+        dir.mkdir(parents=True, exist_ok=True)
+
         r = requests.get(f"https://zenodo.org/api/records/{id}")
         status_code = r.status_code
         # handling API failure
