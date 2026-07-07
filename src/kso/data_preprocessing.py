@@ -658,6 +658,8 @@ class auto_dataset_generator:
 
         if output_path:
             output_path = Path(output_path).expanduser()
+            if not output_path.is_absolute():
+                output_path = resolve_up(relative_path=output_path)
         if not output_path:
             output_path = base_path / f"{base_path.name}_AutoDataset"
         rng = random.Random(seed)
