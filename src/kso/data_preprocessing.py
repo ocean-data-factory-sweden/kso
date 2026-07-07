@@ -44,8 +44,8 @@ def resolve_up(relative_path: str | Path) -> Path:
 
 def make_relative_path(abs_path: Path | str = None):
     """turn absolut path to relative path based on a start point"""
-    if not abs_path or not isinstance(abs_path, Path):
-        raise TypeError(f"{abs_path} must be non-empty path")
+    if not abs_path or not isinstance(abs_path, (Path, str)):
+        raise TypeError(f"{abs_path} must be non-empty path or string.")
 
     startPoint = Path(__file__).resolve().parents[3]
     abs_path = Path(abs_path).expanduser()
