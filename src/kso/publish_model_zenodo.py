@@ -52,7 +52,7 @@ class publish_zenodo:
         folder_path = Path(folder_path).expanduser()
         if not folder_path.is_absolute():
             folder_path = resolve_up(relative_path=folder_path)
-        if folder_path.stem != ("zip"):
+        if folder_path.suffix.lower() != (".zip"):
             zip_file_name = folder_path.with_suffix(".zip")
 
             with zipfile.ZipFile(zip_file_name, "w", zipfile.ZIP_DEFLATED) as zipf:
