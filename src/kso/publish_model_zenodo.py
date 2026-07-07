@@ -215,7 +215,7 @@ class publish_zenodo:
         if not id or not isinstance(id, int):
             raise TypeError(f"id must be integer")
         if not dir or not isinstance(dir, str):
-            raise TypeError(f"id must be non empty string")
+            raise TypeError(f"dir must be non empty string")
 
         dir = Path(dir).expanduser()
         "ensure the directory is created before downloading files."
