@@ -302,6 +302,8 @@ class ProjectManager:
                     new_dir.mkdir(parents=True)
                     break
                 idx += 1
+        else:
+            new_dir = Path(dataset_dir).expanduser()
 
         biigle_yaml_path = preprocess_biigle_csv(
             biigle_csv_path=data_path,
