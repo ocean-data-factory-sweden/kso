@@ -6,15 +6,15 @@ import pandas as pd
 from collections import defaultdict
 import json
 from PIL import Image
-import random
 import os
 import shutil
 import logging
 from tqdm import tqdm
 import multiprocessing as mp
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import cv2
+import random
+
 
 DEFAULT_EXTENSIONS = (".jpg", ".jpeg", ".png")
 VALID_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
