@@ -97,12 +97,12 @@ class ProjectManager:
             mlflow_relative_path = make_relative_path(abs_path=mlflow_path)
 
             yaml_path_relative = make_relative_path(abs_path=yaml_path)
-
-            weights_path = Path(weights_path).expanduser()
-            if not weights_path.is_absolute():
-                if weights_path.name == str(weights_path):
-                    weights_path = base_dir / "models" / weights_path
-                weights_path = resolve_up(relative_path=weights_path)
+            if weights_path:
+                weights_path = Path(weights_path).expanduser()
+                if not weights_path.is_absolute():
+                    if weights_path.name == str(weights_path):
+                        weights_path = base_dir / "models" / weights_path
+                    weights_path = resolve_up(relative_path=weights_path)
 
             if ultralytics_data:
 
