@@ -117,7 +117,7 @@ class ProjectManager:
                 "data_path": {
                     "ultralytics_data_path": str(ultralytics_data),
                 },
-                "models": [{"model_path": str(weights_path), "model_name": model_name}],
+                "models": [],
                 "tracking": {
                     "mlflow": {
                         "experiment_name": None,
@@ -170,22 +170,27 @@ class ProjectManager:
 
         """index the last model added if none is provided"""
         index = -1
+        if yaml_dict["models"]:
 
-        if model_name or model_path:
-            model_paths = [m["model_path"] for m in yaml_dict["models"]]
-            model_names = [m["model_name"] for m in yaml_dict["models"]]
-            if model_name in model_names:
-                index = model_names.index(model_name)
-            elif model_path in model_paths:
-                index = model_paths.index(model_path)
+            if model_name or model_path:
+                model_paths = [m["model_path"] for m in yaml_dict["models"]]
+                model_names = [m["model_name"] for m in yaml_dict["models"]]
+                if model_name in model_names:
+                    index = model_names.index(model_name)
+                elif model_path in model_paths:
+                    index = model_paths.index(model_path)
 
+            model_path = yaml_dict["models"][index]["model_path"]
+            model_name = yaml_dict["models"][index]["model_name"]
+        else:
+            model_path = None
+            model_name = None
         logging.info(f"{yaml_path} loaded successfully")
 
         """get the absolute path from the cfg yaml file"""
 
         mlflow_db_path = yaml_dict["tracking"]["mlflow"]["mlflow.db"]
         data_path = yaml_dict["data_path"]
-        model_path = yaml_dict["models"][index]["model_path"]
 
         mlflow_abs_path = make_abs_path(relative_path=mlflow_db_path)
 
@@ -197,7 +202,7 @@ class ProjectManager:
             data_path=data_path,
             tracking=mlflow_abs_path,
             model_path=model_path,
-            model_name=yaml_dict["models"][index]["model_name"],
+            model_name=model_name,
         )
         pprint.pp(yaml_dict)
         return project
