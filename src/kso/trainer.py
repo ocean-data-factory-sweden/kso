@@ -213,7 +213,7 @@ class TrainingManager:
 
             return re.sub(r"[(B)]", "", yolo_result)
 
-        with mlflow.start_run():
+        with mlflow.start_run(run_name=model_name):
             results = yolo_model.train(
                 data=data_path, name=model_name, epochs=epochs, imgsz=imgsz, **kwargs
             )

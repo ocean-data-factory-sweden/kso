@@ -372,6 +372,8 @@ class ProjectManager:
                 data["models"].append(
                     {"model_name": model_name, "model_path": str(model_trail)}
                 )
+                """update project instance with provided model name or last added model name"""
+                project.model_name = model_name
 
         elif model_path and not model_path.endswith(".pt"):
             raise ValueError("model is not valid, must end with '.pt'")
