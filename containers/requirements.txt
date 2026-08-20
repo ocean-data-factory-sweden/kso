@@ -268,7 +268,7 @@ typing-extensions==4.15.0
 typing-inspect==0.9.0
 typing-inspection==0.4.2
 tzdata==2025.3
-ultralytics==8.3.166
+ultralytics==8.4.51
 ultralytics-thop==2.0.18
 uri-template==1.3.0
 urllib3==2.6.2

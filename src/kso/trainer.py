@@ -158,6 +158,9 @@ class TrainingManager:
         if change_umask:
             set_group_writable_umask()
 
+        # ensure Ultralytics MLflow Callbacks are False
+        settings.update({"mlflow": False})
+
         project_name = project.project_name
         model_name = project.model_name
         model_source = project.model_path
@@ -210,9 +213,9 @@ class TrainingManager:
 
             return re.sub(r"[(B)]", "", yolo_result)
 
-        with mlflow.start_run():
+        with mlflow.start_run(run_name=model_name):
             results = yolo_model.train(
-                data=data_path, epochs=epochs, imgsz=imgsz, **kwargs
+                data=data_path, name=model_name, epochs=epochs, imgsz=imgsz, **kwargs
             )
             mlflow.log_param("epochs", epochs)
             mlflow.log_metrics(
@@ -247,7 +250,7 @@ class TrainingManager:
                 params=sample_params,
             )
 
-            mlflow.pyfunc.log_model(
+            model_info = mlflow.pyfunc.log_model(
                 artifact_path="model",
                 python_model=YOLOUltralyticsMLflowModel(),
                 artifacts={"weights": str(best_weight_path)},
@@ -255,14 +258,13 @@ class TrainingManager:
                 input_example=sample_input,
                 signature=signature,
             )
-        mlflow.end_run()
-        data["mlflow"] = {
-            "path": str(mlflowdb_path),
-            "experiment_name": project_name,
-            "mlflow.db": str(mlflowdb_path),
-        }
+            # copy model into run artifacts
+            local_model_dir = mlflow.artifacts.download_artifacts(
+                artifact_uri=model_info.model_uri
+            )
 
-        proj.yaml_data_dump(yaml_path=yaml_path, data=data)
+            mlflow.log_artifacts(local_model_dir, artifact_path="model")
+        mlflow.end_run()
 
         # Examine the deleted experiment details.
         experiment = mlflow.get_experiment(experiment_id)

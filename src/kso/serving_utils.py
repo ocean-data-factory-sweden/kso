@@ -414,6 +414,7 @@ class MLflowServerManager:
             save_dir = Path(save_dir).expanduser()
             if not save_dir.is_absolute():
                 save_dir = resolve_up(relative_path=save_dir)
+
         else:
             project_name = project.Project_name
             base_dir = Path(project.project_path).expanduser()
@@ -472,7 +473,7 @@ class MLflowServerManager:
                             "y2": round(float(b[3]), 1),
                         }
                     )
-            pd.DataFrame(detections).to_csv(f"{new_dir}/annotations.csv", index=False)
+            pd.DataFrame(detections).to_csv(f"{new_dir}/detections.csv", index=False)
         else:
             raise ValueError(
                 f"Unsupported output_format: {output_format}. Expected 'frames' or 'csv'."

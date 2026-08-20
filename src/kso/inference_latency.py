@@ -123,7 +123,11 @@ class ModelProfiler:
 
         TFLOPS = 0.0
         system = self.os_system()
-        if system == "Linux" and torch.cuda.is_available():
+        if (
+            system == "Linux"
+            and torch.cuda.is_available()
+            and os.environ.get("SLURM_CLUSTER_NAME") == "lumi"
+        ):
             cu_output = subprocess.check_output(
                 "rocminfo | grep -i 'Compute Unit' | awk '{s+=$3} END{print s}'",
                 shell=True,

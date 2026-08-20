@@ -10,6 +10,8 @@ from .serving_utils import (
 )
 from .data_preprocessing import (
     run_augmentation,
+    auto_dataset_generator,
+    video_frame_extractor,
 )
 
 from .inference_latency import (
@@ -27,4 +29,6 @@ __all__ = [
     "run_augmentation",
     "ModelProfiler",
     "Project",
+    "video_frame_extractor",
+    "auto_dataset_generator",
 ]
