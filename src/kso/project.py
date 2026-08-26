@@ -24,8 +24,6 @@ import shutil
 
 # settings.reset()
 os.environ["MLFLOW_TRACKING_URI"] = "http://your-server:5000"
-os.environ["MIOPEN_DEBUG_DISABLE_FIND_DB"] = "1"
-os.environ["MIOPEN_DISABLE_CACHE"] = "1"
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
