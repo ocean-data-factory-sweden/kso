@@ -91,6 +91,7 @@ huggingface-hub==0.24.7
 humanfriendly==10.0
 idna==3.7
 imageio==2.37.2
+imageio-ffmpeg==0.6.0
 imagesize==1.4.1
 importlib-metadata==8.7.0
 ipyfilechooser==0.6.0
