@@ -250,8 +250,8 @@ class ProjectManager:
 
         if not project or not isinstance(project, Project):
             raise ValueError("'Project_path' must be a project instance.")
-        if data_path and not isinstance(data_path, str):
-            raise ValueError("'data_path' must be a non-empty string.")
+        if data_path and not isinstance(data_path, (str, Path)):
+            raise ValueError("'data_path' must be a non-empty string or Path.")
 
         Config_file_path = project.Config_file_path
         yaml_path = Path(Config_file_path)
@@ -262,8 +262,19 @@ class ProjectManager:
 
         if data_path:
             data_path = Path(data_path).expanduser()
+
             if not data_path.is_absolute():
                 data_path = resolve_up(relative_path=data_path)
+
+            if not data_path.exists():
+                raise FileNotFoundError(
+                    f"the provided path: {data_path} was not found."
+                )
+
+            if not data_path.is_file():
+                raise ValueError(
+                    f"data_path must be a file, not a directory: {data_path}"
+                )
 
             settings.update({"datasets_dir": str(data_path.parent)})
         else:
