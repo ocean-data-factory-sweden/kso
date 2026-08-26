@@ -18,10 +18,10 @@ echo "Using $CONTAINER"
 export SINGULARITY_BIND="/pfs,/scratch,/projappl,/project,/flash,/appl"
 export PYTHONUSERBASE="/scratch/$PROJECT/$USER/venv"
 
-export MIOPEN_USER_DB_PATH="/tmp/$USER/miopen-cache"
-export MIOPEN_CUSTOM_CACHE_DIR=${MIOPEN_USER_DB_PATH}
-rm -rf ${MIOPEN_USER_DB_PATH}
-mkdir -p ${MIOPEN_USER_DB_PATH}
+# Set MIOpen paths
+export MIOPEN_CUSTOM_CACHE_DIR="/tmp/$USER/miopen-cache"
+export MIOPEN_USER_DB_PATH="/tmp/$USER/miopen-db"
+mkdir -p "$MIOPEN_CUSTOM_CACHE_DIR" "$MIOPEN_USER_DB_PATH"
 
 KSO_PATH=$(readlink -f ../../)
 export PYTHONPATH=$KSO_PATH${PYTHONPATH:+:$PYTHONPATH}
