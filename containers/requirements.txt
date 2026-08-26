@@ -255,12 +255,12 @@ tinycss2==1.4.0
 tokenize-rt==6.2.0
 tokenizers==0.22.2
 tomlkit==0.13.3
-torch==2.8.0
+torch==2.9.1
 torch-flops==0.4.1
 torch-summary==1.4.5
 torchinfo==1.8.0
 torchscan==0.1.1
-torchvision==0.23.0
+torchvision==0.24.1
 tornado==6.5.4
 tqdm==4.67.1
 traitlets==5.14.3
