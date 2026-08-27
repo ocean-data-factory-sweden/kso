@@ -1,28 +1,20 @@
 from __future__ import annotations
 from pathlib import Path
 import logging
-from typing import Any, Dict, Optional, List, Union
-import yaml
+from typing import Any, Dict, List, Union
 from dataclasses import asdict
 import os
-import sys
 from ultralytics import YOLO
 import re
 from .project import Project, ProjectManager
 from .data_preprocessing import resolve_up
-import psutil
 from urllib.parse import urlparse
 from mlflow.models.signature import infer_signature
 from mlflow_export_import.bulk.export_experiments import export_experiments
 from mlflow_export_import.bulk.import_experiments import import_experiments
 
 
-import json
 import pandas as pd
-import shutil
-from collections import defaultdict
-import random
-from PIL import Image
 from mlflow.pyfunc import PythonModel, PyFuncModel
 import numpy as np
 from ultralytics import settings
@@ -43,8 +35,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger("mlflow").setLevel(logging.WARNING)
 logging.getLogger("mlflow.store").setLevel(logging.WARNING)
 logging.getLogger("alembic").setLevel(logging.WARNING)
-
-logging.getLogger("ultralytics").setLevel(logging.WARNING)
+logging.getLogger("ultralytics").setLevel(logging.INFO)
 logging.getLogger("git").setLevel(logging.WARNING)
 logging.getLogger("git.cmd").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
