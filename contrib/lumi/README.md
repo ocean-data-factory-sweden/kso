@@ -82,6 +82,11 @@ CONTAINER="/projappl/project_.../containers/kso_dev-rocm6.4-ubuntu24.04.sif"
 export SINGULARITY_BIND="/pfs,/scratch,/projappl,/project,/flash,/appl"
 export python="singularity exec $CONTAINER python3"
 export PYTHONUSERBASE="/scratch/$PROJECT/$USER/venv"
+
+# Set MIOpen paths
+export MIOPEN_CUSTOM_CACHE_DIR="/tmp/$USER/miopen-cache"
+export MIOPEN_USER_DB_PATH="/tmp/$USER/miopen-db"
+mkdir -p "$MIOPEN_CUSTOM_CACHE_DIR" "$MIOPEN_USER_DB_PATH"
 ```
 
 ### 3. Connect and navigate
