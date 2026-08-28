@@ -6,6 +6,8 @@ ARG FFMPEG_BASE_IMAGE=docker.io/ubuntu:latest
 # ----------------------------------------------------------------------
 FROM ${FFMPEG_BASE_IMAGE} AS ffmpeg-build
 
+USER root
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
@@ -70,6 +72,8 @@ RUN mkdir -p /opt/ffmpeg && \
 # ----------------------------------------------------------------------
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
+
+USER root
 
 ARG DEBIAN_FRONTEND=noninteractive
 
