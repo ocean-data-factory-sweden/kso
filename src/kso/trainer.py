@@ -205,6 +205,7 @@ class TrainingManager:
             return re.sub(r"[(B)]", "", yolo_result)
 
         with mlflow.start_run(run_name=model_name):
+
             results = yolo_model.train(
                 data=data_path, name=model_name, epochs=epochs, imgsz=imgsz, **kwargs
             )
@@ -212,7 +213,6 @@ class TrainingManager:
             mlflow.log_metrics(
                 {dict_mapper(k): v for k, v in results.results_dict.items()}
             )
-
             mlflow.log_artifacts(results.save_dir, artifact_path="yolo")
 
             best_weight_path = Path(results.save_dir) / "weights" / "best.pt"
@@ -249,12 +249,6 @@ class TrainingManager:
                 input_example=sample_input,
                 signature=signature,
             )
-            # copy model into run artifacts
-            local_model_dir = mlflow.artifacts.download_artifacts(
-                artifact_uri=model_info.model_uri
-            )
-
-            mlflow.log_artifacts(local_model_dir, artifact_path="model")
         mlflow.end_run()
 
         # Examine the deleted experiment details.
