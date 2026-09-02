@@ -7,7 +7,7 @@ import platform
 import subprocess
 import logging
 from torchinfo import summary
-from .trainer import TrainingManager
+from .trainer import InferenceManager
 from mlflow.pyfunc import PyFuncModel
 import psutil
 from pathlib import Path
@@ -16,7 +16,7 @@ import math
 import torchvision.transforms as T
 import cv2
 
-train = TrainingManager()
+train = InferenceManager()
 
 
 class ModelProfiler:
