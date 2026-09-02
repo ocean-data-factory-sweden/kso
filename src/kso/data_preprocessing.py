@@ -14,7 +14,8 @@ import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import cv2
 import random
-
+import re
+import numpy as np
 
 DEFAULT_EXTENSIONS = (".jpg", ".jpeg", ".png")
 VALID_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".webp"}
@@ -551,6 +552,999 @@ def preprocess_biigle_csv(
         print("Augmentation disabled.")
 
     return _write_data_yaml(dataset_dir, class_names)
+
+
+def biigle_yolo_detection(
+    biigle_csv_path: str,
+    images_root: str,
+    dataset_dir: str,
+):
+
+    BIIGLE_CSV_PATH = Path(biigle_csv_path).expanduser()
+    IMAGES_ROOT = Path(images_root).expanduser()
+    OUTPUT_ROOT = Path(dataset_dir).expanduser()
+    # Class source: 'label_name' is the exact label (usually the species). Use 'label_hierarchy'
+    # to fold species up into parent classes instead.
+    CLASS_COLUMN = "label_name"
+    # Labels to drop (calibration points etc.). Case-insensitive.
+    EXCLUDE_LABELS = {"Laser point", "laser point", "Laser Point"}
+    # Split ratios (must sum to 1).
+    TRAIN_RATIO, VAL_RATIO, TEST_RATIO = 0.7, 0.2, 0.1
+    # Rare-class filter: a class is kept only with at least this many annotations AND images,
+    # because image-level splits cannot place a one-image class in all three splits.
+    MIN_ANNOTATIONS_PER_CLASS = 3
+    MIN_IMAGES_PER_CLASS = 3
+    # Background (annotation-free) frames. True + None = include all available.
+    INCLUDE_NEGATIVE_IMAGES = True
+    NEGATIVE_IMAGE_RATIO = (
+        None  # e.g. 0.5 = ~half as many negatives as positives; 0 = none
+    )
+    # Group-aware split: keep all frames of one source video in the same split, so near-identical
+    # frames do not leak across train/test. The group key is the filename before '_frame_'.
+    # Falls back to image-level automatically when fewer than 3 groups are found (e.g. a single
+    # compilation clip), so it is safe to leave on.
+    GROUP_AWARE_SPLIT = True
+    RANDOM_SEED = 42
+    VALID_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+    DATASET_DIR = OUTPUT_ROOT
+    assert (
+        abs(TRAIN_RATIO + VAL_RATIO + TEST_RATIO - 1.0) < 0.01
+    ), "Split ratios must sum to 1.0"
+    assert BIIGLE_CSV_PATH.is_file(), f"CSV not found: {BIIGLE_CSV_PATH}"
+    assert IMAGES_ROOT.is_dir(), f"Images dir not found: {IMAGES_ROOT}"
+    if DATASET_DIR.exists() and any(DATASET_DIR.iterdir()):
+        print(f"Warning: output dir not empty, may overwrite: {DATASET_DIR}")
+    else:
+        DATASET_DIR.mkdir(parents=True, exist_ok=True)
+
+    print(f"CSV:     {BIIGLE_CSV_PATH}")
+    print(f"Images:  {IMAGES_ROOT}")
+    print(f"Output:  {DATASET_DIR}")
+    print(
+        f"Classes: {CLASS_COLUMN} | Splits: {TRAIN_RATIO}/{VAL_RATIO}/{TEST_RATIO} | "
+        f"Group-aware: {GROUP_AWARE_SPLIT}"
+    )
+    ## Phase 2: Load and convert to boxes
+    df = pd.read_csv(BIIGLE_CSV_PATH)
+    print(f"Loaded {len(df)} annotations")
+    audit = {"loaded": int(len(df))}
+
+    required = [
+        "filename",
+        "label_name",
+        "shape_name",
+        "points",
+        "attributes",
+        CLASS_COLUMN,
+    ]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(f"CSV missing required columns: {missing}")
+
+    # Exclude non-training labels (e.g. laser calibration points)
+    if EXCLUDE_LABELS:
+        exclude_lower = {s.lower() for s in EXCLUDE_LABELS}
+        n = len(df)
+        df = df[
+            ~df["label_name"].astype(str).str.lower().isin(exclude_lower)
+        ].reset_index(drop=True)
+        if n - len(df):
+            print(f"Excluded {n - len(df)} annotations from EXCLUDE_LABELS")
+        audit["excluded_labels"] = int(n - len(df))
+
+    # Keep box-able shapes only
+    df = df[df["shape_name"].isin(["Rectangle", "Polygon"])].reset_index(drop=True)
+    print(f"Rectangle/Polygon annotations: {len(df)}")
+    audit["unsupported_shape"] = int(
+        audit["loaded"] - audit.get("excluded_labels", 0) - len(df)
+    )
+    if df.empty:
+        raise ValueError("No Rectangle/Polygon annotations remain after filtering.")
+
+    # Image dimensions from the attributes JSON (tolerant of malformed cells)
+    def parse_attrs(s):
+        try:
+            return json.loads(s)
+        except Exception:
+            return {}
+
+    attrs = df["attributes"].apply(parse_attrs)
+    df["img_w"] = [d.get("width") for d in attrs]
+    df["img_h"] = [d.get("height") for d in attrs]
+    n = len(df)
+    df = df.dropna(subset=["img_w", "img_h"]).reset_index(drop=True)
+    if n - len(df):
+        print(f"Dropped {n - len(df)} annotations missing image width/height")
+    audit["missing_dimensions"] = int(n - len(df))
+
+    # Points -> bounding box. Returns None for truncated/unparseable payloads (BIIGLE's 32767-char
+    # CSV field limit can cut long polygon points), which are then dropped rather than crashing.
+    def bbox_from_points(points_str):
+        try:
+            pts = json.loads(points_str)
+        except Exception:
+            return None
+        if not isinstance(pts, (list, tuple)) or len(pts) < 4 or len(pts) % 2 != 0:
+            return None
+        xs, ys = pts[0::2], pts[1::2]
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    parsed = df["points"].apply(bbox_from_points)
+    n_bad = parsed.isna().sum()
+    if n_bad:
+        print(f"Dropped {n_bad} annotations with unparseable/truncated points")
+    audit["unparseable_points"] = int(n_bad)
+    df = df[parsed.notna()].reset_index(drop=True)
+    parsed = parsed[parsed.notna()].reset_index(drop=True)
+    df[["xmin_raw", "ymin_raw", "xmax_raw", "ymax_raw"]] = pd.DataFrame(parsed.tolist())
+
+    # Clip boxes to the image. Off-screen parts are trimmed to the edge, so a half-visible animal
+    # keeps a valid box around its visible portion. Boxes that fall entirely outside collapse and
+    # are dropped next.
+    oob = (
+        (df["xmin_raw"] < 0)
+        | (df["ymin_raw"] < 0)
+        | (df["xmax_raw"] > df["img_w"])
+        | (df["ymax_raw"] > df["img_h"])
+    ).sum()
+    if oob:
+        print(f"Clipped {oob} boxes extending past the image boundary")
+    audit["clipped_boxes"] = int(oob)
+    df["xmin"] = df["xmin_raw"].clip(lower=0)
+    df["ymin"] = df["ymin_raw"].clip(lower=0)
+    df["xmax"] = df[["xmax_raw", "img_w"]].min(axis=1)
+    df["ymax"] = df[["ymax_raw", "img_h"]].min(axis=1)
+    n = len(df)
+    df = df[(df["xmax"] > df["xmin"]) & (df["ymax"] > df["ymin"])].reset_index(
+        drop=True
+    )
+    if n - len(df):
+        print(f"Dropped {n - len(df)} degenerate boxes after clipping")
+    audit["degenerate_boxes"] = int(n - len(df))
+
+    # Rare-class filter (needs enough annotations AND enough distinct images)
+    df["class_label"] = df[CLASS_COLUMN].astype(str)
+    summary = df.groupby("class_label").agg(
+        annotations=("class_label", "size"), images=("filename", "nunique")
+    )
+    rare = summary[
+        (summary["annotations"] < MIN_ANNOTATIONS_PER_CLASS)
+        | (summary["images"] < MIN_IMAGES_PER_CLASS)
+    ]
+    if not rare.empty:
+        print(
+            f"\nRemoving {len(rare)} rare class(es) (< {MIN_ANNOTATIONS_PER_CLASS} annotations "
+            f"or < {MIN_IMAGES_PER_CLASS} images):"
+        )
+        for name, row in rare.iterrows():
+            print(
+                f"  - {name}: {int(row['annotations'])} annotations, {int(row['images'])} images"
+            )
+        n_before_rare = len(df)
+        df = df[~df["class_label"].isin(rare.index)].reset_index(drop=True)
+        audit["rare_classes_removed"] = [str(x) for x in rare.index]
+        audit["rare_class_annotations_dropped"] = int(n_before_rare - len(df))
+    if df.empty:
+        raise ValueError("No annotations remain after rare-class filtering.")
+
+    # Contiguous class ids after filtering
+    class_names = sorted(df["class_label"].unique())
+    df["class_id"] = df["class_label"].map({n: i for i, n in enumerate(class_names)})
+    print(f"\nRetained {len(class_names)} classes:")
+    kept = (
+        df.groupby("class_label")
+        .agg(annotations=("class_label", "size"), images=("filename", "nunique"))
+        .loc[class_names]
+    )
+    for cid, name in enumerate(class_names):
+        r = kept.loc[name]
+        print(
+            f"  {cid}: {name} ({int(r['annotations'])} annotations, {int(r['images'])} images)"
+        )
+
+    # Normalized YOLO coordinates + safety check
+    df["x_center"] = ((df["xmin"] + df["xmax"]) / 2) / df["img_w"]
+    df["y_center"] = ((df["ymin"] + df["ymax"]) / 2) / df["img_h"]
+    df["w_norm"] = (df["xmax"] - df["xmin"]) / df["img_w"]
+    df["h_norm"] = (df["ymax"] - df["ymin"]) / df["img_h"]
+    cols = ["x_center", "y_center", "w_norm", "h_norm"]
+    if not df[cols].apply(lambda s: s.between(0, 1).all()).all():
+        raise ValueError("Found YOLO coordinates outside [0, 1] after clipping")
+    print(f"\nConverted {len(df)} annotations to YOLO boxes")
+
+    audit.setdefault("excluded_labels", 0)
+    audit.setdefault("rare_classes_removed", [])
+    audit.setdefault("rare_class_annotations_dropped", 0)
+    audit["retained_annotations"] = int(len(df))
+
+    ## Phase 3: Split and build the dataset
+    rng = random.Random(RANDOM_SEED)
+
+    # Index images on disk
+    image_index = {
+        p.name: p
+        for p in IMAGES_ROOT.rglob("*")
+        if p.is_file() and p.suffix.lower() in VALID_EXTS
+    }
+
+    csv_filenames = set(df["filename"].unique())
+    unmatched = csv_filenames - set(image_index)
+    if unmatched:
+        print(
+            f"Warning: {len(unmatched)} CSV filenames not found in {IMAGES_ROOT.name}/"
+        )
+        for fn in sorted(unmatched)[:10]:
+            print(f"  - {fn}")
+        if len(unmatched) == len(csv_filenames):
+            raise FileNotFoundError(
+                "None of the CSV filenames were found on disk. Check IMAGES_ROOT."
+            )
+
+    df_matched = df[df["filename"].isin(image_index)].copy().reset_index(drop=True)
+    if df_matched.empty:
+        raise ValueError("No annotations left after matching filenames to images.")
+
+    img_to_labels = defaultdict(set)
+    class_to_imgs = defaultdict(set)
+    for row in df_matched.itertuples():
+        img_to_labels[row.filename].add(int(row.class_id))
+        class_to_imgs[int(row.class_id)].add(row.filename)
+    positive_images = sorted(img_to_labels)
+
+    # True negatives: frames never annotated in BIIGLE at all. Frames whose only annotations were
+    # filtered out (rare classes, excluded labels) are NOT treated as negatives, to avoid fake blanks.
+    all_annotated = set(pd.read_csv(BIIGLE_CSV_PATH)["filename"].unique())
+    neg_candidates = sorted(set(image_index) - all_annotated)
+    negatives = []
+    if INCLUDE_NEGATIVE_IMAGES and neg_candidates:
+        rng.shuffle(neg_candidates)
+        if NEGATIVE_IMAGE_RATIO is None:
+            n_neg = len(neg_candidates)
+        else:
+            n_neg = min(
+                int(round(len(positive_images) * NEGATIVE_IMAGE_RATIO)),
+                len(neg_candidates),
+            )
+        negatives = neg_candidates[:n_neg]
+        print(
+            f"Including {len(negatives)} background frames (of {len(neg_candidates)} available)"
+        )
+    else:
+        print(f"No background frames included ({len(neg_candidates)} available)")
+
+    images = sorted(positive_images + negatives)
+    n_images = len(images)
+    n_train = round(TRAIN_RATIO * n_images)
+    n_val = round(VAL_RATIO * n_images)
+    n_test = n_images - n_train - n_val
+
+    split_for_image = {}
+    counts = {"train": 0, "val": 0, "test": 0}
+
+    def assign(img, split):
+        if img in split_for_image:
+            return split_for_image[img] == split
+        split_for_image[img] = split
+        counts[split] += 1
+        return True
+
+    # Source video = the filename before '_frame_', matching our frame-extraction convention
+    # (<video>_frame_<number>.jpg). A filename that does not follow it tells us nothing about which
+    # video it came from, so rather than treating it as a video of its own we fall back to the
+    # image-level split for the whole dataset.
+    def group_of(filename):
+        m = re.match(r"(.+?)_frame_\d+$", Path(filename).stem)
+        return m.group(1) if m else None
+
+    group_of_image = {img: group_of(img) for img in images}
+    unrecognized = sorted(img for img, g in group_of_image.items() if g is None)
+    groups = defaultdict(list)
+    for img, g in group_of_image.items():
+        if g is not None:
+            groups[g].append(img)
+
+    use_group = GROUP_AWARE_SPLIT and not unrecognized and len(groups) >= 3
+    if GROUP_AWARE_SPLIT and unrecognized:
+        print(
+            f"{len(unrecognized)} filename(s) do not follow <video>_frame_<number>, so the source "
+            f"video cannot be inferred. Using an image-level split. Examples:"
+        )
+        for fn in unrecognized[:5]:
+            print(f"  - {fn}")
+
+    if use_group:
+        # Assign whole videos. Seed one video into each split first (smallest target first) so no
+        # split can end up empty, then fill by largest RELATIVE shortfall. Absolute shortfall with
+        # equal-sized groups ties toward train and can leave test with zero images.
+        print(f"Group-aware split across {len(groups)} source videos")
+        targets = {"train": n_train, "val": n_val, "test": n_test}
+        positive_set = set(positive_images)
+        # Seed from videos that actually contain annotations, so no split ends up holding only
+        # background frames (a test split with no ground truth cannot produce a meaningful mAP).
+        with_pos = sorted(
+            (g for g in groups if any(i in positive_set for i in groups[g])),
+            key=lambda g: sum(i in positive_set for i in groups[g]),
+            reverse=True,
+        )
+        seeded = with_pos[: len(targets)]
+        rest = [g for g in groups if g not in set(seeded)]
+        seed_order = sorted(targets, key=lambda s: targets[s])
+        for split, g in zip(seed_order, seeded):
+            for img in groups[g]:
+                assign(img, split)
+        for g in sorted(rest, key=lambda g: len(groups[g]), reverse=True):
+            shortfall = {
+                s: (targets[s] - counts[s]) / max(targets[s], 1) for s in targets
+            }
+            split = max(shortfall, key=shortfall.get)
+            for img in groups[g]:
+                assign(img, split)
+    else:
+        if GROUP_AWARE_SPLIT and not unrecognized:
+            print(
+                f"Only {len(groups)} source video group(s) found: using an image-level split"
+            )
+
+        # Coverage-first: try to place each class in every split, then fill to ratios.
+        def choose(cls):
+            # sorted() on both the candidate list and the tie-break key: class_to_imgs holds sets,
+            # whose iteration order changes between Python processes, so without a total ordering
+            # the same seed produces a different split on every run.
+            cand = sorted(
+                i for i in class_to_imgs.get(cls, set()) if i not in split_for_image
+            )
+            if not cand:
+                return None
+            cand.sort(key=lambda i: (len(img_to_labels[i]), i))
+            return cand[0]
+
+        for split in ["train", "val", "test"]:
+            for cls in sorted(class_to_imgs):
+                if any(
+                    split_for_image.get(i) == split for i in sorted(class_to_imgs[cls])
+                ):
+                    continue
+                img = choose(cls)
+                if img is not None:
+                    assign(img, split)
+        remaining = [i for i in images if i not in split_for_image]
+        rng.shuffle(remaining)
+        for img in remaining:
+            needs = {
+                "train": n_train - counts["train"],
+                "val": n_val - counts["val"],
+                "test": n_test - counts["test"],
+            }
+            if max(needs.values()) <= 0:
+                assign(img, "train")
+            else:
+                top = max(needs.values())
+                assign(img, rng.choice([s for s, v in needs.items() if v == top]))
+
+    empty = [s for s, c in counts.items() if c == 0]
+    if empty:
+        raise ValueError(
+            f"Split(s) {empty} ended up empty. A dataset without a test split cannot give an "
+            f"honest final metric. Add more source videos, adjust the ratios, or set "
+            f"GROUP_AWARE_SPLIT = False."
+        )
+
+    # Write images + labels
+    SPLIT_MAP = {"train": "train", "val": "valid", "test": "test"}
+    for folder in SPLIT_MAP.values():
+        (DATASET_DIR / folder / "images").mkdir(parents=True, exist_ok=True)
+        (DATASET_DIR / folder / "labels").mkdir(parents=True, exist_ok=True)
+
+    grouped = {fn: g for fn, g in df_matched.groupby("filename")}
+    positive_set = set(positive_images)
+    stats = {
+        f: {"images": 0, "annotations": 0, "positive": 0, "negative": 0}
+        for f in SPLIT_MAP.values()
+    }
+
+    for filename, split in split_for_image.items():
+        folder = SPLIT_MAP[split]
+        src = image_index.get(filename)
+        if src is None:
+            continue
+        shutil.copy2(src, DATASET_DIR / folder / "images" / filename)
+        lines = []
+        if filename in grouped:
+            for row in grouped[filename].itertuples():
+                lines.append(
+                    f"{int(row.class_id)} {row.x_center:.6f} {row.y_center:.6f} "
+                    f"{row.w_norm:.6f} {row.h_norm:.6f}"
+                )
+        (DATASET_DIR / folder / "labels" / f"{Path(filename).stem}.txt").write_text(
+            "\n".join(lines)
+        )
+        stats[folder]["images"] += 1
+        stats[folder]["annotations"] += len(lines)
+        stats[folder]["positive" if filename in positive_set else "negative"] += 1
+
+    print(
+        f"\nDataset created from {n_images} images "
+        f"({len(positive_images)} positive, {len(negatives)} background):"
+    )
+    for folder, s in stats.items():
+        print(
+            f"  {folder}: {s['images']} images ({s['positive']} pos, {s['negative']} bg), "
+            f"{s['annotations']} annotations"
+        )
+
+    # Per-class image coverage across splits
+    blank = [f for f in ("train", "test") if stats[f]["annotations"] == 0]
+    if blank:
+        raise ValueError(
+            f"Split(s) {blank} contain images but no annotations, so they cannot train or "
+            f"evaluate anything. This usually means the videos holding your annotated frames "
+            f"all landed in one split. Adjust the ratios or set GROUP_AWARE_SPLIT = False."
+        )
+
+    # Split provenance, recorded so it can be written into the project YAML later
+    split_method = "video" if use_group else "image"
+    source_groups = len(groups) if use_group else 0
+    print(
+        f"\nSplit method: {split_method}"
+        + (f" ({source_groups} source videos)" if use_group else "")
+    )
+
+    coverage = {}
+    df_matched["split"] = df_matched["filename"].map(split_for_image)
+    print("\nPer-class image coverage:")
+    print(f"  {'Class':<32s} {'train':>6s} {'valid':>6s} {'test':>6s} {'status':>8s}")
+    warn = []
+    for cid, name in enumerate(class_names):
+        rows = df_matched[df_matched["class_id"] == cid][
+            ["filename", "split"]
+        ].drop_duplicates()
+        c = rows["split"].value_counts()
+        tr, va, te = int(c.get("train", 0)), int(c.get("val", 0)), int(c.get("test", 0))
+        ok = tr > 0 and va > 0 and te > 0
+        if not ok:
+            warn.append(name)
+        coverage[name] = {
+            "train": tr,
+            "valid": va,
+            "test": te,
+            "status": "ok" if ok else "check",
+        }
+        print(f"  {name:<32s} {tr:>6d} {va:>6d} {te:>6d} {'ok' if ok else 'check':>8s}")
+    if warn:
+        print(
+            "\nNote: these classes are not in every split (expected under group-aware "
+            "splitting when a class lives in only one video):"
+        )
+        for name in warn:
+            print(f"  - {name}")
+    else:
+        print("\nEvery retained class appears in train, valid, and test.")
+    ## Phase 4: Write data.yaml
+    data_yaml_path = DATASET_DIR / "data.yaml"
+    with open(data_yaml_path, "w") as f:
+        yaml.safe_dump(
+            {
+                "path": str(DATASET_DIR),
+                "train": "train/images",
+                "val": "valid/images",
+                "test": "test/images",
+                "nc": len(class_names),
+                "names": class_names,
+            },
+            f,
+            sort_keys=False,
+        )
+
+    print(f"Wrote {data_yaml_path}\n")
+    print(data_yaml_path.read_text())
+
+    # Structured summary of everything this converter did. Printed above for the user, and returned
+    # here as data so NB01/NB05 can record the dataset composition in the project YAML without
+    # recomputing it. This is the object the backend converter function should return.
+    converter_result = {
+        "data_yaml": str(data_yaml_path),
+        "task": "detect",
+        "classes": list(class_names),
+        "n_classes": len(class_names),
+        "split_method": split_method,
+        "source_groups": source_groups,
+        "splits": {folder: dict(s) for folder, s in stats.items()},
+        "audit": dict(audit),
+        "coverage": coverage,
+    }
+    print(
+        f"\nConverter summary stored in `converter_result` "
+        f"(keys: {', '.join(converter_result)}).\n"
+        f"Run `converter_result` in a cell to inspect it, or pass it on to the project setup."
+    )
+    return data_yaml_path
+
+
+def biigle_yolo_segmentation(
+    biigle_csv_path: str,
+    images_root: str,
+    dataset_dir: str,
+):
+    # Paths (absolute, or ~). Point CSV at the BIIGLE export, IMAGES_ROOT at the raw frames.
+    BIIGLE_CSV_PATH = Path(biigle_csv_path).expanduser()
+    IMAGES_ROOT = Path(images_root).expanduser()
+    OUTPUT_ROOT = Path(dataset_dir).expanduser()
+
+    # Class source: 'label_name' is the exact label (usually the species). Use 'label_hierarchy'
+    # to fold species up into parent classes instead.
+    CLASS_COLUMN = "label_name"
+
+    # Labels to drop (calibration points etc.). Case-insensitive.
+    EXCLUDE_LABELS = {"Laser point", "laser point", "Laser Point"}
+
+    # Split ratios (must sum to 1).
+    TRAIN_RATIO, VAL_RATIO, TEST_RATIO = 0.7, 0.2, 0.1
+
+    # Rare-class filter: keep a class only with at least this many annotations AND images.
+    MIN_ANNOTATIONS_PER_CLASS = 3
+    MIN_IMAGES_PER_CLASS = 3
+
+    # Background (annotation-free) frames. True + None = include all available. Written as empty masks.
+    INCLUDE_NEGATIVE_IMAGES = True
+    NEGATIVE_IMAGE_RATIO = None
+
+    # Group-aware split by source video (filename before '_frame_'); auto-falls back to image-level
+    # when fewer than 3 groups are found.
+    GROUP_AWARE_SPLIT = True
+
+    # Polygon handling. MIN_VERTICES drops degenerate shapes; SIMPLIFY_TOLERANCE (pixels) thins dense
+    # polygons via cv2.approxPolyDP (0 = keep every vertex; 1.0-2.0 good for 100+ vertex outlines).
+    MIN_VERTICES = 3
+    SIMPLIFY_TOLERANCE = 1.5
+
+    RANDOM_SEED = 42
+    VALID_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+
+    DATASET_DIR = OUTPUT_ROOT
+    assert (
+        abs(TRAIN_RATIO + VAL_RATIO + TEST_RATIO - 1.0) < 0.01
+    ), "Split ratios must sum to 1.0"
+    assert BIIGLE_CSV_PATH.is_file(), f"CSV not found: {BIIGLE_CSV_PATH}"
+    assert IMAGES_ROOT.is_dir(), f"Images dir not found: {IMAGES_ROOT}"
+    if DATASET_DIR.exists() and any(DATASET_DIR.iterdir()):
+        print(f"Warning: output dir not empty, may overwrite: {DATASET_DIR}")
+    else:
+        DATASET_DIR.mkdir(parents=True, exist_ok=True)
+
+    print(f"CSV:     {BIIGLE_CSV_PATH}")
+    print(f"Images:  {IMAGES_ROOT}")
+    print(f"Output:  {DATASET_DIR}")
+    print(
+        f"Classes: {CLASS_COLUMN} | Splits: {TRAIN_RATIO}/{VAL_RATIO}/{TEST_RATIO} | "
+        f"Group-aware: {GROUP_AWARE_SPLIT} | Simplify: {SIMPLIFY_TOLERANCE}px"
+    )
+    ## Phase 2: Load and convert to polygons
+    df = pd.read_csv(BIIGLE_CSV_PATH)
+    print(f"Loaded {len(df)} annotations")
+    audit = {"loaded": int(len(df))}
+
+    required = [
+        "filename",
+        "label_name",
+        "shape_name",
+        "points",
+        "attributes",
+        CLASS_COLUMN,
+    ]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise ValueError(f"CSV missing required columns: {missing}")
+
+    # Exclude non-training labels
+    if EXCLUDE_LABELS:
+        exclude_lower = {s.lower() for s in EXCLUDE_LABELS}
+        n = len(df)
+        df = df[
+            ~df["label_name"].astype(str).str.lower().isin(exclude_lower)
+        ].reset_index(drop=True)
+        if n - len(df):
+            print(f"Excluded {n - len(df)} annotations from EXCLUDE_LABELS")
+        audit["excluded_labels"] = int(n - len(df))
+
+    # Polygons only
+    shape_counts = df["shape_name"].value_counts().to_dict()
+    df = df[df["shape_name"] == "Polygon"].reset_index(drop=True)
+    print(
+        f"Polygon annotations: {len(df)} (other shapes skipped: "
+        f"{ {k: v for k, v in shape_counts.items() if k != 'Polygon'} })"
+    )
+    if df.empty:
+        raise ValueError(
+            "No Polygon annotations found. For boxes, use the detection converter."
+        )
+
+    # Image dimensions from attributes (tolerant)
+    def parse_attrs(s):
+        try:
+            return json.loads(s)
+        except Exception:
+            return {}
+
+    attrs = df["attributes"].apply(parse_attrs)
+    df["img_w"] = [d.get("width") for d in attrs]
+    df["img_h"] = [d.get("height") for d in attrs]
+    n = len(df)
+    df = df.dropna(subset=["img_w", "img_h"]).reset_index(drop=True)
+    if n - len(df):
+        print(f"Dropped {n - len(df)} annotations missing image width/height")
+    audit["missing_dimensions"] = int(n - len(df))
+
+    # Points -> normalized polygon. Tolerant of BIIGLE's 32767-char field truncation (returns None).
+    def normalize_polygon(points_str, img_w, img_h, tol):
+        try:
+            pts = json.loads(points_str)
+        except Exception:
+            return None
+        if len(pts) % 2 != 0:
+            pts = pts[:-1]
+        xs, ys = pts[0::2], pts[1::2]
+        if len(xs) > 1 and xs[0] == xs[-1] and ys[0] == ys[-1]:
+            xs, ys = xs[:-1], ys[:-1]  # drop BIIGLE's repeated closing vertex
+        if len(xs) < MIN_VERTICES:
+            return None
+        if tol > 0 and len(xs) > MIN_VERTICES:
+            contour = np.array(list(zip(xs, ys)), dtype=np.float32).reshape((-1, 1, 2))
+            approx = cv2.approxPolyDP(contour, tol, closed=True).reshape(-1, 2)
+            if len(approx) >= MIN_VERTICES:
+                xs, ys = approx[:, 0].tolist(), approx[:, 1].tolist()
+        norm = []
+        for x, y in zip(xs, ys):
+            norm.append(max(0.0, min(1.0, x / img_w)))
+            norm.append(max(0.0, min(1.0, y / img_h)))
+        return norm
+
+    df["seg_coords"] = df.apply(
+        lambda r: normalize_polygon(
+            r["points"], r["img_w"], r["img_h"], SIMPLIFY_TOLERANCE
+        ),
+        axis=1,
+    )
+    n_bad = df["seg_coords"].isna().sum()
+    if n_bad:
+        print(f"Dropped {n_bad} annotations with truncated/degenerate polygons")
+    audit["truncated_polygons"] = int(n_bad)
+    df = df[df["seg_coords"].notna()].reset_index(drop=True)
+
+    # Rare-class filter (annotations AND distinct images)
+    df["class_label"] = df[CLASS_COLUMN].astype(str)
+    summary = df.groupby("class_label").agg(
+        annotations=("class_label", "size"), images=("filename", "nunique")
+    )
+    rare = summary[
+        (summary["annotations"] < MIN_ANNOTATIONS_PER_CLASS)
+        | (summary["images"] < MIN_IMAGES_PER_CLASS)
+    ]
+    if not rare.empty:
+        print(f"\nRemoving {len(rare)} rare class(es):")
+        for name, row in rare.iterrows():
+            print(
+                f"  - {name}: {int(row['annotations'])} annotations, {int(row['images'])} images"
+            )
+        n_before_rare = len(df)
+        df = df[~df["class_label"].isin(rare.index)].reset_index(drop=True)
+        audit["rare_classes_removed"] = [str(x) for x in rare.index]
+        audit["rare_class_annotations_dropped"] = int(n_before_rare - len(df))
+    if df.empty:
+        raise ValueError("No annotations remain after rare-class filtering.")
+
+    class_names = sorted(df["class_label"].unique())
+    df["class_id"] = df["class_label"].map({n: i for i, n in enumerate(class_names)})
+    print(f"\nRetained {len(class_names)} classes:")
+    kept = (
+        df.groupby("class_label")
+        .agg(annotations=("class_label", "size"), images=("filename", "nunique"))
+        .loc[class_names]
+    )
+    for cid, name in enumerate(class_names):
+        r = kept.loc[name]
+        print(
+            f"  {cid}: {name} ({int(r['annotations'])} annotations, {int(r['images'])} images)"
+        )
+    print(f"\nConverted {len(df)} annotations to YOLO polygons")
+
+    audit.setdefault("excluded_labels", 0)
+    audit.setdefault("rare_classes_removed", [])
+    audit.setdefault("rare_class_annotations_dropped", 0)
+    audit["retained_annotations"] = int(len(df))
+    ## Phase 3: Split and build the dataset
+    rng = random.Random(RANDOM_SEED)
+
+    image_index = {
+        p.name: p
+        for p in IMAGES_ROOT.rglob("*")
+        if p.is_file() and p.suffix.lower() in VALID_EXTS
+    }
+
+    csv_filenames = set(df["filename"].unique())
+    unmatched = csv_filenames - set(image_index)
+    if unmatched:
+        print(
+            f"Warning: {len(unmatched)} CSV filenames not found in {IMAGES_ROOT.name}/"
+        )
+        for fn in sorted(unmatched)[:10]:
+            print(f"  - {fn}")
+        if len(unmatched) == len(csv_filenames):
+            raise FileNotFoundError(
+                "None of the CSV filenames were found on disk. Check IMAGES_ROOT."
+            )
+
+    df_matched = df[df["filename"].isin(image_index)].copy().reset_index(drop=True)
+    if df_matched.empty:
+        raise ValueError("No annotations left after matching filenames to images.")
+
+    img_to_labels = defaultdict(set)
+    class_to_imgs = defaultdict(set)
+    for row in df_matched.itertuples():
+        img_to_labels[row.filename].add(int(row.class_id))
+        class_to_imgs[int(row.class_id)].add(row.filename)
+    positive_images = sorted(img_to_labels)
+
+    all_annotated = set(pd.read_csv(BIIGLE_CSV_PATH)["filename"].unique())
+    neg_candidates = sorted(set(image_index) - all_annotated)
+    negatives = []
+    if INCLUDE_NEGATIVE_IMAGES and neg_candidates:
+        rng.shuffle(neg_candidates)
+        if NEGATIVE_IMAGE_RATIO is None:
+            n_neg = len(neg_candidates)
+        else:
+            n_neg = min(
+                int(round(len(positive_images) * NEGATIVE_IMAGE_RATIO)),
+                len(neg_candidates),
+            )
+        negatives = neg_candidates[:n_neg]
+        print(
+            f"Including {len(negatives)} background frames (of {len(neg_candidates)} available)"
+        )
+    else:
+        print(f"No background frames included ({len(neg_candidates)} available)")
+
+    images = sorted(positive_images + negatives)
+    n_images = len(images)
+    n_train = round(TRAIN_RATIO * n_images)
+    n_val = round(VAL_RATIO * n_images)
+    n_test = n_images - n_train - n_val
+
+    split_for_image = {}
+    counts = {"train": 0, "val": 0, "test": 0}
+
+    def assign(img, split):
+        if img in split_for_image:
+            return split_for_image[img] == split
+        split_for_image[img] = split
+        counts[split] += 1
+        return True
+
+    # Source video = the filename before '_frame_', matching our frame-extraction convention
+    # (<video>_frame_<number>.jpg). A filename that does not follow it tells us nothing about which
+    # video it came from, so rather than treating it as a video of its own we fall back to the
+    # image-level split for the whole dataset.
+    def group_of(filename):
+        m = re.match(r"(.+?)_frame_\d+$", Path(filename).stem)
+        return m.group(1) if m else None
+
+    group_of_image = {img: group_of(img) for img in images}
+    unrecognized = sorted(img for img, g in group_of_image.items() if g is None)
+    groups = defaultdict(list)
+    for img, g in group_of_image.items():
+        if g is not None:
+            groups[g].append(img)
+
+    use_group = GROUP_AWARE_SPLIT and not unrecognized and len(groups) >= 3
+    if GROUP_AWARE_SPLIT and unrecognized:
+        print(
+            f"{len(unrecognized)} filename(s) do not follow <video>_frame_<number>, so the source "
+            f"video cannot be inferred. Using an image-level split. Examples:"
+        )
+        for fn in unrecognized[:5]:
+            print(f"  - {fn}")
+
+    if use_group:
+        # Assign whole videos. Seed one video into each split first (smallest target first) so no
+        # split can end up empty, then fill by largest RELATIVE shortfall. Absolute shortfall with
+        # equal-sized groups ties toward train and can leave test with zero images.
+        print(f"Group-aware split across {len(groups)} source videos")
+        targets = {"train": n_train, "val": n_val, "test": n_test}
+        positive_set = set(positive_images)
+        # Seed from videos that actually contain annotations, so no split ends up holding only
+        # background frames (a test split with no ground truth cannot produce a meaningful mAP).
+        with_pos = sorted(
+            (g for g in groups if any(i in positive_set for i in groups[g])),
+            key=lambda g: sum(i in positive_set for i in groups[g]),
+            reverse=True,
+        )
+        seeded = with_pos[: len(targets)]
+        rest = [g for g in groups if g not in set(seeded)]
+        seed_order = sorted(targets, key=lambda s: targets[s])
+        for split, g in zip(seed_order, seeded):
+            for img in groups[g]:
+                assign(img, split)
+        for g in sorted(rest, key=lambda g: len(groups[g]), reverse=True):
+            shortfall = {
+                s: (targets[s] - counts[s]) / max(targets[s], 1) for s in targets
+            }
+            split = max(shortfall, key=shortfall.get)
+            for img in groups[g]:
+                assign(img, split)
+    else:
+        if GROUP_AWARE_SPLIT and not unrecognized:
+            print(
+                f"Only {len(groups)} source video group(s) found: using an image-level split"
+            )
+
+        def choose(cls):
+            # sorted() on both the candidate list and the tie-break key: class_to_imgs holds sets,
+            # whose iteration order changes between Python processes, so without a total ordering
+            # the same seed produces a different split on every run.
+            cand = sorted(
+                i for i in class_to_imgs.get(cls, set()) if i not in split_for_image
+            )
+            if not cand:
+                return None
+            cand.sort(key=lambda i: (len(img_to_labels[i]), i))
+            return cand[0]
+
+        for split in ["train", "val", "test"]:
+            for cls in sorted(class_to_imgs):
+                if any(
+                    split_for_image.get(i) == split for i in sorted(class_to_imgs[cls])
+                ):
+                    continue
+                img = choose(cls)
+                if img is not None:
+                    assign(img, split)
+        remaining = [i for i in images if i not in split_for_image]
+        rng.shuffle(remaining)
+        for img in remaining:
+            needs = {
+                "train": n_train - counts["train"],
+                "val": n_val - counts["val"],
+                "test": n_test - counts["test"],
+            }
+            if max(needs.values()) <= 0:
+                assign(img, "train")
+            else:
+                top = max(needs.values())
+                assign(img, rng.choice([s for s, v in needs.items() if v == top]))
+
+    empty = [s for s, c in counts.items() if c == 0]
+    if empty:
+        raise ValueError(
+            f"Split(s) {empty} ended up empty. A dataset without a test split cannot give an "
+            f"honest final metric. Add more source videos, adjust the ratios, or set "
+            f"GROUP_AWARE_SPLIT = False."
+        )
+
+    SPLIT_MAP = {"train": "train", "val": "valid", "test": "test"}
+    for folder in SPLIT_MAP.values():
+        (DATASET_DIR / folder / "images").mkdir(parents=True, exist_ok=True)
+        (DATASET_DIR / folder / "labels").mkdir(parents=True, exist_ok=True)
+
+    grouped = {fn: g for fn, g in df_matched.groupby("filename")}
+    positive_set = set(positive_images)
+    stats = {
+        f: {"images": 0, "annotations": 0, "positive": 0, "negative": 0}
+        for f in SPLIT_MAP.values()
+    }
+
+    for filename, split in split_for_image.items():
+        folder = SPLIT_MAP[split]
+        src = image_index.get(filename)
+        if src is None:
+            continue
+        shutil.copy2(src, DATASET_DIR / folder / "images" / filename)
+        lines = []
+        if filename in grouped:
+            for row in grouped[filename].itertuples():
+                coords = " ".join(f"{c:.6f}" for c in row.seg_coords)
+                lines.append(f"{int(row.class_id)} {coords}")
+        (DATASET_DIR / folder / "labels" / f"{Path(filename).stem}.txt").write_text(
+            "\n".join(lines)
+        )
+        stats[folder]["images"] += 1
+        stats[folder]["annotations"] += len(lines)
+        stats[folder]["positive" if filename in positive_set else "negative"] += 1
+
+    print(
+        f"\nDataset created from {n_images} images "
+        f"({len(positive_images)} positive, {len(negatives)} background):"
+    )
+    for folder, s in stats.items():
+        print(
+            f"  {folder}: {s['images']} images ({s['positive']} pos, {s['negative']} bg), "
+            f"{s['annotations']} annotations"
+        )
+
+    blank = [f for f in ("train", "test") if stats[f]["annotations"] == 0]
+    if blank:
+        raise ValueError(
+            f"Split(s) {blank} contain images but no annotations, so they cannot train or "
+            f"evaluate anything. This usually means the videos holding your annotated frames "
+            f"all landed in one split. Adjust the ratios or set GROUP_AWARE_SPLIT = False."
+        )
+
+    # Split provenance, recorded so it can be written into the project YAML later
+    split_method = "video" if use_group else "image"
+    source_groups = len(groups) if use_group else 0
+    print(
+        f"\nSplit method: {split_method}"
+        + (f" ({source_groups} source videos)" if use_group else "")
+    )
+
+    coverage = {}
+    df_matched["split"] = df_matched["filename"].map(split_for_image)
+    print("\nPer-class image coverage:")
+    print(f"  {'Class':<32s} {'train':>6s} {'valid':>6s} {'test':>6s} {'status':>8s}")
+    warn = []
+    for cid, name in enumerate(class_names):
+        rows = df_matched[df_matched["class_id"] == cid][
+            ["filename", "split"]
+        ].drop_duplicates()
+        c = rows["split"].value_counts()
+        tr, va, te = int(c.get("train", 0)), int(c.get("val", 0)), int(c.get("test", 0))
+        ok = tr > 0 and va > 0 and te > 0
+        if not ok:
+            warn.append(name)
+        coverage[name] = {
+            "train": tr,
+            "valid": va,
+            "test": te,
+            "status": "ok" if ok else "check",
+        }
+        print(f"  {name:<32s} {tr:>6d} {va:>6d} {te:>6d} {'ok' if ok else 'check':>8s}")
+    if warn:
+        print(
+            "\nNote: these classes are not in every split (expected under group-aware "
+            "splitting when a class lives in only one video):"
+        )
+        for name in warn:
+            print(f"  - {name}")
+    else:
+        print("\nEvery retained class appears in train, valid, and test.")
+
+    ## Phase 4: Write data.yaml
+    data_yaml_path = DATASET_DIR / "data.yaml"
+    with open(data_yaml_path, "w") as f:
+        yaml.safe_dump(
+            {
+                "path": str(DATASET_DIR),
+                "train": "train/images",
+                "val": "valid/images",
+                "test": "test/images",
+                "nc": len(class_names),
+                "names": class_names,
+            },
+            f,
+            sort_keys=False,
+        )
+
+    print(f"Wrote {data_yaml_path}\n")
+    print(data_yaml_path.read_text())
+
+    # Structured summary of everything this converter did. Printed above for the user, and returned
+    # here as data so NB01/NB05 can record the dataset composition in the project YAML without
+    # recomputing it. This is the object the backend converter function should return.
+    converter_result = {
+        "data_yaml": str(data_yaml_path),
+        "task": "segment",
+        "classes": list(class_names),
+        "n_classes": len(class_names),
+        "split_method": split_method,
+        "source_groups": source_groups,
+        "splits": {folder: dict(s) for folder, s in stats.items()},
+        "audit": dict(audit),
+        "coverage": coverage,
+    }
+    print(
+        f"\nConverter summary stored in `converter_result` "
+        f"(keys: {', '.join(converter_result)}).\n"
+        f"Run `converter_result` in a cell to inspect it, or pass it on to the project setup."
+    )
+    return data_yaml_path
 
 
 class auto_dataset_generator:
