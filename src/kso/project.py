@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Sequence, Tuple, Any, Optional
 from .data_preprocessing import (
     preprocess_biigle_csv,
+    biigle_yolo_segmentation,
+    biigle_yolo_detection,
     resolve_up,
     make_abs_path,
     make_relative_path,
@@ -248,8 +250,8 @@ class ProjectManager:
 
         if not project or not isinstance(project, Project):
             raise ValueError("'Project_path' must be a project instance.")
-        if data_path and not isinstance(data_path, str):
-            raise ValueError("'data_path' must be a non-empty string.")
+        if data_path and not isinstance(data_path, (str, Path)):
+            raise ValueError("'data_path' must be a non-empty string or Path.")
 
         Config_file_path = project.Config_file_path
         yaml_path = Path(Config_file_path)
@@ -260,8 +262,19 @@ class ProjectManager:
 
         if data_path:
             data_path = Path(data_path).expanduser()
+
             if not data_path.is_absolute():
                 data_path = resolve_up(relative_path=data_path)
+
+            if not data_path.exists():
+                raise FileNotFoundError(
+                    f"the provided path: {data_path} was not found."
+                )
+
+            if not data_path.is_file():
+                raise ValueError(
+                    f"data_path must be a file, not a directory: {data_path}"
+                )
 
             settings.update({"datasets_dir": str(data_path.parent)})
         else:
@@ -308,7 +321,35 @@ class ProjectManager:
         else:
             new_dir = Path(dataset_dir).expanduser()
 
-        biigle_yaml_path = preprocess_biigle_csv(
+        biigle_yaml_path = biigle_yolo_detection(
+            biigle_csv_path=data_path,
+            images_root=images_root,
+            dataset_dir=str(new_dir),
+        )
+        return biigle_yaml_path
+
+    def preprocess_Biigle_segmentation(self, images_root, data_path, dataset_dir=None):
+
+        if not images_root or not isinstance(images_root, str):
+            raise ValueError(f"{images_root} must be a non empty string")
+        if not data_path or not isinstance(data_path, str):
+            raise ValueError(f"{data_path} must be a non empty string")
+        if not dataset_dir:
+            home_path = self.home_path_synthesizer()
+            dataset_dir = home_path / "datasets"
+
+            idx = 0
+            while True:
+                suffix = "" if idx == 0 else f"_{idx}"
+                new_dir = dataset_dir / f"ifremer_sled_2026{suffix}"
+                if not new_dir.exists():
+                    new_dir.mkdir(parents=True)
+                    break
+                idx += 1
+        else:
+            new_dir = Path(dataset_dir).expanduser()
+
+        biigle_yaml_path = biigle_yolo_segmentation(
             biigle_csv_path=data_path,
             images_root=images_root,
             dataset_dir=str(new_dir),

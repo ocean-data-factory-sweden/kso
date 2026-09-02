@@ -1,28 +1,20 @@
 from __future__ import annotations
 from pathlib import Path
 import logging
-from typing import Any, Dict, Optional, List, Union
-import yaml
+from typing import Any, Dict, List, Union
 from dataclasses import asdict
 import os
-import sys
 from ultralytics import YOLO
 import re
 from .project import Project, ProjectManager
 from .data_preprocessing import resolve_up
-import psutil
 from urllib.parse import urlparse
 from mlflow.models.signature import infer_signature
 from mlflow_export_import.bulk.export_experiments import export_experiments
 from mlflow_export_import.bulk.import_experiments import import_experiments
 
 
-import json
 import pandas as pd
-import shutil
-from collections import defaultdict
-import random
-from PIL import Image
 from mlflow.pyfunc import PythonModel, PyFuncModel
 import numpy as np
 from ultralytics import settings
@@ -43,8 +35,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger("mlflow").setLevel(logging.WARNING)
 logging.getLogger("mlflow.store").setLevel(logging.WARNING)
 logging.getLogger("alembic").setLevel(logging.WARNING)
-
-logging.getLogger("ultralytics").setLevel(logging.WARNING)
+logging.getLogger("ultralytics").setLevel(logging.INFO)
 logging.getLogger("git").setLevel(logging.WARNING)
 logging.getLogger("git.cmd").setLevel(logging.WARNING)
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -214,6 +205,7 @@ class TrainingManager:
             return re.sub(r"[(B)]", "", yolo_result)
 
         with mlflow.start_run(run_name=model_name):
+
             results = yolo_model.train(
                 data=data_path, name=model_name, epochs=epochs, imgsz=imgsz, **kwargs
             )
@@ -221,7 +213,6 @@ class TrainingManager:
             mlflow.log_metrics(
                 {dict_mapper(k): v for k, v in results.results_dict.items()}
             )
-
             mlflow.log_artifacts(results.save_dir, artifact_path="yolo")
 
             best_weight_path = Path(results.save_dir) / "weights" / "best.pt"
@@ -258,12 +249,6 @@ class TrainingManager:
                 input_example=sample_input,
                 signature=signature,
             )
-            # copy model into run artifacts
-            local_model_dir = mlflow.artifacts.download_artifacts(
-                artifact_uri=model_info.model_uri
-            )
-
-            mlflow.log_artifacts(local_model_dir, artifact_path="model")
         mlflow.end_run()
 
         # Examine the deleted experiment details.
@@ -316,6 +301,11 @@ class TrainingManager:
             use_src_user_id=False,
             use_threads=False,
         )
+
+
+class InferenceManager:
+    def __init__(self):
+        pass
 
     def loading_model(self, project: Project, model_name: str, version: int):
         """load pyfuncModel from registred Mlflow models and versions"""

@@ -4,6 +4,7 @@ from .project import (
 )
 from .trainer import (
     TrainingManager,
+    InferenceManager,
 )
 from .serving_utils import (
     MLflowServerManager,
@@ -31,4 +32,5 @@ __all__ = [
     "Project",
     "video_frame_extractor",
     "auto_dataset_generator",
+    "InferenceManager",
 ]
