@@ -302,6 +302,11 @@ class TrainingManager:
             use_threads=False,
         )
 
+
+class InferenceManager:
+    def __init__(self):
+        pass
+
     def loading_model(self, project: Project, model_name: str, version: int):
         """load pyfuncModel from registred Mlflow models and versions"""
 
