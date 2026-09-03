@@ -150,14 +150,15 @@ jobs:
                 ;;
 
               edito)
-                cuda_version=false
+                cuda_version=12.6
+                cuda_patch_version=3
                 rocm_version=false
                 test=false
-                # onyxia-base is ubuntu:24.04 like cpu build
+                # onyxia-base gpu is based on nvidia/cuda:12.6.3-cudnn-devel-ubuntu24.04
                 platform_tag=edito-ubuntu24.04
-                base_image_base=docker.io/inseefrlab/onyxia-base:latest-2026.08.24
+                base_image_base=docker.io/inseefrlab/onyxia-base:latest-gpu-2026.08.24
                 ffmpeg_base_image=$base_image_base
-                python_requirements=requirements_cpu.txt
+                python_requirements=requirements_cuda${cuda_version}.txt
                 ;;
             esac
 
