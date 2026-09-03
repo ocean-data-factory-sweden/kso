@@ -6,6 +6,8 @@ ARG FFMPEG_BASE_IMAGE=docker.io/ubuntu:latest
 # ----------------------------------------------------------------------
 FROM ${FFMPEG_BASE_IMAGE} AS ffmpeg-build
 
+USER root
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
@@ -71,6 +73,8 @@ RUN mkdir -p /opt/ffmpeg && \
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+USER root
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install apt dependencies
@@ -109,6 +113,26 @@ COPY --from=ffmpeg-build /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
 ARG PIP_BREAK_SYSTEM_PACKAGES=1
 ARG PIP_ROOT_USER_ACTION=ignore
 ARG PIP_NO_CACHE_DIR=1
+
+# Create a separate python system environment
+ENV PYTHONHOME=/opt/python
+ENV PATH=$PYTHONHOME/bin:$PYTHONHOME/local/bin:$PATH
+RUN mkdir -p $PYTHONHOME/bin && \
+    ln -s /usr/bin/python3.12 $PYTHONHOME/bin/ && \
+    ln -s python3.12 $PYTHONHOME/bin/python3 && \
+    ln -s python3.12 $PYTHONHOME/bin/python && \
+    mkdir -p $PYTHONHOME/include/python3.12 && \
+    ln -s /usr/include/python3.12/* $PYTHONHOME/include/python3.12/ && \
+    mkdir -p $PYTHONHOME/lib && \
+    ln -s /usr/lib/python3.12 $PYTHONHOME/lib/ && \
+    ln -s local/etc local/share $PYTHONHOME/ && \
+    mkdir -p $PYTHONHOME/lib/python3/dist-packages && \
+    cp -r /usr/lib/python3/dist-packages/pip* $PYTHONHOME/lib/python3/dist-packages/ && \
+    cp -r /usr/lib/python3/dist-packages/wheel* $PYTHONHOME/lib/python3/dist-packages/ && \
+    cp -r /usr/lib/python3/dist-packages/setuptools* $PYTHONHOME/lib/python3/dist-packages/ && \
+    cp -r /usr/lib/python3/dist-packages/*distutils* $PYTHONHOME/lib/python3/dist-packages/ && \
+    cp -r /usr/lib/python3/dist-packages/pkg_resources $PYTHONHOME/lib/python3/dist-packages/ && \
+    python3 -m pip install --ignore-installed --upgrade pip
 
 # Install Python packages
 ARG PYTHON_REQUIREMENTS=requirements.txt

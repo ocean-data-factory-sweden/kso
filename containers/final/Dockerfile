@@ -1,21 +1,22 @@
 ARG BASE_IMAGE=ghcr.io/ocean-data-factory-sweden/kso-base:latest
 FROM ${BASE_IMAGE}
 
-# Set the user
-ARG NB_USER=jovyan
-ARG NB_UID=1500
-# Random number higher than 1000,
-# since 1000 is already in use in the base image.
-ENV USER=${NB_USER} \
-    NB_UID=${NB_UID} \
-    HOME=/home/${NB_USER}
-RUN adduser --disabled-password \
-    --gecos "Default user" \
-    --uid ${NB_UID} \
-    ${NB_USER}
+# Create user and group if not existing already
+# The variable names are consistent with onyxia-base image
+# used for edito image
+ENV USERNAME=${USERNAME:-jovyan}
+ENV UID=${UID:-1500}
+ENV GROUPNAME=${GROUPNAME:-users}
+ENV GID=${GID:-100}
+ENV HOME=/home/${USERNAME}
+RUN if ! getent passwd "${USERNAME}" > /dev/null 2>&1 ; then \
+      getent group "${GROUPNAME}" > /dev/null 2>&1 || addgroup --gid "${GID}" "${GROUPNAME}" ; \
+      adduser --disabled-password --gecos "Default user" \
+        --uid "${UID}" --gid "${GID}" --home "${HOME}" "${USERNAME}" ; \
+    fi
 
 # Copy KSO
-COPY --chown=${NB_UID}:${NB_UID} . /opt/kso
+COPY --chown=${UID}:${GID} . /opt/kso
 RUN chmod +x /opt/kso/containers/entrypoint.sh
 
 # Install KSO (all dependencies should be satisfied already)
@@ -39,7 +40,9 @@ RUN pip check || { \
 }
 
 # Set run environment
-USER ${NB_USER}
-WORKDIR /opt/kso
+USER ${USERNAME}
+ENV WORKSPACE_DIR=${WORKSPACE_DIR:-/opt/kso}
+WORKDIR ${WORKSPACE_DIR}
+EXPOSE 8888
 ENTRYPOINT ["/opt/kso/containers/entrypoint.sh"]
 CMD []
