@@ -133,8 +133,8 @@ jobs:
                 rocm_version=false
                 test=false
                 platform_tag=cuda$cuda_version-ubuntu$ubuntu_version
-                ffmpeg_base_image=nvcr.io/nvidia/cuda:$cuda_version.$cuda_patch_version-cudnn-devel-ubuntu$ubuntu_version
-                base_image_base=nvcr.io/nvidia/cuda:$cuda_version.$cuda_patch_version-cudnn-runtime-ubuntu$ubuntu_version
+                ffmpeg_base_image=nvcr.io/nvidia/cuda:$cuda_version.$cuda_patch_version-devel-ubuntu$ubuntu_version
+                base_image_base=nvcr.io/nvidia/cuda:$cuda_version.$cuda_patch_version-runtime-ubuntu$ubuntu_version
                 python_requirements=requirements_cuda${cuda_version}.txt
                 ;;
 
