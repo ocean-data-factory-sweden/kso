@@ -37,6 +37,7 @@ dependencies = [
     "panoptes-client==1.7.1",
     "pims>=0.7",
     "psutil>=7.0",
+    "pyworms",
     "pyyaml>=6.0",
     "requests>=2.31",
     "setuptools<81", # required by yolov5, but not defined in its dependencies
@@ -86,3 +87,4 @@ members = [
 [tool.uv.sources]
 kso2 = { workspace = true }
 mlflow-export-import = { git = "https://github.com/mlflow/mlflow-export-import.git", rev = "cf626079fc6729b10e34c2fd0fa3cf36fbfb30b2" }
+pyworms = { git = "https://github.com/iobis/pyworms.git", rev = "3e4584f0d928f71fd013843767e623f1a4dca61f" }
