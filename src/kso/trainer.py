@@ -358,9 +358,9 @@ class InferenceManager:
         mlflowdb = project.tracking
         tracking_uri = f"sqlite:///{str(mlflowdb)}"
         client = mlflow.tracking.MlflowClient(tracking_uri=tracking_uri)
-        model_name = project.model_name
+        model_name = model_name or project.model_name
 
-        if not model and model_name:
+        if not model:
             model = self.loading_model(
                 project=project, model_name=model_name, version=int(version)
             )

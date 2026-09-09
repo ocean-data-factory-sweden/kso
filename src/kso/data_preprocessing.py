@@ -201,7 +201,7 @@ def preprocess_biigle_csv(
     augment_factor: float = 0.5,
     random_seed=42,
     augment_train=True,
-) -> Path:
+):
     """
     Create a YOLO dataset from a biigle CSV file.
     Returns:
@@ -1057,7 +1057,7 @@ def biigle_yolo_detection(
         f"(keys: {', '.join(converter_result)}).\n"
         f"Run `converter_result` in a cell to inspect it, or pass it on to the project setup."
     )
-    return data_yaml_path
+    return (data_yaml_path, converter_result)
 
 
 def biigle_yolo_segmentation(
@@ -1544,7 +1544,7 @@ def biigle_yolo_segmentation(
         f"(keys: {', '.join(converter_result)}).\n"
         f"Run `converter_result` in a cell to inspect it, or pass it on to the project setup."
     )
-    return data_yaml_path
+    return (data_yaml_path, converter_result)
 
 
 class auto_dataset_generator:

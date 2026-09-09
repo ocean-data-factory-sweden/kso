@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Sequence, Tuple, Any, Optional
 from .data_preprocessing import (
-    preprocess_biigle_csv,
     biigle_yolo_segmentation,
     biigle_yolo_detection,
     resolve_up,
@@ -300,13 +299,18 @@ class ProjectManager:
             self.home_path = Path(__file__).resolve().parents[3]
         return self.home_path
 
-    def preprocess_Biigle(self, images_root, data_path, dataset_dir=None):
+    def preprocess_Biigle(
+        self,
+        images_root: str | Path = None,
+        data_path: str | Path = None,
+        dataset_dir: str | Path = None,
+    ):
 
-        if not images_root or not isinstance(images_root, str):
+        if not images_root or not isinstance(images_root, (str, Path)):
             raise ValueError(f"{images_root} must be a non empty string")
-        if not data_path or not isinstance(data_path, str):
+        if not data_path or not isinstance(data_path, (str, Path)):
             raise ValueError(f"{data_path} must be a non empty string")
-        if not dataset_dir:
+        if not dataset_dir or not isinstance(dataset_dir, (str, Path)):
             home_path = self.home_path_synthesizer()
             dataset_dir = home_path / "datasets"
 
@@ -320,6 +324,8 @@ class ProjectManager:
                 idx += 1
         else:
             new_dir = Path(dataset_dir).expanduser()
+            data_path = Path(data_path).expanduser()
+            images_root = Path(images_root).expanduser()
 
         biigle_yaml_path = biigle_yolo_detection(
             biigle_csv_path=data_path,
@@ -328,13 +334,18 @@ class ProjectManager:
         )
         return biigle_yaml_path
 
-    def preprocess_Biigle_segmentation(self, images_root, data_path, dataset_dir=None):
+    def preprocess_Biigle_segmentation(
+        self,
+        images_root: str | Path = None,
+        data_path: str | Path = None,
+        dataset_dir: str | Path = None,
+    ):
 
-        if not images_root or not isinstance(images_root, str):
+        if not images_root or not isinstance(images_root, (str, Path)):
             raise ValueError(f"{images_root} must be a non empty string")
-        if not data_path or not isinstance(data_path, str):
+        if not data_path or not isinstance(data_path, (str, Path)):
             raise ValueError(f"{data_path} must be a non empty string")
-        if not dataset_dir:
+        if not dataset_dir or not isinstance(dataset_dir, (str, Path)):
             home_path = self.home_path_synthesizer()
             dataset_dir = home_path / "datasets"
 
@@ -348,6 +359,8 @@ class ProjectManager:
                 idx += 1
         else:
             new_dir = Path(dataset_dir).expanduser()
+            data_path = Path(data_path).expanduser()
+            images_root = Path(images_root).expanduser()
 
         biigle_yaml_path = biigle_yolo_segmentation(
             biigle_csv_path=data_path,
@@ -371,6 +384,7 @@ class ProjectManager:
             raise ValueError("'model' must be non-empty string")
         if not isinstance(model_name, str):
             raise ValueError("'model_name' must be a non-empty string")
+        model_name = self.sanitized_name(model_name)
         project_name = project.project_name
         yaml_path = Path(project.Config_file_path)
         project_path = Path(project.project_path)
