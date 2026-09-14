@@ -417,6 +417,15 @@ wheels = [
 ]
 
 [[package]]
+name = "backports-functools-lru-cache"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/dc/a1962ae19f83d2a92b8ac76ad2dfdeccf2748464f1560a51d343b9e2609a/backports.functools_lru_cache-2.0.0.tar.gz", hash = "sha256:dcbfa5e0dae8a014168807c9e026d33eead71df5af76c1fb78fd248bf07f6f99", size = 11578 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c6/c6/4761a2ccb03d650ca803b11a7cdd69ff0696926d3fea218c8ca22c808448/backports.functools_lru_cache-2.0.0-py2.py3-none-any.whl", hash = "sha256:0a754323a46847735a112677fb8807b45f6d824d02a5795a50905218ac56a0d6", size = 6657 },
+]
+
+[[package]]
 name = "beautifulsoup4"
 version = "4.14.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2423,6 +2432,7 @@ dependencies = [
     { name = "panoptes-client" },
     { name = "pims" },
     { name = "psutil" },
+    { name = "pyworms" },
     { name = "pyyaml" },
     { name = "requests" },
     { name = "setuptools" },
@@ -2492,6 +2502,7 @@ requires-dist = [
     { name = "psutil", specifier = ">=7.0" },
     { name = "pylint", marker = "extra == 'dev'", specifier = "==3.3.8" },
     { name = "pytest", marker = "extra == 'dev'", specifier = "==8.4.2" },
+    { name = "pyworms", git = "https://github.com/iobis/pyworms.git?rev=3e4584f0d928f71fd013843767e623f1a4dca61f" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "requests", specifier = ">=2.31" },
     { name = "setuptools", specifier = "<81" },
@@ -4460,6 +4471,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/63/32/40a775343ace542cc43ece3f1d1fce454021521ecac41c4c4573081c2336/pywinpty-3.0.3-cp314-cp314-win_arm64.whl", hash = "sha256:34789d685fc0d547ce0c8a65e5a70e56f77d732fa6e03c8f74fefb8cbb252019", size = 234207 },
     { url = "https://files.pythonhosted.org/packages/8d/54/5d5e52f4cb75028104ca6faf36c10f9692389b1986d34471663b4ebebd6d/pywinpty-3.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:0c37e224a47a971d1a6e08649a1714dac4f63c11920780977829ed5c8cadead1", size = 2112910 },
     { url = "https://files.pythonhosted.org/packages/0a/44/dcd184824e21d4620b06c7db9fbb15c3ad0a0f1fa2e6de79969fb82647ec/pywinpty-3.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:c4e9c3dff7d86ba81937438d5819f19f385a39d8f592d4e8af67148ceb4f6ab5", size = 233425 },
+]
+
+[[package]]
+name = "pyworms"
+version = "0.4.0"
+source = { git = "https://github.com/iobis/pyworms.git?rev=3e4584f0d928f71fd013843767e623f1a4dca61f#3e4584f0d928f71fd013843767e623f1a4dca61f" }
+dependencies = [
+    { name = "backports-functools-lru-cache" },
+    { name = "requests" },
 ]
 
 [[package]]
