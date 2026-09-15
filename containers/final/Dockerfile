@@ -47,6 +47,7 @@ RUN pip check || { \
 COPY containers/entrypoint.sh /opt/entrypoint.sh
 RUN chmod +x /opt/entrypoint.sh
 USER ${USERNAME}
+ARG WORKSPACE_DIR
 ENV WORKSPACE_DIR=${WORKSPACE_DIR:-/opt/kso}
 WORKDIR ${WORKSPACE_DIR}
 EXPOSE 8888
