@@ -186,7 +186,6 @@ ARG PYTHON_REQUIREMENTS=requirements.txt
 COPY containers/requirements.txt /opt/kso/
 COPY containers/$PYTHON_REQUIREMENTS /opt/kso/
 RUN pip install -r /opt/kso/requirements.txt -r "/opt/kso/$PYTHON_REQUIREMENTS"
-RUN pip install papermill
 
 # Install MIOpen kdb files with ROCm PyTorch wheels, see
 # https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/3rd-party/pytorch-install.html#using-a-wheels-package
