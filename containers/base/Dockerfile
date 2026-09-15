@@ -176,6 +176,9 @@ ARG PYTHON_DIR=/opt/python
 COPY --from=python-build $PYTHON_DIR $PYTHON_DIR
 ENV PATH=$PYTHON_DIR/bin:$PATH
 
+# Check that all runtime dependencies are installed
+RUN python3 -c "import bz2, ctypes, lzma, readline, sqlite3, ssl, uuid, zlib; print('Runtime OK')"
+
 # Install Python packages
 ARG PIP_ROOT_USER_ACTION=ignore
 ARG PIP_NO_CACHE_DIR=1
