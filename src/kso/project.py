@@ -11,6 +11,7 @@ from .data_preprocessing import (
 )
 import yaml
 import os
+import tempfile
 import sys
 from pathlib import Path
 from dataclasses import dataclass
@@ -116,7 +117,11 @@ class ProjectManager:
                 "data_path": {
                     "ultralytics_data_path": str(ultralytics_data),
                 },
+                "datasets": [],
                 "models": [],
+                "inferences": [],
+                "analyses": [],
+                "publications": [],
                 "tracking": {
                     "mlflow": {
                         "experiment_name": None,
@@ -240,6 +245,121 @@ class ProjectManager:
             yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
         logging.info("data was dumped successfully")
         return data
+
+    def _atomic_yaml_dump(self, yaml_path: str | Path, data: Dict[str, Any]):
+        """
+        Write the project YAML so that a failure cannot damage the old file.
+
+        The data is serialised into a temporary file in the same directory and
+        only then moved over the original. The move is atomic on a single
+        filesystem, so a serialisation error leaves the original untouched
+        rather than truncated.
+        """
+        yaml_path = Path(yaml_path).expanduser()
+        handle_id, tmp_name = tempfile.mkstemp(
+            dir=str(yaml_path.parent),
+            prefix=yaml_path.name,
+            suffix=".tmp",
+        )
+        tmp_path = Path(tmp_name)
+        try:
+            with os.fdopen(handle_id, "w", encoding="utf-8") as handle:
+                yaml.safe_dump(data, handle, sort_keys=False, default_flow_style=False)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_path, yaml_path)
+        except Exception:
+            tmp_path.unlink(missing_ok=True)
+            raise
+        return data
+
+    def record(
+        self,
+        project: Project,
+        collection: str,
+        entry: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Write one entry into a flat collection in the project YAML.
+
+        The collections are datasets, models, inferences, analyses and
+        publications. Each is written by the pipeline step that owns it, and
+        the caller supplies the complete record.
+
+        An entry is identified by "model_name" in models and by "name" in
+        every other collection. Recording an entry whose identifier already
+        exists replaces that entry completely, so re-running a step updates
+        its record instead of appending a duplicate. Everything else in the
+        file is preserved.
+
+        Only one writer should touch the project file at a time. Owning a
+        collection is not protection against a concurrent write to the file.
+        """
+        collections = (
+            "datasets",
+            "models",
+            "inferences",
+            "analyses",
+            "publications",
+        )
+        if not project or not isinstance(project, Project):
+            raise ValueError("'project' must be a Project instance.")
+        if collection not in collections:
+            raise ValueError(f"'collection' must be one of {collections}.")
+        if not entry or not isinstance(entry, dict):
+            raise TypeError("'entry' must be a non-empty dictionary.")
+
+        key = "model_name" if collection == "models" else "name"
+        name = entry.get(key)
+        if not name or not isinstance(name, str):
+            raise ValueError(f"'entry' must carry a non-empty '{key}'.")
+        if collection == "models" and not entry.get("model_path"):
+            # load_project reads model_path for every model in the list, so an
+            # entry without one would break loading the project afterwards.
+            raise ValueError("a models entry must carry a non-empty 'model_path'.")
+
+        yaml_path = Path(project.Config_file_path).expanduser()
+        if not yaml_path.exists():
+            raise FileNotFoundError(f"{yaml_path} not found.")
+
+        data = self.yaml_data_retrieve(yaml_path=yaml_path)
+        if not isinstance(data, dict):
+            raise TypeError(f"{yaml_path} does not contain a mapping.")
+
+        # An absent collection is a legacy file, which is fine. A collection
+        # holding something other than a list is a real problem.
+        records = data.get(collection)
+        if records is None:
+            records = []
+        if not isinstance(records, list):
+            raise TypeError(f"'{collection}' in {yaml_path} is not a list.")
+
+        names = []
+        for item in records:
+            if not isinstance(item, dict):
+                raise TypeError(
+                    f"every entry in '{collection}' must be a mapping, "
+                    f"found {type(item).__name__}."
+                )
+            names.append(item.get(key))
+
+        if names.count(name) > 1:
+            raise ValueError(
+                f"'{collection}' already holds more than one entry named "
+                f"'{name}'. Resolve the duplicate before recording."
+            )
+
+        if name in names:
+            records[names.index(name)] = entry
+            action = "updated"
+        else:
+            records.append(entry)
+            action = "added"
+
+        data[collection] = records
+        self._atomic_yaml_dump(yaml_path=yaml_path, data=data)
+        logging.info(f"{collection}: {name} {action} in {yaml_path}")
+        return entry
 
     def add_data(
         self,
