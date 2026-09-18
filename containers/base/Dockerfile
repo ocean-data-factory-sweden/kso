@@ -183,9 +183,9 @@ RUN python3 -c "import bz2, ctypes, lzma, readline, sqlite3, ssl, uuid, zlib; pr
 ARG PIP_ROOT_USER_ACTION=ignore
 ARG PIP_NO_CACHE_DIR=1
 ARG PYTHON_REQUIREMENTS=requirements.txt
-COPY containers/requirements.txt /opt/kso/
-COPY containers/$PYTHON_REQUIREMENTS /opt/kso/
-RUN pip install -r /opt/kso/requirements.txt -r "/opt/kso/$PYTHON_REQUIREMENTS"
+COPY containers/requirements.txt /opt/
+COPY containers/$PYTHON_REQUIREMENTS /opt/
+RUN pip install -r /opt/requirements.txt -r "/opt/$PYTHON_REQUIREMENTS"
 
 # Install MIOpen kdb files with ROCm PyTorch wheels, see
 # https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/3rd-party/pytorch-install.html#using-a-wheels-package
