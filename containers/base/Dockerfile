@@ -6,6 +6,8 @@ ARG FFMPEG_BASE_IMAGE=docker.io/ubuntu:latest
 # ----------------------------------------------------------------------
 FROM ${FFMPEG_BASE_IMAGE} AS ffmpeg-build
 
+USER root
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
@@ -66,20 +68,70 @@ RUN mkdir -p /opt/ffmpeg && \
 
 
 # ----------------------------------------------------------------------
+#  Stage for building python
+# ----------------------------------------------------------------------
+FROM ${BASE_IMAGE} AS python-build
+
+USER root
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG PYTHON_VERSION=3.12.14
+ARG PYTHON_DIR=/opt/python
+
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
+        build-essential \
+        ca-certificates \
+        dpkg-dev \
+        libbz2-dev \
+        libdb-dev \
+        libffi-dev \
+        libgdbm-dev \
+        liblzma-dev \
+        libncurses-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libssl-dev \
+        tk-dev \
+        uuid-dev \
+        wget \
+        xz-utils \
+        zlib1g-dev \
+        && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir /opt/src && \
+    cd /opt/src && \
+    wget -q "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" && \
+    tar xzf "Python-${PYTHON_VERSION}.tgz" && \
+    cd "Python-${PYTHON_VERSION}" && \
+    ./configure \
+        --prefix="${PYTHON_DIR}" \
+        --enable-optimizations \
+        --enable-shared \
+        --with-lto \
+        LDFLAGS="-Wl,-rpath,${PYTHON_DIR}/lib" \
+        && \
+    make -j $(nproc) && \
+    make install
+
+RUN ln -s python3 "${PYTHON_DIR}/bin/python" && \
+    ln -s pip3 "${PYTHON_DIR}/bin/pip"
+
+
+# ----------------------------------------------------------------------
 #  Final image
 # ----------------------------------------------------------------------
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
+
+USER root
 
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install apt dependencies
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
-        # Python
-        python3.12 \
-        python3-pip \
-        python3.12-venv \
         # General utilities
         adduser \
         git \
@@ -95,6 +147,20 @@ RUN apt-get update && \
         # For OpenCV
         libgl1 \
         libglib2.0-0 \
+        # For python
+        libbz2-1.0 \
+        libdb5.3t64 \
+        libffi8 \
+        libgdbm6t64 \
+        liblzma5 \
+        libncursesw6 \
+        libreadline8t64 \
+        libsqlite3-0 \
+        libssl3t64 \
+        libtinfo6 \
+        tk \
+        uuid-runtime \
+        zlib1g \
         # Are these needed?
         # libmagic1 \
         # libsm6 \
@@ -102,20 +168,24 @@ RUN apt-get update && \
         && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Copy ffmpeg
 COPY --from=ffmpeg-build /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
 
-# Install pip packages directly so that the user can create
-# their own venv with --system-site-packages to use the packages in the container
-ARG PIP_BREAK_SYSTEM_PACKAGES=1
-ARG PIP_ROOT_USER_ACTION=ignore
-ARG PIP_NO_CACHE_DIR=1
+# Copy python
+ARG PYTHON_DIR=/opt/python
+COPY --from=python-build $PYTHON_DIR $PYTHON_DIR
+ENV PATH=$PYTHON_DIR/bin:$PATH
+
+# Check that all runtime dependencies are installed
+RUN python3 -c "import bz2, ctypes, lzma, readline, sqlite3, ssl, uuid, zlib; print('Runtime OK')"
 
 # Install Python packages
+ARG PIP_ROOT_USER_ACTION=ignore
+ARG PIP_NO_CACHE_DIR=1
 ARG PYTHON_REQUIREMENTS=requirements.txt
-COPY containers/requirements.txt /opt/kso/
-COPY containers/$PYTHON_REQUIREMENTS /opt/kso/
-RUN pip install -r /opt/kso/requirements.txt -r "/opt/kso/$PYTHON_REQUIREMENTS"
-RUN pip install papermill
+COPY containers/requirements.txt /opt/
+COPY containers/$PYTHON_REQUIREMENTS /opt/
+RUN pip install -r /opt/requirements.txt -r "/opt/$PYTHON_REQUIREMENTS"
 
 # Install MIOpen kdb files with ROCm PyTorch wheels, see
 # https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/3rd-party/pytorch-install.html#using-a-wheels-package
