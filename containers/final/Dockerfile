@@ -26,7 +26,6 @@ COPY --chown=${UID}:${GID} . /opt/kso
 RUN chmod +x /opt/kso/containers/entrypoint.sh
 
 # Install KSO (all dependencies should be satisfied already)
-ARG PIP_BREAK_SYSTEM_PACKAGES=1
 ARG PIP_ROOT_USER_ACTION=ignore
 ARG PIP_NO_CACHE_DIR=1
 RUN pip install --no-deps /opt/kso[dev]
