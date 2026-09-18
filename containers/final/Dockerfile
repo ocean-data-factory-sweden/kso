@@ -1,12 +1,18 @@
 ARG BASE_IMAGE=ghcr.io/ocean-data-factory-sweden/kso-base:latest
 FROM ${BASE_IMAGE}
 
+USER root
+
 # Create user and group if not existing already
 # The variable names are consistent with onyxia-base image
 # used for edito image
+ARG USERNAME
 ENV USERNAME=${USERNAME:-jovyan}
+ARG UID
 ENV UID=${UID:-1500}
+ARG GROUPNAME
 ENV GROUPNAME=${GROUPNAME:-users}
+ARG GID
 ENV GID=${GID:-100}
 ENV HOME=/home/${USERNAME}
 RUN if ! getent passwd "${USERNAME}" > /dev/null 2>&1 ; then \
@@ -41,6 +47,7 @@ RUN pip check || { \
 COPY containers/entrypoint.sh /opt/entrypoint.sh
 RUN chmod +x /opt/entrypoint.sh
 USER ${USERNAME}
+ARG WORKSPACE_DIR
 ENV WORKSPACE_DIR=${WORKSPACE_DIR:-/opt/kso}
 WORKDIR ${WORKSPACE_DIR}
 EXPOSE 8888
