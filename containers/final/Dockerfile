@@ -23,7 +23,6 @@ RUN if ! getent passwd "${USERNAME}" > /dev/null 2>&1 ; then \
 
 # Copy KSO
 COPY --chown=${UID}:${GID} . /opt/kso
-RUN chmod +x /opt/kso/containers/entrypoint.sh
 
 # Install KSO (all dependencies should be satisfied already)
 ARG PIP_ROOT_USER_ACTION=ignore
@@ -45,10 +44,12 @@ RUN pip check || { \
 }
 
 # Set run environment
+COPY containers/entrypoint.sh /opt/entrypoint.sh
+RUN chmod +x /opt/entrypoint.sh
 USER ${USERNAME}
 ARG WORKSPACE_DIR
 ENV WORKSPACE_DIR=${WORKSPACE_DIR:-/opt/kso}
 WORKDIR ${WORKSPACE_DIR}
 EXPOSE 8888
-ENTRYPOINT ["/opt/kso/containers/entrypoint.sh"]
+ENTRYPOINT ["/opt/entrypoint.sh"]
 CMD []
