@@ -286,6 +286,5 @@ whenever==0.7.3
 widgetsnbextension==4.0.15
 xyzservices==2025.11.0
 yarl==1.22.0
-yolov5==7.0.14
 zipp==3.23.0
 zstandard==0.25.0
