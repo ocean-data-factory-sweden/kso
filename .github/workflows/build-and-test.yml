@@ -125,6 +125,7 @@ jobs:
                 ffmpeg_base_image=docker.io/ubuntu:$ubuntu_version
                 base_image_base=docker.io/ubuntu:$ubuntu_version
                 python_requirements=requirements_cpu.txt
+                docker_platforms=linux/amd64
                 ;;
 
               cuda)
@@ -136,6 +137,7 @@ jobs:
                 ffmpeg_base_image=nvcr.io/nvidia/cuda:$cuda_version.$cuda_patch_version-cudnn-devel-ubuntu$ubuntu_version
                 base_image_base=nvcr.io/nvidia/cuda:$cuda_version.$cuda_patch_version-cudnn-runtime-ubuntu$ubuntu_version
                 python_requirements=requirements_cuda${cuda_version}.txt
+                docker_platforms=linux/amd64,linux/arm64
                 ;;
 
               rocm)
@@ -147,6 +149,7 @@ jobs:
                 ffmpeg_base_image=docker.io/rocm/dev-ubuntu-$ubuntu_version:$rocm_version.$rocm_patch_version
                 base_image_base=docker.io/rocm/dev-ubuntu-$ubuntu_version:$rocm_version.$rocm_patch_version
                 python_requirements=requirements_rocm${rocm_version}.txt
+                docker_platforms=linux/amd64
                 ;;
 
               edito)
@@ -242,6 +245,7 @@ jobs:
               final_image \
               final_image_tags \
               python_requirements \
+              docker_platforms \
             ; do
               jq_inline --arg p $platform --arg k "$k" --arg v "${!k}" '.[$p][$k]=$v' plan.json
             done
@@ -300,7 +304,7 @@ jobs:
         if: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['build_base_image'] == 'true' }}
         with:
           file: containers/base/Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['docker_platforms'] }}
           provenance: false   # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
           sbom: false         # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
           push: true
@@ -399,11 +403,10 @@ jobs:
         if: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['build_final_image'] == 'true' }}
         with:
           file: containers/final/Dockerfile
-          platforms: linux/amd64
+          platforms: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['docker_platforms'] }}
           provenance: false   # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
           sbom: false         # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
           push: true
           tags: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['final_image_tags'] }}
           build-args: |
             BASE_IMAGE=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
-            CUDA=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['cuda'] }}
