@@ -54,10 +54,15 @@ RUN mkdir -p /opt/src && \
       ffmpeg_config_flags="$ffmpeg_config_flags \
           --enable-nonfree \
           --enable-cuda-nvcc \
-          --enable-libnpp \
           --extra-cflags=-I/usr/local/cuda/include \
           --extra-ldflags=-L/usr/local/cuda/lib64 \
       "; \
+      if [ "${CUDA_VERSION%%.*}" = "13" ] ; then \
+        # CUDA 13 dropped support for default sm_60; override with nvccflags
+        ffmpeg_config_flags="$ffmpeg_config_flags \
+            --nvccflags='-gencode arch=compute_75,code=sm_75 -O2' \
+        "; \
+      fi ; \
     fi && \
     if [ "$ROCM_VERSION" != "false" ] ; then \
       # Install vaapi if ROCm is enabled
@@ -77,7 +82,7 @@ RUN mkdir -p /opt/src && \
     git clone -b n8.0.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git ffmpeg && \
     cd ffmpeg && \
     echo "ffmpeg configure flags: $ffmpeg_config_flags" && \
-    ./configure $ffmpeg_config_flags && \
+    eval "./configure $ffmpeg_config_flags" && \
     make -j $(nproc) && \
     make install
 
@@ -213,7 +218,7 @@ RUN python3 -c "import bz2, ctypes, lzma, readline, sqlite3, ssl, uuid, zlib; pr
 # Install Python packages
 ARG PIP_ROOT_USER_ACTION=ignore
 ARG PIP_NO_CACHE_DIR=1
-ARG PYTHON_REQUIREMENTS=requirements.txt
+ARG PYTHON_REQUIREMENTS=requirements_default.txt
 COPY containers/requirements.txt /opt/
 COPY containers/$PYTHON_REQUIREMENTS /opt/
 RUN pip install -r /opt/requirements.txt -r "/opt/$PYTHON_REQUIREMENTS"
