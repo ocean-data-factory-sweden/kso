@@ -121,7 +121,7 @@ jobs:
                 cuda_version=false
                 rocm_version=false
                 test=true
-                platform_tag=ubuntu$ubuntu_version
+                platform_tag=cpu-ubuntu$ubuntu_version
                 ffmpeg_base_image=docker.io/ubuntu:$ubuntu_version
                 base_image_base=docker.io/ubuntu:$ubuntu_version
                 python_requirements=requirements_cpu.txt

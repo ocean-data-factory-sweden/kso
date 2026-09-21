@@ -109,12 +109,12 @@ Any changes you make will be lost when the container stops unless you save them 
 
 ```bash
 # Pull kso with a suitable backend
-docker pull ghcr.io/ocean-data-factory-sweden/kso:dev-ubuntu24.04             # CPU only
+docker pull ghcr.io/ocean-data-factory-sweden/kso:dev-cpu-ubuntu24.04         # CPU only
 # docker pull ghcr.io/ocean-data-factory-sweden/kso:dev-cuda12.9-ubuntu24.04  # CUDA / NVIDIA GPUs
 # docker pull ghcr.io/ocean-data-factory-sweden/kso:dev-rocm6.4-ubuntu24.04   # ROCm / AMD GPUs
 
 # Run the notebooks
-docker run -it --rm -p 8888:8888 ghcr.io/ocean-data-factory-sweden/kso:dev-ubuntu24.04 notebooks/
+docker run -it --rm -p 8888:8888 ghcr.io/ocean-data-factory-sweden/kso:dev-cpu-ubuntu24.04 notebooks/
 # docker run -it --rm -p 8888:8888 --gpus all ghcr.io/ocean-data-factory-sweden/kso:dev-cuda12.9-ubuntu24.04 notebooks/
 # docker run -it --rm -p 8888:8888 --device /dev/kfd --device /dev/dri ghcr.io/ocean-data-factory-sweden/kso:dev-rocm6.4-ubuntu24.04 notebooks/
 
