@@ -7,6 +7,7 @@ ARG FFMPEG_BASE_IMAGE=docker.io/ubuntu:latest
 FROM ${FFMPEG_BASE_IMAGE} AS ffmpeg-build
 
 ARG DEBIAN_FRONTEND=noninteractive
+ARG FFMPEG_DIR=/opt/ffmpeg
 
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
@@ -31,8 +32,10 @@ RUN apt-get update && \
 # Build ffmpeg with CUDA and ROCm support from source
 ARG CUDA_VERSION=false
 ARG ROCM_VERSION=false
-RUN mkdir -p /opt/ffmpeg && \
+RUN mkdir -p /opt/src && \
+    cd /opt/src && \
     ffmpeg_config_flags="\
+        --prefix="${FFMPEG_DIR}" \
         --enable-openssl --enable-version3 \
         --disable-doc \
         --disable-ffplay \
@@ -74,10 +77,7 @@ RUN mkdir -p /opt/ffmpeg && \
     echo "ffmpeg configure flags: $ffmpeg_config_flags" && \
     ./configure $ffmpeg_config_flags && \
     make -j $(nproc) && \
-    make install && \
-    make clean && \
-    cd .. && \
-    rm -rf ffmpeg
+    make install
 
 
 # ----------------------------------------------------------------------
@@ -130,7 +130,11 @@ RUN if [ "$ROCM_VERSION" != "false" ] ; then \
             && \
         apt-get clean && rm -rf /var/lib/apt/lists/*; \
     fi
-COPY --from=ffmpeg-build /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
+
+# Copy ffmpeg
+ARG FFMPEG_DIR=/opt/ffmpeg
+COPY --from=ffmpeg-build $FFMPEG_DIR $FFMPEG_DIR
+ENV PATH=$FFMPEG_DIR/bin:$PATH
 
 # Install pip packages directly so that the user can create
 # their own venv with --system-site-packages to use the packages in the container
