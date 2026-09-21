@@ -305,8 +305,6 @@ jobs:
         with:
           file: containers/base/Dockerfile
           platforms: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['docker_platforms'] }}
-          provenance: false   # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
-          sbom: false         # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
           push: true
           tags: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image_tags'] }}
           cache-to: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image_cache_to'] }}
@@ -404,8 +402,6 @@ jobs:
         with:
           file: containers/final/Dockerfile
           platforms: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['docker_platforms'] }}
-          provenance: false   # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
-          sbom: false         # Disable to avoid unknown/unknown; see https://github.com/orgs/community/discussions/45969
           push: true
           tags: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['final_image_tags'] }}
           build-args: |
