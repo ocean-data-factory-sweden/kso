@@ -133,7 +133,7 @@ RUN if [ "$ROCM_VERSION" != "false" ] ; then \
 
 # Copy ffmpeg
 ARG FFMPEG_DIR=/opt/ffmpeg
-COPY --from=ffmpeg-build $FFMPEG_DIR $FFMPEG_DIR
+COPY --from=ffmpeg-build $FFMPEG_DIR/bin $FFMPEG_DIR/bin
 ENV PATH=$FFMPEG_DIR/bin:$PATH
 
 # Install pip packages directly so that the user can create
