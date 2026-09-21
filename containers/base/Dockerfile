@@ -28,9 +28,9 @@ RUN apt-get update && \
         && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Build ffmpeg with CUDA support from source
-# TODO: Add ROCm support
+# Build ffmpeg with CUDA and ROCm support from source
 ARG CUDA_VERSION=false
+ARG ROCM_VERSION=false
 RUN mkdir -p /opt/ffmpeg && \
     ffmpeg_config_flags="\
         --enable-openssl --enable-version3 \
@@ -52,6 +52,21 @@ RUN mkdir -p /opt/ffmpeg && \
           --enable-libnpp \
           --extra-cflags=-I/usr/local/cuda/include \
           --extra-ldflags=-L/usr/local/cuda/lib64 \
+      "; \
+    fi && \
+    if [ "$ROCM_VERSION" != "false" ] ; then \
+      # Install vaapi if ROCm is enabled
+      apt-get update -qy && \
+      apt-get install --no-install-recommends -y \
+          libva-amdgpu-dev \
+          libdrm-dev \
+          mesa-amdgpu-va-drivers \
+          && \
+      apt-get clean && rm -rf /var/lib/apt/lists/* && \
+      export PKG_CONFIG_PATH=/opt/amdgpu/lib/x86_64-linux-gnu/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} && \
+      ffmpeg_config_flags="$ffmpeg_config_flags \
+          --enable-vaapi \
+          --enable-libdrm \
       "; \
     fi && \
     git clone -b n8.0.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git ffmpeg && \
@@ -102,6 +117,19 @@ RUN apt-get update && \
         && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Install platform-specific apt dependencies
+ARG ROCM_VERSION=false
+RUN if [ "$ROCM_VERSION" != "false" ] ; then \
+        apt-get update && \
+        apt-get install --no-install-recommends -y \
+            # For ffmpeg
+            libva2-amdgpu \
+            libva-amdgpu-drm2 \
+            mesa-amdgpu-va-drivers \
+            vainfo \
+            && \
+        apt-get clean && rm -rf /var/lib/apt/lists/*; \
+    fi
 COPY --from=ffmpeg-build /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
 
 # Install pip packages directly so that the user can create
