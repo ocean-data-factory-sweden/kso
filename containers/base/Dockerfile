@@ -7,6 +7,7 @@ ARG FFMPEG_BASE_IMAGE=docker.io/ubuntu:latest
 FROM ${FFMPEG_BASE_IMAGE} AS ffmpeg-build
 
 ARG DEBIAN_FRONTEND=noninteractive
+ARG FFMPEG_DIR=/opt/ffmpeg
 
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
@@ -28,11 +29,13 @@ RUN apt-get update && \
         && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Build ffmpeg with CUDA support from source
-# TODO: Add ROCm support
+# Build ffmpeg with CUDA and ROCm support from source
 ARG CUDA_VERSION=false
-RUN mkdir -p /opt/ffmpeg && \
+ARG ROCM_VERSION=false
+RUN mkdir -p /opt/src && \
+    cd /opt/src && \
     ffmpeg_config_flags="\
+        --prefix="${FFMPEG_DIR}" \
         --enable-openssl --enable-version3 \
         --disable-doc \
         --disable-ffplay \
@@ -54,15 +57,27 @@ RUN mkdir -p /opt/ffmpeg && \
           --extra-ldflags=-L/usr/local/cuda/lib64 \
       "; \
     fi && \
+    if [ "$ROCM_VERSION" != "false" ] ; then \
+      # Install vaapi if ROCm is enabled
+      apt-get update -qy && \
+      apt-get install --no-install-recommends -y \
+          libva-amdgpu-dev \
+          libdrm-dev \
+          mesa-amdgpu-va-drivers \
+          && \
+      apt-get clean && rm -rf /var/lib/apt/lists/* && \
+      export PKG_CONFIG_PATH=/opt/amdgpu/lib/x86_64-linux-gnu/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH} && \
+      ffmpeg_config_flags="$ffmpeg_config_flags \
+          --enable-vaapi \
+          --enable-libdrm \
+      "; \
+    fi && \
     git clone -b n8.0.1 --depth 1 https://github.com/FFmpeg/FFmpeg.git ffmpeg && \
     cd ffmpeg && \
     echo "ffmpeg configure flags: $ffmpeg_config_flags" && \
     ./configure $ffmpeg_config_flags && \
     make -j $(nproc) && \
-    make install && \
-    make clean && \
-    cd .. && \
-    rm -rf ffmpeg
+    make install
 
 
 # ----------------------------------------------------------------------
@@ -102,7 +117,24 @@ RUN apt-get update && \
         && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ffmpeg-build /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
+# Install platform-specific apt dependencies
+ARG ROCM_VERSION=false
+RUN if [ "$ROCM_VERSION" != "false" ] ; then \
+        apt-get update && \
+        apt-get install --no-install-recommends -y \
+            # For ffmpeg
+            libva2-amdgpu \
+            libva-amdgpu-drm2 \
+            mesa-amdgpu-va-drivers \
+            vainfo \
+            && \
+        apt-get clean && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# Copy ffmpeg
+ARG FFMPEG_DIR=/opt/ffmpeg
+COPY --from=ffmpeg-build $FFMPEG_DIR/bin $FFMPEG_DIR/bin
+ENV PATH=$FFMPEG_DIR/bin:$PATH
 
 # Install pip packages directly so that the user can create
 # their own venv with --system-site-packages to use the packages in the container
