@@ -11,6 +11,7 @@ from .data_preprocessing import (
 )
 import yaml
 import os
+import tempfile
 import sys
 from pathlib import Path
 from dataclasses import dataclass
@@ -116,7 +117,11 @@ class ProjectManager:
                 "data_path": {
                     "ultralytics_data_path": str(ultralytics_data),
                 },
+                "datasets": [],
                 "models": [],
+                "inferences": [],
+                "analyses": [],
+                "publications": [],
                 "tracking": {
                     "mlflow": {
                         "experiment_name": None,
@@ -240,6 +245,140 @@ class ProjectManager:
             yaml.safe_dump(data, d, sort_keys=False, default_flow_style=False)
         logging.info("data was dumped successfully")
         return data
+
+    def _atomic_yaml_dump(self, yaml_path: str | Path, data: Dict[str, Any]):
+        """
+        Write the project YAML so that a failure cannot damage the old file.
+
+        The data is serialised into a temporary file in the same directory and
+        only then moved over the original. The move is atomic on a single
+        filesystem, so a serialisation error leaves the original untouched
+        rather than truncated.
+        """
+        yaml_path = Path(yaml_path).expanduser()
+        handle_id, tmp_name = tempfile.mkstemp(
+            dir=str(yaml_path.parent),
+            prefix=yaml_path.name,
+            suffix=".tmp",
+        )
+        tmp_path = Path(tmp_name)
+        try:
+            with os.fdopen(handle_id, "w", encoding="utf-8") as handle:
+                yaml.safe_dump(data, handle, sort_keys=False, default_flow_style=False)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_path, yaml_path)
+        except Exception:
+            tmp_path.unlink(missing_ok=True)
+            raise
+        return data
+
+    @staticmethod
+    def _find_entry(records: list, collection: str, key: str, name: str):
+        """
+        Return the index of the entry whose identifier is name, or None.
+
+        Shared by record and add_model so both find an entry the same way.
+        A duplicated identifier raises, so an entry is never picked by position.
+        """
+        names = []
+        for item in records:
+            if not isinstance(item, dict):
+                raise TypeError(
+                    f"every entry in '{collection}' must be a mapping, "
+                    f"found {type(item).__name__}."
+                )
+            names.append(item.get(key))
+
+        if names.count(name) > 1:
+            raise ValueError(
+                f"'{collection}' already holds more than one entry named "
+                f"'{name}'. Resolve the duplicate in the project file first."
+            )
+        return names.index(name) if name in names else None
+
+    def record(
+        self,
+        project: Project,
+        collection: str,
+        entry: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Write one entry into a flat collection in the project YAML.
+
+        The collections are datasets, models, inferences, analyses and
+        publications. Each is written by the pipeline step that owns it, and
+        the caller supplies the complete record.
+
+        An entry is identified by "model_name" in models and by "name" in
+        every other collection. Recording an entry whose identifier already
+        exists replaces that entry completely, so re-running a step updates
+        its record instead of appending a duplicate. Everything else in the
+        file is preserved.
+
+        model_name is the one identifier for a model, here and in add_model.
+        It must already be in the sanitised form add_model stores, so both
+        methods always address the same entry.
+
+        Only one writer should touch the project file at a time. Owning a
+        collection is not protection against a concurrent write to the file.
+        """
+        collections = (
+            "datasets",
+            "models",
+            "inferences",
+            "analyses",
+            "publications",
+        )
+        if not project or not isinstance(project, Project):
+            raise ValueError("'project' must be a Project instance.")
+        if collection not in collections:
+            raise ValueError(f"'collection' must be one of {collections}.")
+        if not entry or not isinstance(entry, dict):
+            raise TypeError("'entry' must be a non-empty dictionary.")
+
+        key = "model_name" if collection == "models" else "name"
+        name = entry.get(key)
+        if not name or not isinstance(name, str):
+            raise ValueError(f"'entry' must carry a non-empty '{key}'.")
+        if collection == "models" and name != self.sanitized_name(name):
+            raise ValueError(
+                f"model_name '{name}' is not in sanitised form. Use "
+                f"'{self.sanitized_name(name)}', the name add_model stores."
+            )
+        if collection == "models" and not entry.get("model_path"):
+            # load_project reads model_path for every model in the list, so an
+            # entry without one would break loading the project afterwards.
+            raise ValueError("a models entry must carry a non-empty 'model_path'.")
+
+        yaml_path = Path(project.Config_file_path).expanduser()
+        if not yaml_path.exists():
+            raise FileNotFoundError(f"{yaml_path} not found.")
+
+        data = self.yaml_data_retrieve(yaml_path=yaml_path)
+        if not isinstance(data, dict):
+            raise TypeError(f"{yaml_path} does not contain a mapping.")
+
+        # An absent collection is a legacy file, which is fine. A collection
+        # holding something other than a list is a real problem.
+        records = data.get(collection)
+        if records is None:
+            records = []
+        if not isinstance(records, list):
+            raise TypeError(f"'{collection}' in {yaml_path} is not a list.")
+
+        index = self._find_entry(records, collection, key, name)
+        if index is None:
+            records.append(entry)
+            action = "added"
+        else:
+            records[index] = entry
+            action = "updated"
+
+        data[collection] = records
+        self._atomic_yaml_dump(yaml_path=yaml_path, data=data)
+        logging.info(f"{collection}: {name} {action} in {yaml_path}")
+        return entry
 
     def add_data(
         self,
@@ -377,6 +516,11 @@ class ProjectManager:
 
         Rules for `model`:
         - Absolute path ending with '.pt': accepted if it exists.
+
+        A model is identified by its sanitised model_name, as in record.
+        Adding a name that already exists with the same weights reuses that
+        entry. Adding it with different weights raises. Two models may start
+        from the same weights under different names.
         """
         if not project or not isinstance(project, Project):
             raise ValueError("'Project_path' must be a Project instance.")
@@ -399,7 +543,6 @@ class ProjectManager:
         index = -1
 
         data = self.yaml_data_retrieve(yaml_path)
-        model_paths = [m["model_path"] for m in data["models"]]
         if model_path and model_path.endswith(".pt"):
             candidate = Path(model_path).expanduser()
 
@@ -410,15 +553,22 @@ class ProjectManager:
                     model_trail = (home_dir / candidate).resolve()
             else:
                 model_trail = candidate
-            """update project instance with provided model or last added model"""
-            project.model_path = str(model_trail)
 
-            """CHECK IF THE MODEL ALREADY ADDED"""
-            if str(model_trail) in model_paths:
-                index = model_paths.index(str(model_trail))
-                """update project instance with provided model or last added model"""
-                project.model_name = data["models"][index]["model_name"]
-                logging.info(f"model {str(model_trail)} already exists")
+            """CHECK IF THE MODEL ALREADY ADDED, by name as in record()"""
+            existing = self._find_entry(
+                data["models"], "models", "model_name", model_name
+            )
+            if existing is not None:
+                known_path = data["models"][existing]["model_path"]
+                if (
+                    Path(str(known_path)).expanduser().resolve()
+                    != Path(model_trail).resolve()
+                ):
+                    raise ValueError(
+                        f"model_name '{model_name}' is already used in this "
+                        f"project for {known_path}. Choose a new model_name."
+                    )
+                logging.info(f"model {model_name} already exists")
             else:
                 # filter None values out before appending or before saving to config
                 data["models"] = [
@@ -430,8 +580,9 @@ class ProjectManager:
                 data["models"].append(
                     {"model_name": model_name, "model_path": str(model_trail)}
                 )
-                """update project instance with provided model name or last added model name"""
-                project.model_name = model_name
+            """update project instance with the provided model"""
+            project.model_name = model_name
+            project.model_path = str(model_trail)
 
         elif model_path and not model_path.endswith(".pt"):
             raise ValueError("model is not valid, must end with '.pt'")
