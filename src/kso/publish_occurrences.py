@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
@@ -126,9 +126,9 @@ def load_publication_config(source: Any) -> PublicationConfig:
         data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
 
     pub = data.get("publication", data) or {}
-    known = set(PublicationConfig.__dataclass_fields__)
+    known = {f.name for f in fields(PublicationConfig)}
     if unknown := set(pub) - known:
-        logger.warning("Ignoring unknown publication keys: %s", sorted(unknown))
+        logger.warning(f"Ignoring unknown publication keys: {sorted(unknown)}")
     kwargs = {k: v for k, v in pub.items() if k in known}
     kwargs.setdefault("dataset_name", data.get("project_name", "kso-dataset"))
     kwargs.setdefault("dataset_prefix", _slug(kwargs["dataset_name"]))
@@ -190,7 +190,7 @@ def _worms_taxon(name: str, aphia_id: int) -> Dict[str, Any]:
     try:
         rec = _pyworms().aphiaRecordByAphiaID(aphia_id)
     except Exception as exc:  # network
-        logger.error("WoRMS lookup failed for %s (AphiaID %s): %s", name, aphia_id, exc)
+        logger.error(f"WoRMS lookup failed for {name} (AphiaID {aphia_id}): {exc}")
         return _unpublishable(name, f"WoRMS lookup failed: {exc}")
     if not rec:
         return _unpublishable(name, f"AphiaID {aphia_id} not found in WoRMS")
@@ -198,12 +198,8 @@ def _worms_taxon(name: str, aphia_id: int) -> Dict[str, Any]:
     valid_id = rec.get("valid_AphiaID") or aphia_id
     if rec.get("status") != "accepted" and rec.get("valid_name"):
         logger.warning(
-            "AphiaID %s (%s) is %s; publishing the accepted name %s (AphiaID %s)",
-            aphia_id,
-            rec.get("scientificname"),
-            rec.get("status"),
-            rec["valid_name"],
-            valid_id,
+            f"AphiaID {aphia_id} ({rec.get('scientificname')}) is {rec.get('status')}; "
+            f"publishing the accepted name {rec['valid_name']} (AphiaID {valid_id})"
         )
     taxon = {
         "publishable": True,
@@ -242,7 +238,7 @@ def suggest_aphia_ids(class_names: Iterable[str]) -> pd.DataFrame:
             [_strip_open_nomenclature(n) for n in names], marine_only=False
         )
     except Exception as exc:
-        logger.warning("WoRMS match failed: %s", exc)
+        logger.warning(f"WoRMS match failed: {exc}")
         matches = [[] for _ in names]
 
     rows = []
@@ -317,7 +313,7 @@ def build_events(
         start = _parse_datetime(meta.get("event_start"), video)
         times = pd.to_numeric(group[time_col], errors="coerce").dropna()
         if times.empty:
-            logger.warning("Video %s has no usable %s values; skipped", video, time_col)
+            logger.warning(f"Video {video} has no usable {time_col} values; skipped")
             continue
         t_min, t_max = float(times.min()), float(times.max())
         edges = (
@@ -408,9 +404,8 @@ def _sampled_frame_times(group, t_min, t_max, fps, stride, frame_col, video):
         interval = float(stride) / float(fps)
         return np.arange(t_min, t_max + interval, interval)
     logger.warning(
-        "Video %s: no frame column and no fps, so the sampled-frame grid is unknown "
-        "and mean cover will be averaged over detected frames only.",
-        video,
+        f"Video {video}: no frame column and no fps, so the sampled-frame grid is "
+        "unknown and mean cover will be averaged over detected frames only."
     )
     return None
 
@@ -452,9 +447,8 @@ def _interpolate_track(track: Sequence[Mapping[str, float]], seconds: float):
 def _parse_datetime(value, video: str):
     if value in (None, ""):
         logger.warning(
-            "Deployment %s has no event_start; eventDate will be empty and GBIF "
-            "will reject or downgrade the records.",
-            video,
+            f"Deployment {video} has no event_start; eventDate will be empty and "
+            "GBIF will reject or downgrade the records."
         )
         return None
     if isinstance(value, datetime):
@@ -563,10 +557,9 @@ def format_to_gbif_occurrence(
             continue
         records.append(_occurrence_row(row, taxon, name, pub, quantity_type))
     if dropped:
+        detail = "; ".join(f"{k} ({v})" for k, v in sorted(dropped.items()))
         logger.warning(
-            "Excluded %d class(es) with no taxonomic identifier: %s",
-            len(dropped),
-            "; ".join(f"{k} ({v})" for k, v in sorted(dropped.items())),
+            f"Excluded {len(dropped)} class(es) with no taxonomic identifier: {detail}"
         )
 
     occ = pd.DataFrame(records, columns=OCCURRENCE_TERMS)
@@ -683,7 +676,7 @@ def _assign_events(df, events, video_col, time_col):
     for video, group in df.groupby(video_col, sort=False):
         video_events = events[events["video"] == str(video)].sort_values("bin_start_s")
         if video_events.empty:
-            logger.warning("No events for video %s; its rows are skipped", video)
+            logger.warning(f"No events for video {video}; its rows are skipped")
             continue
         ids = video_events["eventID"].tolist()
         edges = video_events["bin_start_s"].tolist() + [
@@ -796,9 +789,6 @@ def write_ipt_package(
     written["provenance"].write_text(
         json.dumps(provenance, indent=2, default=str), encoding="utf-8"
     )
-    logger.info(
-        "Wrote IPT source files to %s: %s",
-        out,
-        ", ".join(p.name for p in written.values()),
-    )
+    filenames = ", ".join(p.name for p in written.values())
+    logger.info(f"Wrote IPT source files to {out}: {filenames}")
     return written
