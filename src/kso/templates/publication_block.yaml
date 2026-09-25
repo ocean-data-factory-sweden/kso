@@ -1,0 +1,87 @@
+# ---------------------------------------------------------------------------
+# publication: the metadata the GBIF/OBIS export needs.
+#
+# In KSO1 this lived in the SQLite database (the sites, movies and species
+# tables). KSO2 has no database, so it lives here, next to the rest of the
+# project. Paste this block into <project>.project.yaml and fill it in.
+#
+# Nothing here is inferable from the detections CSV - the model outputs carry
+# only video name, frame, timestamp, class and geometry. Every field below is
+# something a person has to know about the survey.
+# ---------------------------------------------------------------------------
+publication:
+  # --- Dataset identity (becomes the IPT resource metadata) ---
+  dataset_name: "Stenshuvud snorkel transect - benthic cover"
+  # Prefix for every occurrenceID and eventID. Must be unique to your
+  # organisation and NEVER change once published: GBIF treats a changed
+  # occurrenceID as a deleted record plus a new one.
+  dataset_prefix: "kso-skane-2024"
+  institution_code: "WILDLIFE.AI"
+  collection_code: "KSO-SEG"
+  license: "http://creativecommons.org/licenses/by/4.0/legalcode"
+  recorded_by: "Louis Fiorina"
+
+  # --- Defaults, overridable per deployment ---
+  country_code: "SE"            # ISO 3166-1 alpha-2
+  locality: "Stenshuvud, Skane, Sweden"
+  geodetic_datum: "WGS84"
+  coordinate_uncertainty_m: 30
+  minimum_depth_m: 0.5
+  maximum_depth_m: 3.0
+  sampling_protocol: >-
+    Snorkel video transect, automated instance segmentation of benthic cover
+
+  # --- Model provenance -> identifiedBy / identificationRemarks ---
+  basis_of_record: "MachineObservation"
+  model_name: "yolo11n-seg"
+  model_version: "Skane1_stride2_conf50"
+  # Zenodo DOI of the published weights, once NB05 has minted it. This is the
+  # link that lets a GBIF user see which model made the identification.
+  model_doi: ""
+  confidence_threshold: 0.5
+
+  # --- One entry per video, keyed by the `video` value in the CSVs ---
+  deployments:
+    GX010009_fixed:
+      # ISO 8601 with a UTC offset. This is the clock time the footage STARTS;
+      # each event's date is derived by adding its timestamp_s offset.
+      event_start: "2024-08-15T10:12:00+02:00"
+
+      # Either a fixed position for the whole deployment...
+      decimal_latitude: 55.6650
+      decimal_longitude: 14.2760
+
+      # ...or a GPS track, which is much better for a transect: each time-binned
+      # event then gets its own interpolated position instead of all records
+      # piling onto one point. t is seconds from the start of the video.
+      # GoPro footage carries this in its GPMF telemetry - see NB04 notes.
+      gps_track:
+        - {t: 0.0,   lat: 55.6650, lon: 14.2760}
+        - {t: 300.0, lat: 55.6664, lon: 14.2791}
+        - {t: 545.0, lat: 55.6679, lon: 14.2823}
+      gps_uncertainty_m: 10
+
+      # Optional per-deployment overrides
+      # country_code: "SE"
+      # locality: "Stenshuvud south transect"
+      # minimum_depth_m: 0.5
+      # maximum_depth_m: 3.0
+      # footprint_wkt: "LINESTRING (14.2760 55.6650, 14.2823 55.6679)"
+      associated_media: ""   # Zenodo DOI/URL of the footage or the figure
+
+  # --- Class list -> taxonomy -------------------------------------------------
+  # AphiaID (WoRMS) per model class. Resolve with suggest_aphia_ids() in NB04,
+  # then CHECK each match by eye before trusting it.
+  #
+  # Classes that are morphotypes or functional groups rather than taxa get an
+  # explicit null. They are excluded from the occurrence export - GBIF and OBIS
+  # need a name that resolves to a taxon - but they are still in the coverage
+  # table and belong in the Zenodo package, which is the right home for them.
+  class_taxonomy:
+    Fucus sp.: 144129          # genus Fucus, verified against WoRMS
+    Algal turf: null           # functional group, no taxon
+    Filamentous algae: null    # functional group, no taxon
+
+  # Optional: paste resolved WoRMS records here to let the export run with no
+  # network (LUMI compute nodes have none). NB04 can write this for you.
+  taxon_cache: {}

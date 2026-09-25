@@ -20,6 +20,7 @@ azure-core==1.38.0
 azure-storage-blob==12.28.0
 azure-storage-file-datalake==12.23.0
 babel==2.17.0
+backports.functools-lru-cache==2.0.0
 beautifulsoup4==4.14.3
 black==24.4.2
 bleach==6.3.0
@@ -210,6 +211,7 @@ python-dotenv==1.2.1
 python-json-logger==4.0.0
 python-magic==0.4.27
 pytz==2025.2
+pyworms @ git+https://github.com/iobis/pyworms.git@3e4584f0d928f71fd013843767e623f1a4dca61f
 pyyaml==6.0.3
 pyzmq==27.1.0
 redo==3.0.0
