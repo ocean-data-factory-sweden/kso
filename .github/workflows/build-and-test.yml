@@ -43,7 +43,7 @@ jobs:
           is_latest=$is_tag
 
           # Platforms
-          platforms=(cpu cuda rocm)
+          platforms=(cpu cuda rocm edito)
 
           # Names of the images
           base_tag=dev
@@ -147,6 +147,18 @@ jobs:
                 ffmpeg_base_image=docker.io/rocm/dev-ubuntu-$ubuntu_version:$rocm_version.$rocm_patch_version
                 base_image_base=docker.io/rocm/dev-ubuntu-$ubuntu_version:$rocm_version.$rocm_patch_version
                 python_requirements=requirements_rocm${rocm_version}.txt
+                ;;
+
+              edito)
+                cuda_version=12.6
+                cuda_patch_version=3
+                rocm_version=false
+                test=false
+                # onyxia-base gpu is based on nvidia/cuda:12.6.3-cudnn-devel-ubuntu24.04
+                platform_tag=edito-ubuntu24.04
+                base_image_base=docker.io/inseefrlab/onyxia-base:latest-gpu-2026.08.24
+                ffmpeg_base_image=$base_image_base
+                python_requirements=requirements_cuda${cuda_version}.txt
                 ;;
             esac
 
@@ -271,20 +283,20 @@ jobs:
         uses: ./.github/actions/increase-docker-space
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: '${{ github.actor }}'
           password: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and push base image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         if: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['build_base_image'] == 'true' }}
         with:
           file: containers/base/Dockerfile
@@ -370,20 +382,20 @@ jobs:
         uses: ./.github/actions/increase-docker-space
 
       - name: Log in to the Container registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: '${{ github.actor }}'
           password: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and push final image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         if: ${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['build_final_image'] == 'true' }}
         with:
           file: containers/final/Dockerfile
