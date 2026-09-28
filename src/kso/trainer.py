@@ -204,7 +204,15 @@ class TrainingManager:
 
             return re.sub(r"[(B)]", "", yolo_result)
 
-        with mlflow.start_run(run_name=model_name):
+        with mlflow.start_run(run_name=model_name) as run:
+            run_id = run.info.run_id
+            # rename the run by the model name and the run ID
+            ml = mlflow.MlflowClient(tracking_uri=f"sqlite:///{mlflowdb_path}")
+            ml.set_tag(
+                run.info.run_id,
+                "mlflow.runName",
+                f"{model_name}-{run.info.run_id[:8]}",
+            )
 
             results = yolo_model.train(
                 data=data_path, name=model_name, epochs=epochs, imgsz=imgsz, **kwargs
