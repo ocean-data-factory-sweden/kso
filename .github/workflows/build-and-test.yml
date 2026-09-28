@@ -29,6 +29,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Generate build info
+          build_info=$(git show -s --format="BuildDate: $(date -u -Iseconds)\\nCommit: %H\\nAuthor: %an <%ae>\\nAuthorDate: %aI\\nSubject: %s")
+
           # Check whether workflow was triggered by a fork
           if [[ "${{ github.repository }}" == "ocean-data-factory-sweden/kso" ]]; then
             is_fork=false
@@ -242,6 +245,7 @@ jobs:
               final_image \
               final_image_tags \
               python_requirements \
+              build_info \
             ; do
               jq_inline --arg p $platform --arg k "$k" --arg v "${!k}" '.[$p][$k]=$v' plan.json
             done
@@ -313,6 +317,7 @@ jobs:
             CUDA_VERSION=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['cuda_version'] }}
             ROCM_VERSION=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['rocm_version'] }}
             PYTHON_REQUIREMENTS=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['python_requirements'] }}
+            BUILD_INFO=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['build_info'] }}
 
   lint:
     name: Lint
@@ -407,3 +412,4 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['base_image'] }}
             CUDA=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['cuda'] }}
+            BUILD_INFO=${{ fromJSON(needs.plan.outputs.plan)[matrix.platform]['build_info'] }}
