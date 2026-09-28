@@ -161,3 +161,7 @@ RUN if [ "$ROCM_VERSION" != "false" ] ; then \
       bash install_kdb_files_for_pytorch_wheels.sh && \
       rm install_kdb_files_for_pytorch_wheels.sh ; \
     fi
+
+# Include info in the image
+ARG BUILD_INFO
+RUN printf '%b\n' "$BUILD_INFO" > /opt/base-image-info.txt

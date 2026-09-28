@@ -38,6 +38,10 @@ RUN pip check || { \
     exit 1; \
 }
 
+# Include info in the image
+ARG BUILD_INFO
+RUN printf '%b\n' "$BUILD_INFO" > /opt/final-image-info.txt
+
 # Set run environment
 USER ${NB_USER}
 WORKDIR /opt/kso
