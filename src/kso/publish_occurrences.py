@@ -14,11 +14,12 @@ Typical use, from NB04::
     events = build_events(cov, pub, bin_seconds=30, stride=STRIDE)
     occ = format_to_gbif_occurrence(cov, events, pub, taxonomy)
     validate_occurrences(occ)
-    write_ipt_package(occ, events, out_dir, pub, taxonomy)
+    write_ipt_package(occ, events, out_dir, pub, taxonomy, source=cov_path)
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -321,7 +322,9 @@ def build_events(
             if bin_seconds is None
             else _bin_edges(t_min, t_max, float(bin_seconds))
         )
-        grid = _sampled_frame_times(group, t_min, t_max, fps, stride, frame_col, video)
+        grid = _sampled_frame_times(
+            group, t_min, t_max, fps, stride, frame_col, time_col, video
+        )
         parent = f"{pub.dataset_prefix}:{video}"
 
         # per-deployment constants, falling back to the YAML-level defaults
@@ -339,14 +342,17 @@ def build_events(
             "associatedMedia": meta.get("associated_media", ""),
         }
         for b0, b1 in zip(edges[:-1], edges[1:]):
-            lat, lon, uncertainty = _position_for(meta, b0, b1, pub)
-            e0 = start + timedelta(seconds=b0) if start else None
-            e1 = start + timedelta(seconds=b1) if start else None
-            n_sampled = (
-                max(1, int(((grid >= b0) & (grid < b1)).sum()))
-                if grid is not None
-                else None
-            )
+            # The first and last bins can run past the ends of the video, so
+            # time, effort and position use only the part the video covers.
+            s0, s1 = max(b0, t_min), min(b1, t_max)
+            lat, lon, uncertainty = _position_for(meta, s0, s1, pub)
+            e0 = start + timedelta(seconds=s0) if start else None
+            e1 = start + timedelta(seconds=s1) if start else None
+            n_sampled = None
+            if grid is not None:
+                # the last bin keeps its closing edge, as in _assign_events
+                upper = grid <= b1 if b1 == edges[-1] else grid < b1
+                n_sampled = max(1, int(((grid >= b0) & upper).sum()))
             rows.append(
                 {
                     **fixed,
@@ -361,7 +367,7 @@ def build_events(
                     "year": e0.year if e0 else "",
                     "month": e0.month if e0 else "",
                     "day": e0.day if e0 else "",
-                    "sampleSizeValue": round(b1 - b0, 3),
+                    "sampleSizeValue": round(s1 - s0, 3),
                     "samplingEffort": (
                         f"{n_sampled} frames analysed (every {stride} frame(s) of video)"
                         if n_sampled
@@ -378,31 +384,46 @@ def build_events(
         raise ValueError(
             "No events were built - check the video column and deployment metadata."
         )
-    return pd.DataFrame(rows)
+    events = pd.DataFrame(rows)
+    # Read back by write_ipt_package, so provenance.json records the settings
+    # that were actually used rather than ones typed in a second time.
+    events.attrs["kso_export"] = {
+        "bin_seconds": bin_seconds,
+        "stride": stride,
+        "fps": fps,
+        # False means frames with no detections were left out of mean cover
+        "empty_frames_counted": bool(events["nFramesSampled"].notna().all()),
+    }
+    return events
 
 
-def _sampled_frame_times(group, t_min, t_max, fps, stride, frame_col, video):
+def _sampled_frame_times(group, t_min, t_max, fps, stride, frame_col, time_col, video):
     """Timestamps of every frame the model looked at, detections or not.
 
-    Built from the frame column when there is one, with the effective frame
-    rate measured from the data. That avoids the nominal-vs-actual fps trap:
-    GoPro footage labelled 30 fps is really 29.97, and assuming 30 inflates
-    every event's frame count by ~0.1%.
+    Built from the frame column when there is one. The frames run from the
+    first frame in the table to the last, not from frame 0, because a clip cut
+    from a longer video keeps that video's timestamps. Frames in the table keep
+    their own timestamps and the empty frames between them are filled in, so
+    no frame rate has to be assumed (GoPro "30 fps" is really 29.97).
     """
     if not stride:
         return None
     if frame_col in group.columns:
-        frames = pd.to_numeric(group[frame_col], errors="coerce").dropna()
-        if not frames.empty and t_max > t_min:
-            fps_effective = (frames.max() - frames.min()) / (t_max - t_min)
-            if fps_effective > 0:
-                return (
-                    np.arange(0, int(frames.max()) + int(stride), int(stride))
-                    / fps_effective
-                )
+        pairs = (
+            group[[frame_col, time_col]]
+            .apply(pd.to_numeric, errors="coerce")
+            .dropna()
+            .drop_duplicates(frame_col)
+            .sort_values(frame_col)
+        )
+        if len(pairs) > 1:
+            frames = pairs[frame_col].to_numpy()
+            sampled = np.arange(frames[0], frames[-1] + 1, int(stride))
+            return np.interp(sampled, frames, pairs[time_col].to_numpy())
     if fps:
         interval = float(stride) / float(fps)
-        return np.arange(t_min, t_max + interval, interval)
+        # half an interval of slack, so rounding cannot add a frame past the end
+        return np.arange(t_min, t_max + interval / 2, interval)
     logger.warning(
         f"Video {video}: no frame column and no fps, so the sampled-frame grid is "
         "unknown and mean cover will be averaged over detected frames only."
@@ -491,12 +512,17 @@ def format_to_gbif_occurrence(
     min_frames: int = 1,
     quantity_basis: str = "event_mean",
     offline: bool = False,
+    count_individuals: bool = False,
 ) -> pd.DataFrame:
     """One Darwin Core record per (event x class) the model saw.
 
     Coverage tables carry ``organismQuantity`` as mean percentage cover over
-    the event; detection tables carry ``individualCount`` as the peak number
-    of instances in any one frame.
+    the event.
+
+    ``individualCount`` stays empty unless ``count_individuals=True``. Only
+    turn it on when each detection is one animal, such as fish from an object
+    detection model; it is then the most seen in any one frame (MaxN).
+    Segmentation instances are patches of habitat or algae, not individuals.
 
     ``quantity_basis="event_mean"`` (default) averages over every frame
     sampled, counting frames without the class as zero - the figure that
@@ -521,19 +547,21 @@ def format_to_gbif_occurrence(
         )
 
     assigned = _assign_events(work, events, video_col, time_col)
-    # Peak instances in any one frame: the coverage table counts them; a
-    # detections table has one row per instance, so count rows per frame.
-    if "n_instances" in assigned:
-        assigned["__instances"] = pd.to_numeric(
-            assigned["n_instances"], errors="coerce"
-        )
-    else:
-        assigned["__instances"] = assigned.groupby(["eventID", class_col, time_col])[
-            time_col
-        ].transform("size")
 
     # nunique, not size: a detections table has several rows per frame
-    aggs = {"n_frames": (time_col, "nunique"), "peak_instances": ("__instances", "max")}
+    aggs = {"n_frames": (time_col, "nunique")}
+    if count_individuals:
+        # Most instances in any one frame: the coverage table counts them; a
+        # detections table has one row per instance, so count rows per frame.
+        if "n_instances" in assigned:
+            assigned["__instances"] = pd.to_numeric(
+                assigned["n_instances"], errors="coerce"
+            )
+        else:
+            assigned["__instances"] = assigned.groupby(
+                ["eventID", class_col, time_col]
+            )[time_col].transform("size")
+        aggs["peak_instances"] = ("__instances", "max")
     if quantity_col:
         aggs.update(
             quantity_sum=(quantity_col, "sum"),
@@ -568,11 +596,19 @@ def format_to_gbif_occurrence(
             "No publishable occurrences - fill in publication.class_taxonomy "
             "with AphiaIDs for the taxa you can name."
         )
-        return occ
-    if occ["occurrenceID"].duplicated().any():
-        raise ValueError("Duplicate occurrenceIDs generated - this is a bug.")
-    occ = occ.astype(object).where(occ.notna(), "")
-    return occ.sort_values(["eventID", "scientificName"]).reset_index(drop=True)
+    else:
+        if occ["occurrenceID"].duplicated().any():
+            raise ValueError("Duplicate occurrenceIDs generated - this is a bug.")
+        occ = occ.astype(object).where(occ.notna(), "")
+        occ = occ.sort_values(["eventID", "scientificName"]).reset_index(drop=True)
+    # read back by write_ipt_package for provenance.json
+    occ.attrs["kso_export"] = {
+        "quantity_basis": quantity_basis,
+        "quantity": quantity_type if quantity_col else None,
+        "min_frames": min_frames,
+        "count_individuals": count_individuals,
+    }
+    return occ
 
 
 def _occurrence_row(row, taxon, class_name, pub, quantity_type) -> Dict[str, Any]:
@@ -659,8 +695,8 @@ def _resolve_quantity(df, quantity_col, quantity_type):
     The segmentation post-processing already merges overlapping instances of a
     class, so it is a true per-class share of the frame. ``area_frac`` from
     the detections table is deliberately not used: boxes of the same class
-    overlap, so summing them overstates cover. Detection tables get
-    individualCount instead; pass ``quantity_col`` explicitly to override.
+    overlap, so summing them overstates cover. Detection tables get no
+    quantity; pass ``quantity_col`` explicitly to override.
     """
     if quantity_col is not None:
         return quantity_col, quantity_type or "unspecified"
@@ -761,11 +797,15 @@ def write_ipt_package(
     out_dir: str | Path,
     pub: Optional[PublicationConfig] = None,
     taxonomy: Optional[Dict[str, Dict[str, Any]]] = None,
+    source: str | Path | None = None,
 ) -> Dict[str, Path]:
     """Write the tab-delimited source files to upload to the IPT.
 
     Not a finished Darwin Core Archive: the IPT builds that itself once the
     columns are mapped in its UI, and keeps the mapping and EML editable.
+
+    ``source`` is the detections or coverage table the export was built from.
+    If it is a file, its SHA-256 is recorded so the exact input can be checked.
     """
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -776,8 +816,19 @@ def write_ipt_package(
         events[[c for c in EVENT_TERMS if c in events]].to_csv(
             written["event"], sep="\t", index=False, encoding="utf-8"
         )
+    settings = {
+        **(events.attrs.get("kso_export", {}) if events is not None else {}),
+        **occ.attrs.get("kso_export", {}),
+    }
+    if not settings:
+        logger.warning(
+            "No export settings found on these tables, so provenance.json will "
+            "not record bin_seconds, stride or quantity_basis."
+        )
     provenance = {
         "generated_at": datetime.now().astimezone().isoformat(),
+        "source": _describe_source(source),
+        "settings": settings,
         "n_occurrences": int(len(occ)),
         "n_events": int(len(events)) if events is not None else 0,
         "publication": (
@@ -792,3 +843,16 @@ def write_ipt_package(
     filenames = ", ".join(p.name for p in written.values())
     logger.info(f"Wrote IPT source files to {out}: {filenames}")
     return written
+
+
+def _describe_source(source) -> Optional[Dict[str, str]]:
+    if source is None:
+        return None
+    path = Path(source)
+    if not path.is_file():
+        return {"path": str(source)}
+    with path.open("rb") as fh:
+        return {
+            "path": str(source),
+            "sha256": hashlib.file_digest(fh, "sha256").hexdigest(),
+        }
