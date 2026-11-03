@@ -42,12 +42,12 @@ KSO is transitioning to a clear, staged notebook pipeline. Stages **01–02** ar
 
 | # | Notebook | Description | Status |
 |--:|----------|-------------|--------|
-| 00 | 00_Data_Preparation.ipynb | Transfer footage to LUMI (optional), extract frames, build your image set for annotation in [BIIGLE](https://biigle.de), convert annotation CSV → YOLO. *Skip if you already have a YOLO dataset.* | 🔜 In development |
+| 00 | 00_Data_Preparation.ipynb | Transfer footage to LUMI (optional), extract frames, build your image set for annotation in [BIIGLE](https://biigle.de), convert annotation CSV → YOLO. *Skip if you already have a YOLO dataset.* | ✅ Stable  |
 | 01 | 01_Project_Setup.ipynb | Create a KSO2 project (`.project.yaml`), attach your YOLO dataset, configure tracking, and optionally run offline augmentation. | ✅ Stable |
 | 02 | 02_Train_and_Eval_Models.ipynb | Train or fine-tune a YOLO model, track runs with MLflow, and evaluate on the test set. | ✅ Stable |
-| 03 | 03_Inference.ipynb | Run inference or batch inference on new images or video; export detections (CSV + annotated media). | 🔜 In development |
-| 04 | 04_Analysis.ipynb | Summary statistics, maxN, per-class summaries, and visualizations. | 🚧 Planned |
-| 05 | 05_Publish_Models.ipynb | Package models and metadata; publish to Zenodo or Researchdata.se. | 🚧 Planned |
+| 03 | 03_Inference.ipynb | Run inference or batch inference on new images or video; export detections (CSV + annotated media). | ✅ Stable |
+| 04 | 04_Analysis.ipynb | Summary statistics, maxN, per-class summaries, and visualizations. | ✅ Stable  |
+| 05 | 05_Publish_Models.ipynb | Package models and metadata; publish to Zenodo or Researchdata.se. | ✅ Stable |
 
 ### Standalone Notebooks
 
