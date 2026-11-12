@@ -90,7 +90,7 @@ FROM ${BASE_IMAGE} AS python-build
 USER root
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG PYTHON_VERSION=3.12.14
+ARG PYTHON_VERSION=3.12.16
 ARG PYTHON_DIR=/opt/python
 
 RUN apt-get update && \
