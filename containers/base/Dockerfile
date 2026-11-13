@@ -90,7 +90,7 @@ FROM ${BASE_IMAGE} AS python-build
 USER root
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG PYTHON_VERSION=3.12.14
+ARG PYTHON_VERSION=3.12.16
 ARG PYTHON_DIR=/opt/python
 
 RUN apt-get update && \
@@ -206,6 +206,23 @@ ENV PATH=$FFMPEG_DIR/bin:$PATH
 ARG PYTHON_DIR=/opt/python
 COPY --from=python-build $PYTHON_DIR $PYTHON_DIR
 ENV PATH=$PYTHON_DIR/bin:$PATH
+
+# Replace outdated certificates in the base images
+RUN for CERT in \
+        "/home/onyxia/.TinyTeX/tlpkg/installer/curl/curl-ca-bundle.crt" \
+        "/usr/lib/python3/dist-packages/pip/_vendor/certifi/cacert.pem"; \
+    do \
+        if [ -f "$CERT" ]; then \
+            rm -vf "$CERT" && \
+            ln -vs "/etc/ssl/certs/ca-certificates.crt" "$CERT"; \
+        fi; \
+    done
+
+# Install safe pip as the default in Python 3.12.16 is too old
+# See https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
+ARG PIP_ROOT_USER_ACTION=ignore
+ARG PIP_NO_CACHE_DIR=1
+RUN pip install "pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70"
 
 # Check that all runtime dependencies are installed
 RUN python3 -c "import bz2, ctypes, lzma, readline, sqlite3, ssl, uuid, zlib; print('Runtime OK')"
