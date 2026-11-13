@@ -207,6 +207,17 @@ ARG PYTHON_DIR=/opt/python
 COPY --from=python-build $PYTHON_DIR $PYTHON_DIR
 ENV PATH=$PYTHON_DIR/bin:$PATH
 
+# Replace outdated certificates in the base images
+RUN for CERT in \
+        "/home/onyxia/.TinyTeX/tlpkg/installer/curl/curl-ca-bundle.crt" \
+        "/usr/lib/python3/dist-packages/pip/_vendor/certifi/cacert.pem"; \
+    do \
+        if [ -f "$CERT" ]; then \
+            rm -vf "$CERT" && \
+            ln -vs "/etc/ssl/certs/ca-certificates.crt" "$CERT"; \
+        fi; \
+    done
+
 # Install safe pip as the default in Python 3.12.16 is too old
 # See https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
 ARG PIP_ROOT_USER_ACTION=ignore
